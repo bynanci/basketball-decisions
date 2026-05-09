@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Build outputs
+frontend/dist/
+frontend/.vite/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local media and generated data
+backend/data/uploads/*
+backend/data/frames/*
+backend/data/results/*
+backend/data/projects/*
+!backend/data/uploads/.gitkeep
+!backend/data/frames/.gitkeep
+!backend/data/results/.gitkeep
+!backend/data/projects/.gitkeep
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
