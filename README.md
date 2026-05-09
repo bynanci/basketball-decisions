@@ -57,7 +57,7 @@ The frontend now supports the real local MP4 path through the backend APIs:
 5. Mark 4+ manual court keypoints in real image pixel coordinates.
 6. Save calibration so the backend computes a `cv2.findHomography` homography.
 7. Run backend tracking.
-8. View detection / track / projected-track counts and projected 2D court paths.
+8. View detection / track / projected-track counts and projected 2D court paths returned by the backend. The UI does not substitute demo tracks when backend results are absent.
 
 Decision Quiz scoring and quiz-builder workflows are intentionally not part of this MVP milestone.
 
@@ -132,7 +132,7 @@ From the UI:
 
 1. Open the tracking page for a project after extracting frames and saving calibration.
 2. Click **Run Tracking**.
-3. Review backend detection count, track count, projected track count, detector mode, the frame overlay, and the 2D court projection.
+3. Review backend detection count, track count, projected track count, detector mode, the frame overlay, and the 2D court projection. Before tracking runs, the page shows zero backend results and an explicit empty-state message rather than demo tracks.
 
 The tracking endpoint currently uses deterministic MVP detector/tracker logic, then projects image-space track points through the saved homography when calibration exists. The 2D court view renders backend `court_x` / `court_y` values as court feet in a `0 0 94 50` SVG viewBox.
 
