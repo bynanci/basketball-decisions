@@ -19,7 +19,8 @@ function trackPath(track: ProjectedPlayerTrack) {
 </script>
 
 <template>
-  <svg class="court" viewBox="0 0 94 50" role="img" aria-label="2D basketball court">
+  <figure class="court-figure">
+    <svg class="court" viewBox="0 0 94 50" role="img" aria-label="2D basketball court">
     <rect x="1" y="1" width="92" height="48" rx="1" />
     <line x1="47" y1="1" x2="47" y2="49" />
     <circle cx="47" cy="25" r="6" />
@@ -49,10 +50,16 @@ function trackPath(track: ProjectedPlayerTrack) {
     <g v-for="player in players ?? []" :key="player.id">
       <circle class="player" :class="player.team" :cx="player.x" :cy="player.y" r="1.6" />
     </g>
-  </svg>
+    </svg>
+    <figcaption>Projected backend court coordinates are rendered in court feet on a 94 × 50 ft viewBox.</figcaption>
+  </figure>
 </template>
 
 <style scoped>
+.court-figure {
+  margin: 0;
+}
+
 .court {
   background: #f8d49b;
   border-radius: 12px;
@@ -98,5 +105,10 @@ path,
 
 .player.unknown {
   fill: #64748b;
+}
+figcaption {
+  color: #64748b;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
 }
 </style>

@@ -96,3 +96,20 @@ button:disabled {
   background: #94a3b8;
   cursor: not-allowed;
 }
+
+.error-card {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #991b1b;
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+.error-card p {
+  margin: 0.35rem 0;
+}
+
+.error-card small {
+  color: #7f1d1d;
+}

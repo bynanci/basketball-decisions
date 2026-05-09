@@ -1,16 +1,16 @@
 # Basketball Decisions
 
-A minimal runnable monorepo for basketball-video decision experiments. The repo has a Vite + Vue 3 + TypeScript frontend and a FastAPI backend with stubbed pipeline modules for frame extraction, homography, player detection, tracking, and 2D court projection.
+A minimal runnable monorepo for basketball-video decision experiments. The repo has a Vite + Vue 3 + TypeScript frontend and a FastAPI backend with local JSON storage for projects, uploads, extracted frames, manual calibration, tracking, and projected 2D court paths.
 
 ## Repository layout
 
 ```text
 frontend/                 # Vite + Vue 3 + TypeScript app
   src/pages/              # Home, project, calibration, tracking pages
-  src/components/         # Video and overlay components
+  src/components/         # Video, calibration, tracking, and court components
 backend/                  # FastAPI app
-  app/api/                # Projects, videos, calibration, tracking routers
-  app/pipeline/           # Stub pipeline building blocks
+  app/api/                # Projects, videos, frames, calibration, tracking routers
+  app/pipeline/           # OpenCV frame extraction, homography, detector/tracker/projector building blocks
   data/                   # Local project/upload/frame/result storage
 ```
 
@@ -46,6 +46,21 @@ npm run dev
 
 Open <http://localhost:5173>. The Vite dev server proxies `/api` requests to `http://localhost:8000`.
 
+## Current MVP flow
+
+The frontend now supports the real local MP4 path through the backend APIs:
+
+1. Create a backend project.
+2. Upload an MP4.
+3. Extract frames with the OpenCV-backed frame extractor.
+4. Choose an extracted frame for calibration.
+5. Mark 4+ manual court keypoints in real image pixel coordinates.
+6. Save calibration so the backend computes a `cv2.findHomography` homography.
+7. Run backend tracking.
+8. View detection / track / projected-track counts and projected 2D court paths.
+
+Decision Quiz scoring and quiz-builder workflows are intentionally not part of this MVP milestone.
+
 ## 3. Upload a local MP4
 
 From the UI:
@@ -55,6 +70,8 @@ From the UI:
 3. Choose an `.mp4` file.
 4. Click **Create upload project**.
 
+The frontend creates the project with `POST /api/projects`, uploads the MP4 with `POST /api/projects/{project_id}/video/upload`, stores the returned backend `project_id` and `VideoAsset` in Pinia, and keeps a browser object URL only for local preview.
+
 Backend API example:
 
 ```bash
@@ -63,9 +80,21 @@ curl -X POST "http://localhost:8000/api/projects/${PROJECT_ID}/video/upload" \
   -F "file=@/absolute/path/to/video.mp4"
 ```
 
-Uploaded files are stored under the project directory in `backend/app/data/projects/`. This directory is intended for local development data and is ignored by git except for `.gitkeep`.
+Uploaded files are stored under `backend/data/projects/{project_id}/videos/`. This directory is intended for local development data and is ignored by git except for `.gitkeep` files.
 
-## 4. Create a project from a YouTube URL
+## 4. Extract frames
+
+From the project page, click **Extract Frames** after a video asset exists. The frontend calls:
+
+```http
+POST /api/projects/{project_id}/frames/extract
+```
+
+with `target_fps: 1` and `max_frames: 120`, then renders a thumbnail strip from the returned frame index. Each thumbnail links to calibration with `?frameIndex=<frame_index>`.
+
+The frame extractor is OpenCV-backed (`cv2.VideoCapture` plus sampled image writes), not a placeholder folder creator.
+
+## 5. Create a project from a YouTube URL
 
 YouTube source processing is only for videos you have the rights or permission to process. For MVP demos, prefer the local MP4 upload flow because it avoids optional downloader setup and third-party source availability issues.
 
@@ -74,7 +103,9 @@ From the UI:
 1. Open the home page.
 2. In **YouTube URL**, paste a YouTube watch URL.
 3. Check **I confirm I have the rights or permission to process this video.**
-4. Click **Create YouTube project**. The submit button stays disabled until the checkbox is selected.
+4. Click **Create YouTube project**.
+
+The frontend creates a backend project first, then calls `POST /api/projects/{project_id}/video/youtube` with `rights_confirmed: true`. If the optional downloader dependency such as `yt-dlp` is not installed, the endpoint returns `501 Not Implemented`; the UI displays a clear message telling the user to use local MP4 upload for the MVP flow.
 
 Backend API example:
 
@@ -85,47 +116,35 @@ curl -X POST "http://localhost:8000/api/projects/${PROJECT_ID}/video/youtube" \
   -d '{"url":"https://www.youtube.com/watch?v=VIDEO_ID","rights_confirmed":true}'
 ```
 
-If `rights_confirmed` is `false`, the endpoint returns `400 Bad Request`. If the optional downloader dependency such as `yt-dlp` is not installed, the endpoint returns `501 Not Implemented` with `debug_hint: "Install optional YouTube downloader or use local MP4 upload for MVP demo."` instead of pretending the video was processed.
+## 6. Manually mark court keypoints
 
-## 5. Manually mark court keypoints
+1. Create a project and upload an MP4.
+2. Extract frames on the project page.
+3. Click **Use for calibration** on a frame thumbnail.
+4. Mark at least 4 known court keypoints.
+5. Click **Save backend calibration**.
 
-1. Create or open a project in the frontend.
-2. Click **Calibrate court**.
-3. Use the calibration page as the placeholder interaction surface for court keypoints.
-4. Submit keypoints to the backend homography endpoint when wiring the UI to the API.
+Calibration clicks are saved in real image pixel coordinates, while court points remain in court feet on a 94 × 50 ft court. When `homography` is omitted, the backend estimates it with `cv2.findHomography` and returns the calibration plus reprojection error when available.
 
-Backend API example:
-
-```bash
-curl -X POST http://localhost:8000/api/calibration/homography \
-  -H "Content-Type: application/json" \
-  -d '{
-    "project_id":"demo",
-    "image_points":[{"x":100,"y":200},{"x":500,"y":200},{"x":100,"y":600},{"x":500,"y":600}],
-    "court_points":[{"x":0,"y":0},{"x":94,"y":0},{"x":0,"y":50},{"x":94,"y":50}]
-  }'
-```
-
-The homography module currently returns an identity matrix plus the submitted points.
-
-## 6. Run the tracking demo
+## 7. Run tracking and view projected court paths
 
 From the UI:
 
-1. Open a project.
-2. Click **Tracking demo**.
-3. Review the placeholder video track overlay and 2D court projection.
+1. Open the tracking page for a project after extracting frames and saving calibration.
+2. Click **Run Tracking**.
+3. Review backend detection count, track count, projected track count, detector mode, the frame overlay, and the 2D court projection.
+
+The tracking endpoint currently uses deterministic MVP detector/tracker logic, then projects image-space track points through the saved homography when calibration exists. The 2D court view renders backend `court_x` / `court_y` values as court feet in a `0 0 94 50` SVG viewBox.
 
 Backend API example:
 
 ```bash
-curl -X POST http://localhost:8000/api/tracking/demo \
+curl -X POST "http://localhost:8000/api/projects/${PROJECT_ID}/tracking/run" \
   -H "Content-Type: application/json" \
-  -d '{"project_id":"demo"}'
+  -d '{"project_id":"'"${PROJECT_ID}"'","confidence_threshold":0.25,"iou_threshold":0.3,"max_players":10}'
+
+curl "http://localhost:8000/api/projects/${PROJECT_ID}/tracks"
 ```
-
-The endpoint runs deterministic detector, tracker, and projector stubs so downstream UI integration can start before model work is complete.
-
 
 ## Future: Decision Quiz
 
@@ -137,15 +156,13 @@ The following Decision Quiz work is intentionally deferred beyond the MVP:
 - Wiring quiz prompts to coach annotations.
 - Handling multi-player decision contexts.
 
-## 7. Stub / TODO functionality
+## Current limitations / TODO functionality
 
-The following pieces are intentionally minimal placeholders:
+The following pieces are intentionally minimal:
 
-- **Frontend API integration**: forms currently create in-memory Pinia projects; wire them to the FastAPI endpoints next.
-- **Video playback source handling**: uploaded and YouTube videos are represented as metadata in the UI until storage URLs/streaming are added.
-- **Court keypoint editing**: calibration overlay displays seed points; click/drag creation and persistence are TODO.
-- **Frame extraction**: `frame_extractor.py` creates output folders but does not call OpenCV or ffmpeg yet.
-- **Homography estimation**: `homography.py` returns an identity matrix placeholder.
-- **Detection/tracking models**: `detector.py` and `tracker.py` return deterministic demo data.
-- **2D projection accuracy**: `projector.py` returns simple demo court coordinates instead of applying a real homography.
+- **Frontend API integration**: project creation, MP4 upload, YouTube metadata creation, frame extraction, calibration saving, tracking, and projected tracks are wired for the MVP flow; broader persistence/reload behavior is still limited by in-memory Pinia state.
+- **Video playback source handling**: uploaded videos are previewed with a browser object URL for the current session; production video streaming is not implemented.
+- **YouTube downloader**: optional `yt-dlp` support may be unavailable in local environments.
+- **Detection/tracking models**: `detector.py` and `tracker.py` remain deterministic MVP implementations, not production player models.
 - **Persistence model**: project JSON files are local dev storage, not a production database.
+- **Decision Quiz**: scoring, prompt authoring, and quiz-builder flows are intentionally deferred.
