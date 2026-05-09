@@ -1,0 +1,23 @@
+[project]
+name = "basketball-decisions"
+version = "0.1.0"
+description = "FastAPI backend for basketball video decision workflows"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.111,<1.0",
+  "pydantic>=2.7,<3.0",
+  "python-multipart>=0.0.9",
+  "uvicorn[standard]>=0.29,<1.0",
+]
+
+[project.optional-dependencies]
+vision = [
+  "opencv-python>=4.9,<5.0",
+  "ultralytics>=8.2,<9.0",
+]
+youtube = [
+  "yt-dlp>=2024.4.9",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
