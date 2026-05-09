@@ -9,11 +9,23 @@ interface CourtKeypointOption {
   courtPoint: CourtPoint
 }
 
-const props = defineProps<{
-  keypoints: CourtKeypointOption[]
-  pairs: CourtKeypointPair[]
-  activeKeypointId: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    keypoints: CourtKeypointOption[]
+    pairs: CourtKeypointPair[]
+    activeKeypointId: string
+    imageNaturalWidth?: number
+    imageNaturalHeight?: number
+    displayWidth?: number
+    displayHeight?: number
+  }>(),
+  {
+    imageNaturalWidth: 100,
+    imageNaturalHeight: 100,
+    displayWidth: undefined,
+    displayHeight: undefined
+  }
+)
 
 const emit = defineEmits<{
   addPoint: [pair: CourtKeypointPair]
@@ -24,13 +36,22 @@ const emit = defineEmits<{
 const activeKeypoint = computed(() => props.keypoints.find((point) => point.id === props.activeKeypointId))
 const completedIds = computed(() => new Set(props.pairs.map((pair) => pair.keypoint_id)))
 const waitingLabel = computed(() => activeKeypoint.value?.label ?? 'Select a court keypoint')
+const viewBox = computed(() => `0 0 ${props.imageNaturalWidth} ${props.imageNaturalHeight}`)
+
+function markerX(pair: CourtKeypointPair) {
+  return (pair.image_point.x / props.imageNaturalWidth) * props.imageNaturalWidth
+}
+
+function markerY(pair: CourtKeypointPair) {
+  return (pair.image_point.y / props.imageNaturalHeight) * props.imageNaturalHeight
+}
 
 function onOverlayClick(event: MouseEvent) {
   if (!activeKeypoint.value) return
   const svg = event.currentTarget as SVGSVGElement
   const rect = svg.getBoundingClientRect()
-  const x = ((event.clientX - rect.left) / rect.width) * 100
-  const y = ((event.clientY - rect.top) / rect.height) * 100
+  const x = ((event.clientX - rect.left) / rect.width) * props.imageNaturalWidth
+  const y = ((event.clientY - rect.top) / rect.height) * props.imageNaturalHeight
   emit('addPoint', {
     keypoint_id: activeKeypoint.value.id,
     image_point: { x, y },
@@ -57,15 +78,15 @@ function onOverlayClick(event: MouseEvent) {
     </div>
   </div>
 
-  <svg class="overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Court calibration overlay" @click="onOverlayClick">
-    <rect class="click-surface" x="0" y="0" width="100" height="100" />
-    <line x1="5" y1="10" x2="95" y2="10" />
-    <line x1="5" y1="90" x2="95" y2="90" />
-    <line x1="5" y1="10" x2="5" y2="90" />
-    <line x1="95" y1="10" x2="95" y2="90" />
+  <svg class="overlay" :viewBox="viewBox" preserveAspectRatio="none" aria-label="Court calibration overlay" @click="onOverlayClick">
+    <rect class="click-surface" x="0" y="0" :width="imageNaturalWidth" :height="imageNaturalHeight" />
+    <line :x1="imageNaturalWidth * 0.05" :y1="imageNaturalHeight * 0.1" :x2="imageNaturalWidth * 0.95" :y2="imageNaturalHeight * 0.1" />
+    <line :x1="imageNaturalWidth * 0.05" :y1="imageNaturalHeight * 0.9" :x2="imageNaturalWidth * 0.95" :y2="imageNaturalHeight * 0.9" />
+    <line :x1="imageNaturalWidth * 0.05" :y1="imageNaturalHeight * 0.1" :x2="imageNaturalWidth * 0.05" :y2="imageNaturalHeight * 0.9" />
+    <line :x1="imageNaturalWidth * 0.95" :y1="imageNaturalHeight * 0.1" :x2="imageNaturalWidth * 0.95" :y2="imageNaturalHeight * 0.9" />
     <g v-for="pair in pairs" :key="pair.keypoint_id" class="marker" @click.stop="emit('removePoint', pair.keypoint_id)">
-      <circle :cx="pair.image_point.x" :cy="pair.image_point.y" r="2.5" />
-      <text :x="pair.image_point.x + 3" :y="pair.image_point.y - 2">{{ pair.court_point.label ?? pair.keypoint_id }}</text>
+      <circle :cx="markerX(pair)" :cy="markerY(pair)" :r="Math.max(imageNaturalWidth, imageNaturalHeight) * 0.012" />
+      <text :x="markerX(pair) + imageNaturalWidth * 0.018" :y="markerY(pair) - imageNaturalHeight * 0.012">{{ pair.court_point.label ?? pair.keypoint_id }}</text>
     </g>
   </svg>
 </template>
@@ -125,7 +146,7 @@ function onOverlayClick(event: MouseEvent) {
 
 line {
   stroke: #38bdf8;
-  stroke-width: 0.6;
+  stroke-width: 2;
 }
 
 .marker {
@@ -135,14 +156,14 @@ line {
 circle {
   fill: #f97316;
   stroke: white;
-  stroke-width: 0.4;
+  stroke-width: 2;
 }
 
 text {
   fill: white;
-  font-size: 4px;
+  font-size: 18px;
   paint-order: stroke;
   stroke: #0f172a;
-  stroke-width: 0.5px;
+  stroke-width: 2px;
 }
 </style>

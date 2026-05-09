@@ -7,6 +7,26 @@ export interface ApiErrorResponse {
   debug_hint?: string | null
 }
 
+export class ApiClientError extends Error {
+  code: string
+  details: Record<string, unknown>
+  debug_hint?: string | null
+  status: number
+
+  constructor(status: number, payload: ApiErrorResponse) {
+    super(payload.message)
+    this.name = 'ApiClientError'
+    this.status = status
+    this.code = payload.code
+    this.details = payload.details
+    this.debug_hint = payload.debug_hint
+  }
+}
+
+export function isApiClientError(error: unknown): error is ApiClientError {
+  return error instanceof ApiClientError
+}
+
 export interface ProjectCreateRequest {
   name: string
   description?: string | null
@@ -236,7 +256,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       payload = undefined
     }
-    throw new Error(payload?.message ?? `API request failed with status ${response.status}`)
+    const normalizedPayload: ApiErrorResponse = {
+      code: payload?.code ?? 'HTTP_ERROR',
+      message: payload?.message ?? `API request failed with status ${response.status}`,
+      details: payload?.details ?? {},
+      debug_hint: payload?.debug_hint ?? null
+    }
+    throw new ApiClientError(response.status, normalizedPayload)
   }
   return (await response.json()) as T
 }
