@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useProjectsStore } from '../stores/projects'
+import { useProjectStore } from '../stores/projectStore'
 
 const router = useRouter()
-const projectsStore = useProjectsStore()
+const projectStore = useProjectStore()
 const projectName = ref('Demo Project')
 const youtubeUrl = ref('')
 const selectedFile = ref<File | null>(null)
@@ -16,18 +16,29 @@ function onFileChange(event: Event) {
 
 function createUploadProject() {
   const id = crypto.randomUUID()
-  projectsStore.addProject({
+  const previewUrl = selectedFile.value ? URL.createObjectURL(selectedFile.value) : undefined
+  projectStore.addProject({
     id,
     name: projectName.value,
     source: 'upload',
-    videoPath: selectedFile.value?.name
+    videoPreviewUrl: previewUrl,
+    videoFileName: selectedFile.value?.name,
+    videoAsset: selectedFile.value
+      ? {
+          project_id: id,
+          asset_id: `local-${id}`,
+          source_type: 'upload',
+          filename: selectedFile.value.name,
+          content_type: selectedFile.value.type
+        }
+      : null
   })
   router.push(`/projects/${id}`)
 }
 
 function createYoutubeProject() {
   const id = crypto.randomUUID()
-  projectsStore.addProject({
+  projectStore.addProject({
     id,
     name: projectName.value,
     source: 'youtube',
@@ -40,7 +51,7 @@ function createYoutubeProject() {
 <template>
   <section class="card">
     <h1>Basketball video decision pipeline</h1>
-    <p>Create a project from a local MP4 or YouTube URL, calibrate the court, then run a tracking demo.</p>
+    <p>Create a project from a local MP4 or YouTube URL, calibrate court keypoints manually, then inspect tracking overlays and a 2D projection.</p>
   </section>
 
   <section class="grid">
