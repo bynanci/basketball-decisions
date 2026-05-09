@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from backend.app.core.errors import api_error
 from backend.app.models import (
     DetectionTrack,
+    ErrorResponse,
     ExtractFramesRequest,
     ExtractFramesResponse,
     FrameAsset,
@@ -35,6 +36,17 @@ from backend.app.services.storage import (
 )
 
 router = APIRouter(prefix="/api", tags=["projects"])
+
+ERROR_RESPONSES = {
+    400: {"model": ErrorResponse},
+    404: {"model": ErrorResponse},
+    415: {"model": ErrorResponse},
+    422: {"model": ErrorResponse},
+    500: {"model": ErrorResponse},
+    501: {"model": ErrorResponse},
+    502: {"model": ErrorResponse},
+    504: {"model": ErrorResponse},
+}
 
 
 def _project_meta_path(project_id: str) -> Path:
@@ -100,7 +112,12 @@ def _media_type_for(path: Path) -> str:
     return "application/octet-stream"
 
 
-@router.post("/projects", response_model=ProjectCreateResponse, status_code=201)
+@router.post(
+    "/projects",
+    response_model=ProjectCreateResponse,
+    status_code=201,
+    responses=ERROR_RESPONSES,
+)
 def create_project(request: ProjectCreateRequest) -> ProjectCreateResponse:
     ensure_data_dirs()
     project = ProjectRecord(
@@ -116,7 +133,11 @@ def create_project(request: ProjectCreateRequest) -> ProjectCreateResponse:
     return ProjectCreateResponse(project=project)
 
 
-@router.post("/projects/{project_id}/video/upload", response_model=VideoAsset)
+@router.post(
+    "/projects/{project_id}/video/upload",
+    response_model=VideoAsset,
+    responses=ERROR_RESPONSES,
+)
 async def upload_video(project_id: str, file: UploadFile = File(...)) -> VideoAsset:
     _require_project(project_id)
     filename = file.filename or "upload.mp4"
@@ -150,7 +171,11 @@ async def upload_video(project_id: str, file: UploadFile = File(...)) -> VideoAs
     return asset
 
 
-@router.post("/projects/{project_id}/video/youtube", response_model=VideoAsset)
+@router.post(
+    "/projects/{project_id}/video/youtube",
+    response_model=VideoAsset,
+    responses=ERROR_RESPONSES,
+)
 def import_youtube_video(project_id: str, request: YouTubeVideoRequest) -> VideoAsset:
     _require_project(project_id)
     downloader = shutil.which("yt-dlp")
@@ -334,7 +359,11 @@ def _extract_frames_with_ffmpeg(
     ]
 
 
-@router.post("/projects/{project_id}/frames/extract", response_model=ExtractFramesResponse)
+@router.post(
+    "/projects/{project_id}/frames/extract",
+    response_model=ExtractFramesResponse,
+    responses=ERROR_RESPONSES,
+)
 def extract_frames(project_id: str, request: ExtractFramesRequest) -> ExtractFramesResponse:
     _require_project(project_id)
     video = _require_video(project_id)
@@ -368,7 +397,7 @@ def extract_frames(project_id: str, request: ExtractFramesRequest) -> ExtractFra
     return ExtractFramesResponse(project_id=project_id, video_id=video.id, frames=frames, count=len(frames))
 
 
-@router.get("/projects/{project_id}/frames/{frame_index}")
+@router.get("/projects/{project_id}/frames/{frame_index}", responses=ERROR_RESPONSES)
 def get_frame(project_id: str, frame_index: int) -> FileResponse:
     _require_project(project_id)
     frames = read_model_list(_frames_path(project_id), FrameAsset)
@@ -393,7 +422,11 @@ def get_frame(project_id: str, frame_index: int) -> FileResponse:
     )
 
 
-@router.post("/projects/{project_id}/calibration", response_model=SaveCalibrationResponse)
+@router.post(
+    "/projects/{project_id}/calibration",
+    response_model=SaveCalibrationResponse,
+    responses=ERROR_RESPONSES,
+)
 def save_calibration(project_id: str, request: SaveCalibrationRequest) -> SaveCalibrationResponse:
     _require_project(project_id)
     image_points = [keypoint.image for keypoint in request.keypoints]
@@ -489,7 +522,11 @@ def _stub_tracking(project_id: str, request: RunTrackingRequest) -> list[Detecti
     return [DetectionTrack(track_id="stub-person-0", points=points)]
 
 
-@router.post("/projects/{project_id}/tracking/run", response_model=RunTrackingResponse)
+@router.post(
+    "/projects/{project_id}/tracking/run",
+    response_model=RunTrackingResponse,
+    responses=ERROR_RESPONSES,
+)
 def run_tracking(project_id: str, request: RunTrackingRequest) -> RunTrackingResponse:
     _require_project(project_id)
     if not _frames_path(project_id).exists():
@@ -530,7 +567,11 @@ def run_tracking(project_id: str, request: RunTrackingRequest) -> RunTrackingRes
     return response
 
 
-@router.get("/projects/{project_id}/tracks", response_model=RunTrackingResponse)
+@router.get(
+    "/projects/{project_id}/tracks",
+    response_model=RunTrackingResponse,
+    responses=ERROR_RESPONSES,
+)
 def get_tracks(project_id: str) -> RunTrackingResponse:
     _require_project(project_id)
     path = _tracks_path(project_id)

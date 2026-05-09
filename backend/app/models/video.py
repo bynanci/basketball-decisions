@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 class VideoAsset(BaseModel):
@@ -19,4 +19,4 @@ class VideoAsset(BaseModel):
 
 
 class YouTubeVideoRequest(BaseModel):
-    url: HttpUrl
+    url: str = Field(..., min_length=1)

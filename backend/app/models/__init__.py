@@ -1,6 +1,7 @@
 """Pydantic models for the Basketball Decisions backend API."""
 
 from .calibration import (
+    CalibrationKeypoint,
     CourtPoint,
     ImagePoint,
     SaveCalibrationRequest,
@@ -13,6 +14,7 @@ from .tracking import DetectionTrack, RunTrackingRequest, RunTrackingResponse, T
 from .video import VideoAsset, YouTubeVideoRequest
 
 __all__ = [
+    "CalibrationKeypoint",
     "CourtPoint",
     "DetectionTrack",
     "ErrorResponse",
