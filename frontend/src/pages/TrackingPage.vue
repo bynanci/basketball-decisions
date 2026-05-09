@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { apiClient, isApiClientError, type Detection, type PlayerTrack, type ProjectedPlayerTrack, type RunTrackingResponse } from '../api/client'
+import { apiClient, isApiClientError, type RunTrackingResponse } from '../api/client'
 import Court2DView from '../components/Court2DView.vue'
 import TrackOverlay from '../components/TrackOverlay.vue'
 import VideoPlayer from '../components/VideoPlayer.vue'
@@ -20,33 +20,15 @@ const errorHint = ref('')
 const pipelineOutput = ref<RunTrackingResponse['pipeline_output'] | null>(null)
 const debugMetadata = ref<RunTrackingResponse['debug_metadata'] | null>(null)
 
-const demoDetections: Detection[] = [
-  { detection_id: 'det-1', frame_id: 'demo-frame', frame_index: 0, box: { x: 31, y: 42, width: 8, height: 18 }, confidence: 0.92, class_name: 'person', track_id: 'track-1', metadata: {} },
-  { detection_id: 'det-2', frame_id: 'demo-frame', frame_index: 0, box: { x: 48, y: 37, width: 7, height: 17 }, confidence: 0.88, class_name: 'person', track_id: 'track-2', metadata: {} },
-  { detection_id: 'det-3', frame_id: 'demo-frame', frame_index: 0, box: { x: 62, y: 45, width: 8, height: 19 }, confidence: 0.81, class_name: 'person', track_id: 'track-3', metadata: {} }
-]
-
-const demoTracks: PlayerTrack[] = [
-  { track_id: 'track-1', player_id: '#1', points: [{ frame_id: 'demo-frame', frame_index: 0, timestamp_seconds: 0, image_point_x: 35, image_point_y: 60 }], metadata: {} },
-  { track_id: 'track-2', player_id: '#2', points: [{ frame_id: 'demo-frame', frame_index: 0, timestamp_seconds: 0, image_point_x: 51.5, image_point_y: 54 }], metadata: {} },
-  { track_id: 'track-3', player_id: '#3', points: [{ frame_id: 'demo-frame', frame_index: 0, timestamp_seconds: 0, image_point_x: 66, image_point_y: 64 }], metadata: {} }
-]
-
-const demoProjectedTracks: ProjectedPlayerTrack[] = [
-  { track_id: 'track-1', player_id: '#1', points: [{ frame_id: 'demo-frame', frame_index: 0, timestamp_seconds: 0, court_x: 30, court_y: 26, metadata: {} }], metadata: {} },
-  { track_id: 'track-2', player_id: '#2', points: [{ frame_id: 'demo-frame', frame_index: 0, timestamp_seconds: 0, court_x: 45, court_y: 20, metadata: {} }], metadata: {} },
-  { track_id: 'track-3', player_id: '#3', points: [{ frame_id: 'demo-frame', frame_index: 0, timestamp_seconds: 0, court_x: 60, court_y: 31, metadata: {} }], metadata: {} }
-]
-
 const hasBackendResult = computed(() => !!project.value && (project.value.detections.length > 0 || project.value.tracks.length > 0 || project.value.projectedTracks.length > 0))
-const detections = computed(() => (hasBackendResult.value ? project.value?.detections ?? [] : demoDetections))
-const tracks = computed(() => (hasBackendResult.value ? project.value?.tracks ?? [] : demoTracks))
-const projectedTracks = computed(() => (hasBackendResult.value ? project.value?.projectedTracks ?? [] : demoProjectedTracks))
+const detections = computed(() => project.value?.detections ?? [])
+const tracks = computed(() => project.value?.tracks ?? [])
+const projectedTracks = computed(() => project.value?.projectedTracks ?? [])
 const currentFrameIndex = computed(() => detections.value[0]?.frame_index ?? project.value?.frames[0]?.frame_index ?? 0)
 const currentFrame = computed(() => project.value?.frames.find((frame) => frame.frame_index === currentFrameIndex.value) ?? project.value?.frames[0] ?? null)
 const frameSrc = computed(() => (currentFrame.value ? apiClient.frameImageUrl(props.projectId, currentFrame.value.frame_index) : undefined))
-const overlayWidth = computed(() => (hasBackendResult.value ? currentFrame.value?.width ?? project.value?.videoAsset?.width ?? 100 : 100))
-const overlayHeight = computed(() => (hasBackendResult.value ? currentFrame.value?.height ?? project.value?.videoAsset?.height ?? 100 : 100))
+const overlayWidth = computed(() => currentFrame.value?.width ?? project.value?.videoAsset?.width ?? 100)
+const overlayHeight = computed(() => currentFrame.value?.height ?? project.value?.videoAsset?.height ?? 100)
 const detectorMode = computed(() => {
   const outputMode = pipelineOutput.value?.detector_mode
   const detector = debugMetadata.value?.detector
@@ -105,7 +87,7 @@ async function runTracking() {
     <h1>Tracking</h1>
     <p>Project {{ props.projectId }}: run backend detection/tracking, then visualize image-space tracks and projected 2D court paths.</p>
     <button type="button" :disabled="isRunning" @click="runTracking">{{ isRunning ? 'Running…' : 'Run Tracking' }}</button>
-    <p v-if="!hasBackendResult" class="demo-label">Showing demo placeholder tracks until backend tracking is run.</p>
+    <p v-if="!hasBackendResult" class="empty-label">No backend tracking results yet. Click Run Tracking to request detections, tracks, and projected court paths.</p>
     <div class="stats-grid">
       <span><strong>{{ detections.length }}</strong> detections</span>
       <span><strong>{{ tracks.length }}</strong> tracks</span>
@@ -155,7 +137,7 @@ async function runTracking() {
   width: 100%;
 }
 
-.demo-label {
+.empty-label {
   color: #b45309;
   font-weight: 700;
 }
