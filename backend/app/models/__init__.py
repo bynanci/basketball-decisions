@@ -8,6 +8,7 @@ from .calibration import (
     SaveCalibrationRequest,
     SaveCalibrationResponse,
 )
+from .errors import ApiErrorResponse
 from .project import Project, ProjectCreateRequest, ProjectCreateResponse
 from .projection import ProjectedPlayerTrack, ProjectedTrackPoint
 from .tracking import (
@@ -16,6 +17,7 @@ from .tracking import (
     PlayerTrack,
     RunTrackingRequest,
     RunTrackingResponse,
+    ProjectTracksResponse,
     TrackPoint,
 )
 from .video import (
@@ -24,9 +26,11 @@ from .video import (
     FrameAsset,
     VideoAsset,
     VideoSourceType,
+    YouTubeVideoRequest,
 )
 
 __all__ = [
+    "ApiErrorResponse",
     "Calibration",
     "CourtKeypointPair",
     "CourtPoint",
@@ -42,11 +46,13 @@ __all__ = [
     "ProjectCreateResponse",
     "ProjectedPlayerTrack",
     "ProjectedTrackPoint",
+    "ProjectTracksResponse",
     "RunTrackingRequest",
     "RunTrackingResponse",
     "SaveCalibrationRequest",
     "SaveCalibrationResponse",
     "TrackPoint",
     "VideoAsset",
+    "YouTubeVideoRequest",
     "VideoSourceType",
 ]

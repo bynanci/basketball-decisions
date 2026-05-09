@@ -11,6 +11,12 @@ from .base import ProjectArtifact
 VideoSourceType = Literal["upload", "youtube"]
 
 
+class YouTubeVideoRequest(BaseModel):
+    """Client payload for registering or downloading a YouTube video."""
+
+    url: str
+
+
 class VideoAsset(ProjectArtifact):
     """Persisted source video document stored at video.json."""
 
