@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 
 from app.api.common import api_error, assert_path_child, read_json, require_project_dir, write_json_model
 from app.models import ExtractFramesRequest, ExtractFramesResponse, FrameAsset, VideoAsset, YouTubeVideoRequest
-from app.pipeline.frame_extractor import extract_frames
+from app.pipeline.frame_extractor import FrameExtractionError, extract_frames
 
 router = APIRouter(prefix="/projects/{project_id}/video", tags=["videos"])
 frames_router = APIRouter(prefix="/projects/{project_id}/frames", tags=["frames"])
@@ -120,27 +120,44 @@ def extract_project_frames(project_id: str, payload: ExtractFramesRequest) -> Ex
     output_dir = directory / "frames" / "images"
     target_fps = payload.target_fps or 1.0
     every_n_frames = max(1, round((video_doc.fps or 30.0) / target_fps))
-    frame_paths = extract_frames(Path(video_doc.uri), output_dir, every_n_frames=every_n_frames)
-    if payload.max_frames is not None:
-        frame_paths = frame_paths[: payload.max_frames]
+    try:
+        frame_paths = extract_frames(
+            Path(video_doc.uri),
+            output_dir,
+            every_n_frames=every_n_frames,
+            sample_rate=target_fps,
+            max_frames=payload.max_frames,
+        )
+    except FrameExtractionError as exc:
+        raise api_error(
+            422,
+            "FRAME_EXTRACTION_FAILED",
+            str(exc),
+            {"uri": video_doc.uri},
+            "Verify the video path, codec support, and OpenCV installation before retrying.",
+        ) from exc
+
+    raw_index = read_json(directory / "frames" / "index.json")
+    raw_frames = raw_index.get("frames", [])
     frames = [
         FrameAsset(
-            frame_id=f"frame-{index:06d}",
-            frame_index=index,
-            timestamp_seconds=index / target_fps,
-            image_path=str(path),
+            frame_id=item["frame_id"],
+            frame_index=int(item["frame_index"]),
+            timestamp_seconds=float(item["timestamp_seconds"]),
+            image_path=str(item["image_path"]),
+            width=item.get("width"),
+            height=item.get("height"),
+            metadata=item.get("metadata", {}),
         )
-        for index, path in enumerate(frame_paths)
+        for item in raw_frames[: len(frame_paths)]
     ]
     response = ExtractFramesResponse(
         project_id=project_id,
         request=payload,
         frames=frames,
         original_input=payload.model_dump(),
-        pipeline_output={"frame_count": len(frames), "extractor": "opencv_or_mvp_stub"},
-        debug_metadata={
-            "debug_hint": "If frame_count is 0, install and wire OpenCV/ffmpeg; the current pipeline fallback is a stub."
-        },
+        pipeline_output={"frame_count": len(frames), "extractor": "opencv", "every_n_frames": every_n_frames},
+        debug_metadata={"source_video": video_doc.uri},
     )
     write_json_model(directory / "frames" / "index.json", response)
     return response

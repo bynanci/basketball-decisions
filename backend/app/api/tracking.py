@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter
 
 from app.api.common import api_error, read_json, require_project_dir, write_json_model
@@ -16,7 +18,9 @@ from app.models import (
     RunTrackingResponse,
     TrackPoint,
 )
-from app.pipeline.detector import detect_players
+from app.pipeline.detector import detect_players_in_frame
+from app.pipeline.projector import project_tracks_to_court
+from app.pipeline.tracker import track_frame_detections
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["tracking"])
 
@@ -43,59 +47,98 @@ def _build_tracking(project_id: str, payload: RunTrackingRequest) -> RunTracking
     if payload.frame_ids:
         requested_ids = set(payload.frame_ids)
         frame_assets = [frame for frame in frame_assets if frame.frame_id in requested_ids]
-    if not frame_assets:
-        frame_assets = []
 
-    detections: list[Detection] = []
-    tracks_by_id: dict[str, PlayerTrack] = {}
     source_frames = frame_assets or [None]
     max_players = payload.max_players or 10
+    confidence_threshold = payload.confidence_threshold if payload.confidence_threshold is not None else 0.25
+    model_name = payload.model_name or "yolov8n.pt"
+
+    detections: list[Detection] = []
+    frame_detections: list[dict[str, object]] = []
+    detector_metadata: dict[str, object] = {}
+
     for frame_offset, frame in enumerate(source_frames):
-        raw_detections = detect_players(None)
-        for detection_index, raw in enumerate(raw_detections[:max_players]):
+        frame_path = Path(frame.image_path) if frame else None
+        result = detect_players_in_frame(frame_path, confidence_threshold=confidence_threshold, model_name=model_name)
+        detector_metadata.update(result.get("metadata", {}))
+        raw_detections = result.get("detections", [])[:max_players]
+        frame_id = frame.frame_id if frame else "frame-000000"
+        frame_index = frame.frame_index if frame else frame_offset
+        timestamp = frame.timestamp_seconds if frame else 0.0
+        tracker_detections: list[dict[str, object]] = []
+
+        for detection_index, raw in enumerate(raw_detections):
             bbox = raw["bbox"]
             confidence = float(raw["score"])
-            if payload.confidence_threshold is not None and confidence < payload.confidence_threshold:
-                continue
-            frame_id = frame.frame_id if frame else "stub-frame-000000"
-            frame_index = frame.frame_index if frame else frame_offset
-            timestamp = frame.timestamp_seconds if frame else 0.0
-            track_id = f"track-{detection_index + 1}"
             detection_id = f"{frame_id}-det-{detection_index + 1}"
             box = DetectionBox(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
-            detections.append(
-                Detection(
-                    detection_id=detection_id,
-                    frame_id=frame_id,
-                    frame_index=frame_index,
-                    box=box,
-                    confidence=confidence,
-                    class_name="person",
-                    track_id=track_id,
-                    metadata={"source": "yolo_person_or_mvp_stub"},
-                )
+            detection = Detection(
+                detection_id=detection_id,
+                frame_id=frame_id,
+                frame_index=frame_index,
+                box=box,
+                confidence=confidence,
+                class_name="person",
+                metadata={"source": detector_metadata.get("detector_mode", "unknown"), **raw.get("metadata", {})},
             )
-            track = tracks_by_id.setdefault(track_id, PlayerTrack(track_id=track_id, metadata={"source": "mvp_stub"}))
+            detections.append(detection)
+            tracker_detections.append(
+                {
+                    "detection_id": detection_id,
+                    "bbox": [box.x, box.y, box.width, box.height],
+                    "confidence": confidence,
+                    "class_name": "person",
+                }
+            )
+
+        frame_detections.append(
+            {
+                "frame_id": frame_id,
+                "frame_index": frame_index,
+                "timestamp_seconds": timestamp,
+                "detections": tracker_detections,
+            }
+        )
+
+    raw_tracks = track_frame_detections(frame_detections, iou_threshold=payload.iou_threshold or 0.3)
+    detection_track_ids: dict[str, str] = {}
+    tracks: list[PlayerTrack] = []
+    for raw_track in raw_tracks:
+        track = PlayerTrack(track_id=raw_track["track_id"], metadata=raw_track.get("metadata", {}))
+        for point in raw_track.get("points", []):
+            bbox = point["bbox"]
+            detection_id = point.get("detection_id")
+            if detection_id:
+                detection_track_ids[str(detection_id)] = raw_track["track_id"]
             track.points.append(
                 TrackPoint(
-                    frame_id=frame_id,
-                    frame_index=frame_index,
-                    timestamp_seconds=timestamp,
-                    image_point_x=box.x + box.width / 2,
-                    image_point_y=box.y + box.height,
+                    frame_id=point["frame_id"],
+                    frame_index=point["frame_index"],
+                    timestamp_seconds=point["timestamp_seconds"],
+                    image_point_x=bbox[0] + bbox[2] / 2,
+                    image_point_y=bbox[1] + bbox[3],
                     detection_id=detection_id,
-                    confidence=confidence,
+                    confidence=point.get("confidence"),
                 )
             )
+        tracks.append(track)
+
+    for index, detection in enumerate(detections):
+        if detection.detection_id in detection_track_ids:
+            detections[index] = detection.model_copy(update={"track_id": detection_track_ids[detection.detection_id]})
 
     response = RunTrackingResponse(
         project_id=project_id,
         request=payload,
         detections=detections,
-        tracks=list(tracks_by_id.values()),
+        tracks=tracks,
         original_input=payload.model_dump(),
-        pipeline_output={"detector": payload.model_name or "yolo_person_or_mvp_stub", "track_count": len(tracks_by_id)},
-        debug_metadata={"debug_hint": "Install/wire YOLO to replace deterministic MVP stub detections."},
+        pipeline_output={
+            "detector": model_name,
+            "detector_mode": detector_metadata.get("detector_mode", "unknown"),
+            "track_count": len(tracks),
+        },
+        debug_metadata={"detector": detector_metadata, "tracker": {"mode": "iou_centroid_mvp"}},
     )
     write_json_model(directory / "tracking.json", response)
     return response
@@ -108,25 +151,32 @@ def _project_tracks(project_id: str, tracking: RunTrackingResponse) -> list[Proj
     if calibration_path.exists():
         calibration = Calibration.model_validate(read_json(calibration_path))
         homography = calibration.homography
+
+    raw_projected_tracks = project_tracks_to_court([track.model_dump() for track in tracking.tracks], homography)
     projected_tracks: list[ProjectedPlayerTrack] = []
-    for track in tracking.tracks:
-        points: list[ProjectedTrackPoint] = []
-        for point in track.points:
-            court_x, court_y = _apply_homography(homography, point.image_point_x, point.image_point_y)
-            points.append(
-                ProjectedTrackPoint(
-                    frame_id=point.frame_id,
-                    frame_index=point.frame_index,
-                    timestamp_seconds=point.timestamp_seconds,
-                    court_x=court_x,
-                    court_y=court_y,
-                    source_image_point_x=point.image_point_x,
-                    source_image_point_y=point.image_point_y,
-                    confidence=point.confidence,
-                    metadata={"homography_applied": homography is not None},
-                )
+    for raw_track in raw_projected_tracks:
+        points = [
+            ProjectedTrackPoint(
+                frame_id=point["frame_id"],
+                frame_index=point["frame_index"],
+                timestamp_seconds=point["timestamp_seconds"],
+                court_x=point["court_x"],
+                court_y=point["court_y"],
+                source_image_point_x=point.get("source_image_point_x"),
+                source_image_point_y=point.get("source_image_point_y"),
+                confidence=point.get("confidence"),
+                metadata=point.get("metadata", {}),
             )
-        projected_tracks.append(ProjectedPlayerTrack(track_id=track.track_id, player_id=track.player_id, points=points))
+            for point in raw_track.get("points", [])
+        ]
+        projected_tracks.append(
+            ProjectedPlayerTrack(
+                track_id=raw_track["track_id"],
+                player_id=raw_track.get("player_id"),
+                points=points,
+                metadata=raw_track.get("metadata", {}),
+            )
+        )
     return projected_tracks
 
 
