@@ -1,22 +1,24 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import VideoPlayer from '../components/VideoPlayer.vue'
 import Court2DView from '../components/Court2DView.vue'
-import { useProjectsStore } from '../stores/projects'
+import VideoPlayer from '../components/VideoPlayer.vue'
+import { useProjectStore } from '../stores/projectStore'
 
 const props = defineProps<{
   projectId: string
 }>()
 
-const projectsStore = useProjectsStore()
-const project = computed(() => projectsStore.projects.find((item) => item.id === props.projectId))
+const projectStore = useProjectStore()
+projectStore.setActiveProject(props.projectId)
+const project = computed(() => projectStore.getProject(props.projectId))
 </script>
 
 <template>
   <section class="card">
     <h1>{{ project?.name ?? 'Project' }}</h1>
-    <p>Source: {{ project?.source ?? 'unknown' }}</p>
+    <p>Project id: {{ projectId }}</p>
+    <p>Source: {{ project?.source ?? 'unknown' }} <span v-if="project?.videoFileName">· {{ project.videoFileName }}</span></p>
     <RouterLink class="button" :to="`/projects/${projectId}/calibration`">Calibrate court</RouterLink>
     <RouterLink class="button secondary" :to="`/projects/${projectId}/tracking`">Tracking demo</RouterLink>
   </section>
@@ -24,11 +26,11 @@ const project = computed(() => projectsStore.projects.find((item) => item.id ===
   <section class="grid">
     <div class="card">
       <h2>Video</h2>
-      <VideoPlayer :title="project?.videoPath ?? project?.youtubeUrl ?? 'No video selected'" />
+      <VideoPlayer :video-src="project?.videoPreviewUrl" :title="project?.videoFileName ?? project?.youtubeUrl ?? 'No video selected'" />
     </div>
     <div class="card">
       <h2>Projected court</h2>
-      <Court2DView />
+      <Court2DView :projected-tracks="project?.projectedTracks" />
     </div>
   </section>
 </template>

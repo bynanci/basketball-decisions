@@ -1,16 +1,19 @@
 <script setup lang="ts">
 defineProps<{
-  src?: string
+  videoSrc?: string
+  frameSrc?: string
   title?: string
+  caption?: string
 }>()
 </script>
 
 <template>
   <section class="video-frame">
-    <video v-if="src" controls :src="src" />
+    <img v-if="frameSrc" :src="frameSrc" :alt="title ?? 'Frame preview'" />
+    <video v-else-if="videoSrc" controls :src="videoSrc" />
     <div v-else class="placeholder">
       <strong>{{ title ?? 'Video preview' }}</strong>
-      <span>Upload an MP4 or create a YouTube project to load a video.</span>
+      <span>{{ caption ?? 'Upload an MP4, extract a frame, or create a YouTube project to load a preview.' }}</span>
     </div>
   </section>
 </template>
@@ -28,8 +31,11 @@ defineProps<{
   position: relative;
 }
 
-video {
+video,
+img {
+  display: block;
   height: 100%;
+  object-fit: contain;
   width: 100%;
 }
 
