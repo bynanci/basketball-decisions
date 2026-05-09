@@ -35,7 +35,8 @@ def save_calibration(project_id: str, payload: SaveCalibrationRequest) -> SaveCa
                 "Provide at least four non-degenerate image/court keypoint pairs or pass a precomputed homography.",
             ) from exc
         homography = result["matrix"]
-        reprojection_error = 0.0
+        reprojection_error = result["debug"]["mean_residual_error"]
+        payload.debug_metadata.update({"homography_debug": result["debug"]})
 
     calibration = Calibration(
         project_id=project_id,
