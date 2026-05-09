@@ -10,6 +10,7 @@ from .calibration import (
 )
 from .errors import ApiErrorResponse
 from .project import Project, ProjectCreateRequest, ProjectCreateResponse
+from .quiz import DecisionAnswer, DecisionOption, FreezeFrame, QuizPrompt
 from .projection import ProjectedPlayerTrack, ProjectedTrackPoint
 from .tracking import (
     Detection,
@@ -36,9 +37,12 @@ __all__ = [
     "CourtPoint",
     "Detection",
     "DetectionBox",
+    "DecisionAnswer",
+    "DecisionOption",
     "ExtractFramesRequest",
     "ExtractFramesResponse",
     "FrameAsset",
+    "FreezeFrame",
     "ImagePoint",
     "PlayerTrack",
     "Project",
@@ -47,6 +51,7 @@ __all__ = [
     "ProjectedPlayerTrack",
     "ProjectedTrackPoint",
     "ProjectTracksResponse",
+    "QuizPrompt",
     "RunTrackingRequest",
     "RunTrackingResponse",
     "SaveCalibrationRequest",
