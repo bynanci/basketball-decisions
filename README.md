@@ -126,6 +126,17 @@ curl -X POST http://localhost:8000/api/tracking/demo \
 
 The endpoint runs deterministic detector, tracker, and projector stubs so downstream UI integration can start before model work is complete.
 
+
+## Future: Decision Quiz
+
+Decision Quiz is a traceable extension point for future basketball decision prompts, not an MVP-complete feature. The backend model surface is reserved in `backend/app/models/quiz.py`, with future local JSON storage expected at `backend/data/projects/{project_id}/quiz_prompts.json`. The frontend includes a placeholder `DecisionQuizOverlay.vue` that only renders a freeze frame and direction-arrow placeholder.
+
+The following Decision Quiz work is intentionally deferred beyond the MVP:
+
+- Scoring answers or selecting correct decisions.
+- Wiring quiz prompts to coach annotations.
+- Handling multi-player decision contexts.
+
 ## 7. Stub / TODO functionality
 
 The following pieces are intentionally minimal placeholders:

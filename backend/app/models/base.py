@@ -25,6 +25,7 @@ class ProjectArtifact(BaseModel):
     - backend/data/projects/{project_id}/detections.json
     - backend/data/projects/{project_id}/tracks.json
     - backend/data/projects/{project_id}/projected_tracks.json
+    - backend/data/projects/{project_id}/quiz_prompts.json
     """
 
     schema_version: str = "1.0"
