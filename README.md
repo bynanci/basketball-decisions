@@ -58,29 +58,34 @@ From the UI:
 Backend API example:
 
 ```bash
-curl -X POST http://localhost:8000/api/videos/upload \
+PROJECT_ID="<project id returned by POST /api/projects>"
+curl -X POST "http://localhost:8000/api/projects/${PROJECT_ID}/video/upload" \
   -F "file=@/absolute/path/to/video.mp4"
 ```
 
-Uploaded files are stored under `backend/data/uploads/`. This directory is intended for local development data and is ignored by git except for `.gitkeep`.
+Uploaded files are stored under the project directory in `backend/app/data/projects/`. This directory is intended for local development data and is ignored by git except for `.gitkeep`.
 
 ## 4. Create a project from a YouTube URL
+
+YouTube source processing is only for videos you have the rights or permission to process. For MVP demos, prefer the local MP4 upload flow because it avoids optional downloader setup and third-party source availability issues.
 
 From the UI:
 
 1. Open the home page.
 2. In **YouTube URL**, paste a YouTube watch URL.
-3. Click **Create YouTube project**.
+3. Check **I confirm I have the rights or permission to process this video.**
+4. Click **Create YouTube project**. The submit button stays disabled until the checkbox is selected.
 
 Backend API example:
 
 ```bash
-curl -X POST http://localhost:8000/api/projects \
+PROJECT_ID="<project id returned by POST /api/projects>"
+curl -X POST "http://localhost:8000/api/projects/${PROJECT_ID}/video/youtube" \
   -H "Content-Type: application/json" \
-  -d '{"name":"YouTube demo","youtube_url":"https://www.youtube.com/watch?v=VIDEO_ID"}'
+  -d '{"url":"https://www.youtube.com/watch?v=VIDEO_ID","rights_confirmed":true}'
 ```
 
-The current backend stores the URL metadata only. Downloading or transcoding the YouTube video is a TODO.
+If `rights_confirmed` is `false`, the endpoint returns `400 Bad Request`. If the optional downloader dependency such as `yt-dlp` is not installed, the endpoint returns `501 Not Implemented` with `debug_hint: "Install optional YouTube downloader or use local MP4 upload for MVP demo."` instead of pretending the video was processed.
 
 ## 5. Manually mark court keypoints
 

@@ -12,9 +12,10 @@ VideoSourceType = Literal["upload", "youtube"]
 
 
 class YouTubeVideoRequest(BaseModel):
-    """Client payload for registering or downloading a YouTube video."""
+    """Client payload for downloading a YouTube video with explicit rights confirmation."""
 
     url: str
+    rights_confirmed: bool
 
 
 class VideoAsset(ProjectArtifact):
