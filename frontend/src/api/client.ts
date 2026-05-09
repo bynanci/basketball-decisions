@@ -39,6 +39,7 @@ export type VideoSourceType = 'upload' | 'youtube'
 
 export interface YouTubeVideoRequest {
   url: string
+  rights_confirmed: boolean
 }
 
 export interface VideoAsset {

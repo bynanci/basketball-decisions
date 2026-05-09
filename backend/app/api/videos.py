@@ -64,13 +64,22 @@ async def upload_video(project_id: str, file: UploadFile = File(...)) -> VideoAs
 @router.post("/youtube", response_model=VideoAsset)
 def create_youtube_video(project_id: str, payload: YouTubeVideoRequest) -> VideoAsset:
     directory = require_project_dir(project_id)
+    if not payload.rights_confirmed:
+        raise api_error(
+            400,
+            "YOUTUBE_RIGHTS_NOT_CONFIRMED",
+            "You must confirm you have the rights or permission to process this video.",
+            {"url": payload.url, "rights_confirmed": payload.rights_confirmed},
+            "Confirm rights permission before submitting a YouTube source.",
+        )
+
     if importlib.util.find_spec("yt_dlp") is None:
         raise api_error(
             501,
             "YOUTUBE_DOWNLOADER_UNAVAILABLE",
             "YouTube download is not configured in this environment.",
             {"url": payload.url, "missing_optional_dependency": "yt_dlp"},
-            "TODO: add yt-dlp to backend requirements or inject a downloader service for production use.",
+            "Install optional YouTube downloader or use local MP4 upload for MVP demo.",
         )
 
     yt_dlp = importlib.import_module("yt_dlp")

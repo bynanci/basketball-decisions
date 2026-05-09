@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/projectStore'
 
@@ -7,6 +7,8 @@ const router = useRouter()
 const projectStore = useProjectStore()
 const projectName = ref('Demo Project')
 const youtubeUrl = ref('')
+const youtubeRightsConfirmed = ref(false)
+const canSubmitYouTube = computed(() => youtubeUrl.value.trim().length > 0 && youtubeRightsConfirmed.value)
 const selectedFile = ref<File | null>(null)
 
 function onFileChange(event: Event) {
@@ -37,12 +39,14 @@ function createUploadProject() {
 }
 
 function createYoutubeProject() {
+  if (!canSubmitYouTube.value) return
+
   const id = crypto.randomUUID()
   projectStore.addProject({
     id,
     name: projectName.value,
     source: 'youtube',
-    youtubeUrl: youtubeUrl.value
+    youtubeUrl: youtubeUrl.value.trim()
   })
   router.push(`/projects/${id}`)
 }
@@ -72,9 +76,13 @@ function createYoutubeProject() {
       <h2>YouTube URL</h2>
       <label>
         YouTube URL
-        <input v-model="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." />
+        <input v-model="youtubeUrl" type="url" placeholder="https://www.youtube.com/watch?v=..." required />
       </label>
-      <button type="submit">Create YouTube project</button>
+      <label class="checkbox-row">
+        <input v-model="youtubeRightsConfirmed" type="checkbox" required />
+        <span>I confirm I have the rights or permission to process this video.</span>
+      </label>
+      <button type="submit" :disabled="!canSubmitYouTube">Create YouTube project</button>
     </form>
   </section>
 </template>
