@@ -69,3 +69,16 @@ class RunTrackingResponse(ProjectArtifact):
     request: RunTrackingRequest
     detections: list[Detection] = Field(default_factory=list)
     tracks: list[PlayerTrack] = Field(default_factory=list)
+
+
+class ProjectTracksResponse(BaseModel):
+    """Combined tracking and projected court-coordinate response."""
+
+    project_id: str
+    tracking: RunTrackingResponse | None = None
+    projected_tracks: list["ProjectedPlayerTrack"] = Field(default_factory=list)
+    storage_paths: dict[str, str] = Field(default_factory=dict)
+
+
+from .projection import ProjectedPlayerTrack
+ProjectTracksResponse.model_rebuild()

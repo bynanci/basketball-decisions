@@ -1,30 +1,43 @@
-from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "projects"
+from app.api.common import DATA_DIR, api_error, project_dir, write_json_model
+from app.models import Project, ProjectCreateRequest, ProjectCreateResponse
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-class ProjectCreate(BaseModel):
-    name: str = Field(default="Untitled Project")
-    youtube_url: str | None = None
-
-
 @router.get("")
-def list_projects() -> dict[str, list[dict[str, str]]]:
+def list_projects() -> dict[str, list[dict[str, str | None]]]:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    projects = [{"id": path.stem, "name": path.stem} for path in DATA_DIR.glob("*.json")]
+    projects: list[dict[str, str | None]] = []
+    for path in DATA_DIR.glob("*/project.json"):
+        project = Project.model_validate_json(path.read_text(encoding="utf-8"))
+        projects.append({"id": project.project_id, "name": project.name, "description": project.description})
     return {"projects": projects}
 
 
-@router.post("")
-def create_project(payload: ProjectCreate) -> dict[str, str | None]:
+@router.post("", response_model=ProjectCreateResponse)
+def create_project(payload: ProjectCreateRequest) -> ProjectCreateResponse:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     project_id = str(uuid4())
-    project_file = DATA_DIR / f"{project_id}.json"
-    project_file.write_text(payload.model_dump_json(indent=2), encoding="utf-8")
-    return {"id": project_id, "name": payload.name, "youtube_url": payload.youtube_url}
+    directory = project_dir(project_id)
+    if directory.exists():
+        raise api_error(
+            409,
+            "PROJECT_ID_COLLISION",
+            "Generated project id already exists.",
+            {"project_id": project_id},
+            "Retry the request; UUID collisions should be exceptionally rare.",
+        )
+    project = Project(
+        project_id=project_id,
+        name=payload.name,
+        description=payload.description,
+        metadata=payload.metadata,
+        original_input=payload.model_dump(),
+    )
+    storage_path = directory / "project.json"
+    write_json_model(storage_path, project)
+    return ProjectCreateResponse(project=project, storage_path=str(storage_path))

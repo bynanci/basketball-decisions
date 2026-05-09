@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 
 from app.api import calibration, projects, tracking, videos
 
@@ -15,8 +18,49 @@ app.add_middleware(
 
 app.include_router(projects.router, prefix="/api")
 app.include_router(videos.router, prefix="/api")
+app.include_router(videos.frames_router, prefix="/api")
 app.include_router(calibration.router, prefix="/api")
 app.include_router(tracking.router, prefix="/api")
+
+
+@app.exception_handler(HTTPException)
+async def api_http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    if isinstance(exc.detail, dict) and {"code", "message", "details", "debug_hint"}.issubset(exc.detail):
+        payload = exc.detail
+    else:
+        payload = {
+            "code": "HTTP_ERROR",
+            "message": str(exc.detail),
+            "details": {},
+            "debug_hint": "Check the request path, method, headers, and body.",
+        }
+    return JSONResponse(status_code=exc.status_code, content=payload, headers=getattr(exc, "headers", None))
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={
+            "code": "REQUEST_VALIDATION_ERROR",
+            "message": "Request validation failed.",
+            "details": {"errors": jsonable_encoder(exc.errors())},
+            "debug_hint": "Compare the request body and parameters with the endpoint's Pydantic model.",
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": "INTERNAL_SERVER_ERROR",
+            "message": "An unexpected API error occurred.",
+            "details": {"exception_type": exc.__class__.__name__},
+            "debug_hint": "Check backend logs for the stack trace and add a typed api_error for expected failure modes.",
+        },
+    )
 
 
 @app.get("/api/health")

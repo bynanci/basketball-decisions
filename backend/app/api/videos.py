@@ -1,18 +1,171 @@
+from __future__ import annotations
+
+import importlib
+import importlib.util
+import shutil
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, File, UploadFile
+from fastapi.responses import FileResponse
 
-UPLOAD_DIR = Path(__file__).resolve().parents[2] / "data" / "uploads"
+from app.api.common import api_error, assert_path_child, read_json, require_project_dir, write_json_model
+from app.models import ExtractFramesRequest, ExtractFramesResponse, FrameAsset, VideoAsset, YouTubeVideoRequest
+from app.pipeline.frame_extractor import extract_frames
 
-router = APIRouter(prefix="/videos", tags=["videos"])
+router = APIRouter(prefix="/projects/{project_id}/video", tags=["videos"])
+frames_router = APIRouter(prefix="/projects/{project_id}/frames", tags=["frames"])
 
 
-@router.post("/upload")
-async def upload_video(file: UploadFile = File(...)) -> dict[str, str]:
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = Path(file.filename or "video.mp4").suffix or ".mp4"
-    video_id = str(uuid4())
-    destination = UPLOAD_DIR / f"{video_id}{suffix}"
-    destination.write_bytes(await file.read())
-    return {"video_id": video_id, "filename": file.filename or destination.name, "path": str(destination)}
+def _validate_body_project_id(path_project_id: str, body_project_id: str) -> None:
+    if path_project_id != body_project_id:
+        raise api_error(
+            400,
+            "PROJECT_ID_MISMATCH",
+            "Request body project_id must match the path project_id.",
+            {"path_project_id": path_project_id, "body_project_id": body_project_id},
+            "Send the same project id in the URL and Pydantic request body.",
+        )
+
+
+@router.post("/upload", response_model=VideoAsset)
+async def upload_video(project_id: str, file: UploadFile = File(...)) -> VideoAsset:
+    directory = require_project_dir(project_id)
+    suffix = Path(file.filename or "video.mp4").suffix.lower() or ".mp4"
+    allowed_content_types = {"video/mp4", "application/octet-stream", None}
+    if suffix != ".mp4" or file.content_type not in allowed_content_types:
+        raise api_error(
+            415,
+            "UNSUPPORTED_VIDEO_TYPE",
+            "Only MP4 uploads are supported by the MVP endpoint.",
+            {"filename": file.filename, "content_type": file.content_type},
+            "Upload a .mp4 file with content type video/mp4.",
+        )
+    asset_id = str(uuid4())
+    video_dir = directory / "videos"
+    destination = video_dir / f"{asset_id}.mp4"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("wb") as output:
+        shutil.copyfileobj(file.file, output)
+    video = VideoAsset(
+        project_id=project_id,
+        asset_id=asset_id,
+        source_type="upload",
+        uri=str(destination),
+        filename=file.filename or destination.name,
+        content_type=file.content_type,
+        original_input={"filename": file.filename, "content_type": file.content_type},
+        debug_metadata={"todo": "Probe video metadata with ffprobe/OpenCV in a later pipeline step."},
+    )
+    write_json_model(directory / "video.json", video)
+    return video
+
+
+@router.post("/youtube", response_model=VideoAsset)
+def create_youtube_video(project_id: str, payload: YouTubeVideoRequest) -> VideoAsset:
+    directory = require_project_dir(project_id)
+    if importlib.util.find_spec("yt_dlp") is None:
+        raise api_error(
+            501,
+            "YOUTUBE_DOWNLOADER_UNAVAILABLE",
+            "YouTube download is not configured in this environment.",
+            {"url": payload.url, "missing_optional_dependency": "yt_dlp"},
+            "TODO: add yt-dlp to backend requirements or inject a downloader service for production use.",
+        )
+
+    yt_dlp = importlib.import_module("yt_dlp")
+    asset_id = str(uuid4())
+    destination_template = str(directory / "videos" / f"{asset_id}.%(ext)s")
+    options = {"format": "mp4/bestvideo+bestaudio/best", "outtmpl": destination_template, "quiet": True}
+    with yt_dlp.YoutubeDL(options) as downloader:
+        info = downloader.extract_info(payload.url, download=True)
+    downloaded = next((directory / "videos").glob(f"{asset_id}.*"), None)
+    video = VideoAsset(
+        project_id=project_id,
+        asset_id=asset_id,
+        source_type="youtube",
+        uri=str(downloaded) if downloaded else payload.url,
+        filename=downloaded.name if downloaded else None,
+        content_type="video/mp4" if downloaded and downloaded.suffix == ".mp4" else None,
+        duration_seconds=info.get("duration"),
+        original_input=payload.model_dump(),
+        pipeline_output={"downloader": "yt_dlp", "title": info.get("title")},
+    )
+    write_json_model(directory / "video.json", video)
+    return video
+
+
+@frames_router.post("/extract", response_model=ExtractFramesResponse)
+def extract_project_frames(project_id: str, payload: ExtractFramesRequest) -> ExtractFramesResponse:
+    _validate_body_project_id(project_id, payload.project_id)
+    directory = require_project_dir(project_id)
+    video_doc = VideoAsset.model_validate(read_json(directory / "video.json"))
+    if payload.video_asset_id != video_doc.asset_id:
+        raise api_error(
+            404,
+            "VIDEO_ASSET_NOT_FOUND",
+            "Requested video_asset_id does not match the project's current video asset.",
+            {"requested": payload.video_asset_id, "current": video_doc.asset_id},
+            "Use the asset_id returned by the video upload or YouTube endpoint.",
+        )
+    if not video_doc.uri or not Path(video_doc.uri).exists():
+        raise api_error(
+            404,
+            "VIDEO_FILE_NOT_FOUND",
+            "The source video file is not available on disk.",
+            {"uri": video_doc.uri},
+            "Upload a local MP4 before extracting frames, or configure the YouTube downloader.",
+        )
+
+    output_dir = directory / "frames" / "images"
+    target_fps = payload.target_fps or 1.0
+    every_n_frames = max(1, round((video_doc.fps or 30.0) / target_fps))
+    frame_paths = extract_frames(Path(video_doc.uri), output_dir, every_n_frames=every_n_frames)
+    if payload.max_frames is not None:
+        frame_paths = frame_paths[: payload.max_frames]
+    frames = [
+        FrameAsset(
+            frame_id=f"frame-{index:06d}",
+            frame_index=index,
+            timestamp_seconds=index / target_fps,
+            image_path=str(path),
+        )
+        for index, path in enumerate(frame_paths)
+    ]
+    response = ExtractFramesResponse(
+        project_id=project_id,
+        request=payload,
+        frames=frames,
+        original_input=payload.model_dump(),
+        pipeline_output={"frame_count": len(frames), "extractor": "opencv_or_mvp_stub"},
+        debug_metadata={
+            "debug_hint": "If frame_count is 0, install and wire OpenCV/ffmpeg; the current pipeline fallback is a stub."
+        },
+    )
+    write_json_model(directory / "frames" / "index.json", response)
+    return response
+
+
+@frames_router.get("/{frame_index}")
+def get_project_frame(project_id: str, frame_index: int) -> FileResponse:
+    directory = require_project_dir(project_id)
+    frame_index_doc = ExtractFramesResponse.model_validate(read_json(directory / "frames" / "index.json"))
+    frame = next((item for item in frame_index_doc.frames if item.frame_index == frame_index), None)
+    if frame is None:
+        raise api_error(
+            404,
+            "FRAME_NOT_FOUND",
+            "Requested frame index was not found in the extracted frame index.",
+            {"frame_index": frame_index},
+            "Call POST /api/projects/{project_id}/frames/extract and request an existing frame_index.",
+        )
+    frame_path = assert_path_child(Path(frame.image_path), directory)
+    if not frame_path.exists():
+        raise api_error(
+            404,
+            "FRAME_IMAGE_NOT_FOUND",
+            "Frame metadata exists, but the image file is missing.",
+            {"image_path": str(frame_path)},
+            "Re-run frame extraction to recreate missing images.",
+        )
+    return FileResponse(frame_path)
