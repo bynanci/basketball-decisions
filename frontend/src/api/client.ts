@@ -494,6 +494,13 @@ export interface DatasetListResponse {
   datasets: DatasetSummary[]
 }
 
+export interface DecisionEventsBuildSummary {
+  event_count: number
+  avg_raw_score: number
+  avg_role_adjusted_score: number
+  opportunity_cost_avg: number
+}
+
 export function normalizeApiErrorPayload(status: number, payload?: Partial<ApiErrorResponse> | null): ApiErrorResponse {
   return {
     code: payload?.code ?? 'HTTP_ERROR',
@@ -530,6 +537,7 @@ export const apiClient = {
   listDatasets: () => request<DatasetListResponse>('/local-lab/datasets'),
   exportRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/export', { method: 'POST' }),
   exportDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/export', { method: 'POST' }),
+  buildDecisionEvents: () => request<DecisionEventsBuildSummary>('/local-lab/decision-events/build', { method: 'POST' }),
   scoreRecognitionQuality: (projectId: string) =>
     request<RecognitionScoreProjectResponse>(`/local-lab/recognition/score-project/${projectId}`, { method: 'POST' }),
   getProjectBundle: (projectId: string) => request<ProjectBundleResponse>(`/projects/${projectId}/bundle`),

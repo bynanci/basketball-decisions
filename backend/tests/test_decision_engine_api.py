@@ -1,0 +1,132 @@
+import json
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from app.api import local_lab
+from app.api.common import write_json_model
+from app.models import Project, QuizAttemptRecord, QuizPrompt
+
+
+def _option(option_id: str, *, is_correct: bool = False, expected_value: float | None = None) -> dict:
+    return {
+        "option_id": option_id,
+        "label": f"Option {option_id}",
+        "action_type": "PASS",
+        "start": {"x": 0.25, "y": 0.4},
+        "end": {"x": 0.75, "y": 0.6},
+        "expected_value": expected_value,
+        "is_correct": is_correct,
+        "explanation": f"Explanation for {option_id}",
+    }
+
+
+def _prompt(project_id: str = "project-1", **overrides) -> QuizPrompt:
+    payload = {
+        "project_id": project_id,
+        "prompt_id": "prompt-1",
+        "question": "What is the best decision?",
+        "court_role_target": "BALL_HANDLER",
+        "situation_type": "PICK_AND_ROLL",
+        "frame_id": "frame-1",
+        "frame_index": 7,
+        "timestamp_seconds": 2.8,
+        "question_mode": "ROLE_READ",
+        "options": [
+            _option("A", expected_value=1.12),
+            _option("C", is_correct=True, expected_value=1.18),
+        ],
+        "explanation": "Hit the cutter for the highest-value look.",
+    }
+    payload.update(overrides)
+    return QuizPrompt.model_validate(payload)
+
+
+def _attempt(project_id: str = "project-1", **overrides) -> QuizAttemptRecord:
+    payload = {
+        "project_id": project_id,
+        "attempt_id": "attempt-1",
+        "prompt_id": "prompt-1",
+        "selected_option_id": "A",
+        "correct_option_id": "C",
+        "is_correct": False,
+        "selected_expected_value": 1.12,
+        "correct_expected_value": 1.18,
+        "opportunity_cost": 0.06,
+        "score": 88,
+        "scoring_mode": "EXPECTED_VALUE",
+        "selected_explanation": "Explanation for A",
+        "correct_explanation": "Explanation for C",
+        "selected_role_feedback": "Explanation for A",
+        "correct_role_feedback": "Explanation for C",
+        "summary_explanation": "Hit the cutter for the highest-value look.",
+        "response_time_ms": 1200,
+        "timed_out": False,
+        "user_role": "PLAYER",
+    }
+    payload.update(overrides)
+    return QuizAttemptRecord.model_validate(payload)
+
+
+def _write_project_with_quiz(directory: Path, *, prompt: QuizPrompt, attempts: list[QuizAttemptRecord]) -> None:
+    write_json_model(directory / "project.json", Project(project_id=prompt.project_id, name="Decision engine test"))
+    (directory / "quiz_prompts.json").write_text(json.dumps([prompt.model_dump(mode="json")], indent=2), encoding="utf-8")
+    (directory / "quiz_attempts.json").write_text(json.dumps([attempt.model_dump(mode="json") for attempt in attempts], indent=2), encoding="utf-8")
+
+
+def test_build_decision_events_writes_explainable_jsonl(
+    client: TestClient, tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(local_lab, "DATASETS_DIR", tmp_path / "datasets")
+    prompt = _prompt()
+    attempt = _attempt()
+    _write_project_with_quiz(tmp_path / "project-1", prompt=prompt, attempts=[attempt])
+
+    response = client.post("/api/local-lab/decision-events/build")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "event_count": 1,
+        "avg_raw_score": 88.0,
+        "avg_role_adjusted_score": 88.0,
+        "opportunity_cost_avg": 0.06,
+    }
+    output_path = tmp_path / "datasets" / "player_value" / "player_decision_events.jsonl"
+    rows = [json.loads(line) for line in output_path.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 1
+    event = rows[0]
+    assert event["evaluation_source"] == "MANUAL_EXPECTED_VALUE"
+    assert event["selected_expected_value"] == 1.12
+    assert event["best_expected_value"] == 1.18
+    assert event["opportunity_cost"] == 0.06
+    assert event["role_adjusted_score"] == 88
+    assert event["explanations"]
+
+
+def test_decision_events_use_rule_based_fallback_and_role_bonuses(
+    client: TestClient, tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(local_lab, "DATASETS_DIR", tmp_path / "datasets")
+    prompt = _prompt(options=[_option("A"), _option("C", is_correct=True)], time_limit_ms=3000)
+    attempt = _attempt(
+        selected_option_id="C",
+        is_correct=True,
+        selected_expected_value=None,
+        correct_expected_value=None,
+        opportunity_cost=None,
+        score=100,
+        scoring_mode="CORRECTNESS_ONLY",
+        response_time_ms=1000,
+    )
+    _write_project_with_quiz(tmp_path / "project-1", prompt=prompt, attempts=[attempt])
+
+    response = client.post("/api/local-lab/decision-events/build")
+
+    assert response.status_code == 200
+    assert response.json()["avg_role_adjusted_score"] == 100.0
+    output_path = tmp_path / "datasets" / "player_value" / "player_decision_events.jsonl"
+    event = json.loads(output_path.read_text(encoding="utf-8").strip())
+    assert event["evaluation_source"] == "RULE_BASED"
+    assert event["raw_score"] == 100
+    assert "ROLE_READ correct-answer bonus applied: +5, capped at 100." in event["explanations"]
+    assert "Fast response bonus applied: +3 for answering faster than half the time limit, capped at 100." in event["explanations"]

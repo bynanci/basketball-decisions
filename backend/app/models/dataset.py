@@ -81,6 +81,13 @@ class DecisionAttemptTrainingLabel(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class DecisionEventsBuildSummary(BaseModel):
+    event_count: int = 0
+    avg_raw_score: float = 0.0
+    avg_role_adjusted_score: float = 0.0
+    opportunity_cost_avg: float = 0.0
+
+
 class DatasetManifest(BaseModel):
     dataset_type: DatasetType
     schema_version: str = "1.0"
