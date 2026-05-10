@@ -14,6 +14,8 @@ from app.api.common import DATA_DIR, api_error, read_json, write_json_model
 from app.models import (
     DatasetListResponse,
     DatasetManifest,
+    CuratedTrainingLabel,
+    CuratedTrainingSample,
     DatasetSummary,
     DecisionAttemptTrainingLabel,
     DecisionEvent,
@@ -36,6 +38,7 @@ from app.models import (
     VideoSourceRecord,
 )
 from app.models.base import utc_now
+from app.models.tracking import Detection, PlayerTrack
 from app.pipeline.recognition_quality import score_project_recognition
 from app.services.decision_engine import evaluate_attempt
 
@@ -206,6 +209,406 @@ def _average(values: list[float | int]) -> float:
         return 0.0
     return round(sum(values) / len(values), 4)
 
+
+
+def _curated_dataset_storage_paths(dataset_type: str) -> dict[str, str]:
+    directory = DATASETS_DIR / dataset_type
+    return {
+        "manifest": str(directory / "dataset_manifest.json"),
+        "samples": str(directory / "curated_samples.jsonl"),
+        "labels": str(directory / "curated_labels.jsonl"),
+    }
+
+
+def _label_distribution(labels: Iterable[CuratedTrainingLabel]) -> dict[str, int]:
+    distribution: dict[str, int] = {}
+    for label in labels:
+        distribution[label.label] = distribution.get(label.label, 0) + 1
+    return dict(sorted(distribution.items()))
+
+
+def _positive_negative_counts(labels: Iterable[CuratedTrainingLabel]) -> tuple[int, int]:
+    positive_labels = {"VALID_PLAYER_TRACK", "PLAYER", "GOOD_DECISION", "GOOD_READ", "ACCEPTABLE_READ"}
+    negative_labels = {"FALSE_POSITIVE_TRACK", "FALSE_POSITIVE", "BAD_DECISION", "BAD_READ", "MISSED_READ"}
+    positive = 0
+    negative = 0
+    for label in labels:
+        if label.label in positive_labels:
+            positive += 1
+        elif label.label in negative_labels:
+            negative += 1
+    return positive, negative
+
+
+def _positive_negative_ratio(positive: int, negative: int) -> float | None:
+    if negative == 0:
+        return None
+    return round(positive / negative, 4)
+
+
+def _curated_manifest(
+    *,
+    dataset_type: str,
+    samples: list[CuratedTrainingSample],
+    labels: list[CuratedTrainingLabel],
+    project_ids: set[str],
+    skipped_projects: list[SkippedProject],
+    created_at: datetime,
+    notes: str,
+) -> DatasetManifest:
+    positive_count, negative_count = _positive_negative_counts(labels)
+    return DatasetManifest(
+        dataset_type=dataset_type,  # type: ignore[arg-type]
+        sample_count=len(samples),
+        label_count=len(labels),
+        project_count=len(project_ids),
+        included_project_count=len(project_ids),
+        skipped_project_count=len(skipped_projects),
+        skipped_projects=skipped_projects,
+        exported_at=created_at,
+        storage_paths=_curated_dataset_storage_paths(dataset_type),
+        positive_sample_count=positive_count,
+        negative_sample_count=negative_count,
+        positive_negative_ratio=_positive_negative_ratio(positive_count, negative_count),
+        source_project_ids=sorted(project_ids),
+        skipped_project_ids=[project.project_id for project in skipped_projects],
+        label_distribution=_label_distribution(labels),
+        created_at=created_at,
+        notes=notes,
+    )
+
+
+def _add_curated_pair(
+    samples: list[CuratedTrainingSample],
+    labels: list[CuratedTrainingLabel],
+    *,
+    sample_id: str,
+    dataset_type: str,
+    sample_type: str,
+    project_id: str,
+    target_type: str,
+    target_id: str,
+    label: str,
+    source: str,
+    rationale: str,
+    trace: dict,
+    payload: dict,
+    created_at: datetime,
+) -> None:
+    samples.append(
+        CuratedTrainingSample(
+            sample_id=sample_id,
+            dataset_type=dataset_type,  # type: ignore[arg-type]
+            sample_type=sample_type,
+            project_id=project_id,
+            label=label,
+            source=source,  # type: ignore[arg-type]
+            trace=trace,
+            payload=payload,
+            created_at=created_at,
+        )
+    )
+    labels.append(
+        CuratedTrainingLabel(
+            sample_id=sample_id,
+            dataset_type=dataset_type,  # type: ignore[arg-type]
+            target_type=target_type,
+            target_id=target_id,
+            project_id=project_id,
+            label=label,
+            source=source,  # type: ignore[arg-type]
+            rationale=rationale,
+            trace=trace,
+            created_at=created_at,
+        )
+    )
+
+
+def _tracking_for_positive_samples(directory: Path) -> tuple[RunTrackingResponse | None, str]:
+    cleaned_path = directory / "tracking_cleaned.json"
+    if cleaned_path.exists():
+        return RunTrackingResponse.model_validate(read_json(cleaned_path)), "tracking_cleaned.json"
+    tracking_path = directory / "tracking.json"
+    if tracking_path.exists():
+        return RunTrackingResponse.model_validate(read_json(tracking_path)), "tracking.json"
+    return None, "tracking.json"
+
+
+def _raw_tracking(directory: Path) -> RunTrackingResponse | None:
+    tracking_path = directory / "tracking.json"
+    if not tracking_path.exists():
+        return None
+    return RunTrackingResponse.model_validate(read_json(tracking_path))
+
+
+@router.post("/datasets/recognition/curate", response_model=DatasetManifest)
+def curate_recognition_dataset() -> DatasetManifest:
+    _ensure_dataset_dirs()
+    samples: list[CuratedTrainingSample] = []
+    labels: list[CuratedTrainingLabel] = []
+    project_ids: set[str] = set()
+    created_at = utc_now()
+
+    eligible_dirs, skipped_projects = _training_eligible_project_dirs()
+    for directory in eligible_dirs:
+        positive_tracking, positive_artifact = _tracking_for_positive_samples(directory)
+        raw_tracking = _raw_tracking(directory)
+        if positive_tracking is None and raw_tracking is None:
+            continue
+        review_path = directory / "tracking_review_patch.json"
+        review_patch = TrackReviewPatch.model_validate(read_json(review_path)) if review_path.exists() else TrackReviewPatch()
+        project_id = (positive_tracking or raw_tracking).project_id  # type: ignore[union-attr]
+        project_ids.add(project_id)
+
+        excluded_track_ids = set(review_patch.excluded_track_ids)
+        excluded_detection_ids = set(review_patch.excluded_detection_ids)
+        positive_tracks: list[PlayerTrack] = [] if positive_tracking is None else [
+            track for track in positive_tracking.tracks if track.track_id not in excluded_track_ids
+        ]
+        valid_track_ids = {track.track_id for track in positive_tracks}
+        source_for_tracks = "TRACKING_REVIEW" if review_path.exists() else "HEURISTIC"
+
+        for track in positive_tracks:
+            trace = {
+                "artifact": positive_artifact,
+                "track_id": track.track_id,
+                "review_patch": str(review_path) if review_path.exists() else None,
+                "excluded_track_ids": sorted(excluded_track_ids),
+            }
+            _add_curated_pair(
+                samples,
+                labels,
+                sample_id=f"{project_id}:track:{track.track_id}:VALID_PLAYER_TRACK",
+                dataset_type="recognition",
+                sample_type="track",
+                project_id=project_id,
+                target_type="track",
+                target_id=track.track_id,
+                label="VALID_PLAYER_TRACK",
+                source=source_for_tracks,
+                rationale="Track is present in the training-eligible tracking artifact and is not excluded by tracking review.",
+                trace=trace,
+                payload=track.model_dump(mode="json"),
+                created_at=created_at,
+            )
+
+        positive_detections: list[Detection] = [] if positive_tracking is None else [
+            detection
+            for detection in positive_tracking.detections
+            if detection.track_id in valid_track_ids and detection.detection_id not in excluded_detection_ids
+        ]
+        for detection in positive_detections:
+            trace = {
+                "artifact": positive_artifact,
+                "detection_id": detection.detection_id,
+                "track_id": detection.track_id,
+                "attached_to_valid_track": True,
+            }
+            _add_curated_pair(
+                samples,
+                labels,
+                sample_id=f"{project_id}:detection:{detection.detection_id}:PLAYER",
+                dataset_type="recognition",
+                sample_type="detection",
+                project_id=project_id,
+                target_type="detection",
+                target_id=detection.detection_id,
+                label="PLAYER",
+                source="HEURISTIC",
+                rationale="Detection is attached to a valid non-excluded player track.",
+                trace=trace,
+                payload=detection.model_dump(mode="json"),
+                created_at=created_at,
+            )
+
+        raw_track_by_id = {track.track_id: track for track in raw_tracking.tracks} if raw_tracking is not None else {}
+        for track_id in sorted(excluded_track_ids):
+            track_payload = raw_track_by_id.get(track_id).model_dump(mode="json") if track_id in raw_track_by_id else {"track_id": track_id}
+            trace = {
+                "artifact": "tracking_review_patch.json",
+                "tracking_artifact": "tracking.json",
+                "excluded_track_ids": sorted(excluded_track_ids),
+            }
+            _add_curated_pair(
+                samples,
+                labels,
+                sample_id=f"{project_id}:track:{track_id}:FALSE_POSITIVE_TRACK",
+                dataset_type="recognition",
+                sample_type="track",
+                project_id=project_id,
+                target_type="track",
+                target_id=track_id,
+                label="FALSE_POSITIVE_TRACK",
+                source="TRACKING_REVIEW",
+                rationale="Track ID is explicitly listed in tracking_review_patch.excluded_track_ids.",
+                trace=trace,
+                payload=track_payload,
+                created_at=created_at,
+            )
+
+        raw_detection_by_id = {detection.detection_id: detection for detection in raw_tracking.detections} if raw_tracking is not None else {}
+        for detection_id in sorted(excluded_detection_ids):
+            detection = raw_detection_by_id.get(detection_id)
+            trace = {
+                "artifact": "tracking_review_patch.json",
+                "tracking_artifact": "tracking.json",
+                "excluded_detection_ids": sorted(excluded_detection_ids),
+            }
+            _add_curated_pair(
+                samples,
+                labels,
+                sample_id=f"{project_id}:detection:{detection_id}:FALSE_POSITIVE",
+                dataset_type="recognition",
+                sample_type="detection",
+                project_id=project_id,
+                target_type="detection",
+                target_id=detection_id,
+                label="FALSE_POSITIVE",
+                source="TRACKING_REVIEW",
+                rationale="Detection ID is explicitly listed in tracking_review_patch.excluded_detection_ids.",
+                trace=trace,
+                payload=detection.model_dump(mode="json") if detection is not None else {"detection_id": detection_id},
+                created_at=created_at,
+            )
+
+    directory = DATASETS_DIR / "recognition"
+    _write_jsonl(directory / "curated_samples.jsonl", samples)
+    _write_jsonl(directory / "curated_labels.jsonl", labels)
+    manifest = _curated_manifest(
+        dataset_type="recognition",
+        samples=samples,
+        labels=labels,
+        project_ids=project_ids,
+        skipped_projects=skipped_projects,
+        created_at=created_at,
+        notes="Curated recognition dataset with positive player tracks/detections and reviewer-sourced false positives. No ML training was performed.",
+    )
+    write_json_model(directory / "dataset_manifest.json", manifest)
+    return manifest
+
+
+def _option_label(prompt: QuizPrompt, option) -> tuple[str | None, str | None, str | None, dict]:
+    expected_values = [candidate.expected_value for candidate in prompt.options if candidate.expected_value is not None]
+    max_expected_value = max(expected_values) if expected_values else None
+    within_best = max_expected_value is not None and option.expected_value is not None and max_expected_value - option.expected_value <= 0.1
+    below_best = max_expected_value is not None and option.expected_value is not None and max_expected_value - option.expected_value >= 0.25
+    trace = {
+        "prompt_id": prompt.prompt_id,
+        "option_id": option.option_id,
+        "is_correct": option.is_correct,
+        "expected_value": option.expected_value,
+        "max_expected_value": max_expected_value,
+        "within_0_1_of_max_expected_value": within_best,
+        "lower_than_max_by_at_least_0_25": below_best,
+    }
+    if option.is_correct:
+        return "GOOD_DECISION", "QUIZ_AUTHOR", "Option is marked correct by the quiz author.", trace
+    if within_best:
+        return "GOOD_DECISION", "EXPECTED_VALUE", "Option expected value is within 0.1 of the prompt maximum expected value.", trace
+    if not option.is_correct:
+        return "BAD_DECISION", "QUIZ_AUTHOR", "Option is not marked correct by the quiz author.", trace
+    if below_best:
+        return "BAD_DECISION", "EXPECTED_VALUE", "Option expected value is lower than the prompt maximum by at least 0.25.", trace
+    return None, None, None, trace
+
+
+def _attempt_read_label(attempt: QuizAttemptRecord) -> tuple[str, str]:
+    if attempt.timed_out:
+        return "MISSED_READ", "Attempt timed out before a decision was selected."
+    if attempt.score >= 80:
+        return "GOOD_READ", "Attempt score is at least 80."
+    if attempt.score >= 50:
+        return "ACCEPTABLE_READ", "Attempt score is between 50 and 79."
+    return "BAD_READ", "Attempt score is below 50."
+
+
+@router.post("/datasets/decision/curate", response_model=DatasetManifest)
+def curate_decision_dataset() -> DatasetManifest:
+    _ensure_dataset_dirs()
+    samples: list[CuratedTrainingSample] = []
+    labels: list[CuratedTrainingLabel] = []
+    project_ids: set[str] = set()
+    created_at = utc_now()
+
+    eligible_dirs, skipped_projects = _training_eligible_project_dirs()
+    for directory in eligible_dirs:
+        prompts = _read_json_list(directory / "quiz_prompts.json", _PROMPTS_ADAPTER)
+        attempts = _read_json_list(directory / "quiz_attempts.json", _ATTEMPTS_ADAPTER)
+        prompt_by_id = {prompt.prompt_id: prompt for prompt in prompts}
+
+        for prompt in prompts:
+            project_ids.add(prompt.project_id)
+            for option in prompt.options:
+                label, source, rationale, trace = _option_label(prompt, option)
+                if label is None or source is None or rationale is None:
+                    continue
+                _add_curated_pair(
+                    samples,
+                    labels,
+                    sample_id=f"{prompt.project_id}:prompt:{prompt.prompt_id}:option:{option.option_id}:{label}",
+                    dataset_type="decision",
+                    sample_type="option",
+                    project_id=prompt.project_id,
+                    target_type="option",
+                    target_id=option.option_id,
+                    label=label,
+                    source=source,
+                    rationale=rationale,
+                    trace=trace,
+                    payload={
+                        "prompt": prompt.model_dump(mode="json", exclude={"options"}),
+                        "option": option.model_dump(mode="json"),
+                    },
+                    created_at=created_at,
+                )
+
+        for attempt in attempts:
+            prompt = prompt_by_id.get(attempt.prompt_id)
+            project_ids.add(attempt.project_id)
+            label, rationale = _attempt_read_label(attempt)
+            trace = {
+                "attempt_id": attempt.attempt_id,
+                "prompt_id": attempt.prompt_id,
+                "selected_option_id": attempt.selected_option_id,
+                "correct_option_id": attempt.correct_option_id,
+                "score": attempt.score,
+                "timed_out": attempt.timed_out,
+                "response_time_ms": attempt.response_time_ms,
+            }
+            _add_curated_pair(
+                samples,
+                labels,
+                sample_id=f"{attempt.project_id}:attempt:{attempt.attempt_id}:{label}",
+                dataset_type="decision",
+                sample_type="attempt",
+                project_id=attempt.project_id,
+                target_type="attempt",
+                target_id=attempt.attempt_id,
+                label=label,
+                source="QUIZ_ATTEMPT",
+                rationale=rationale,
+                trace=trace,
+                payload={
+                    "attempt": attempt.model_dump(mode="json"),
+                    "prompt": prompt.model_dump(mode="json") if prompt is not None else None,
+                },
+                created_at=created_at,
+            )
+
+    directory = DATASETS_DIR / "decision"
+    _write_jsonl(directory / "curated_samples.jsonl", samples)
+    _write_jsonl(directory / "curated_labels.jsonl", labels)
+    manifest = _curated_manifest(
+        dataset_type="decision",
+        samples=samples,
+        labels=labels,
+        project_ids=project_ids,
+        skipped_projects=skipped_projects,
+        created_at=created_at,
+        notes="Curated decision dataset with good/bad option labels and read-quality attempt labels. No ML training was performed.",
+    )
+    write_json_model(directory / "dataset_manifest.json", manifest)
+    return manifest
 
 @router.post("/datasets/recognition/export", response_model=DatasetManifest)
 def export_recognition_dataset() -> DatasetManifest:
@@ -402,6 +805,10 @@ def _summary_for_dataset(dataset_type: str) -> DatasetSummary:
         project_count=manifest.project_count,
         last_exported_at=manifest.exported_at,
         storage_paths=manifest.storage_paths,
+        positive_sample_count=manifest.positive_sample_count,
+        negative_sample_count=manifest.negative_sample_count,
+        positive_negative_ratio=manifest.positive_negative_ratio,
+        label_distribution=manifest.label_distribution,
     )
 
 

@@ -29,8 +29,10 @@ TrackTrainingLabelValue = Literal[
     "LOST_TRACK",
     "OCCLUDED",
 ]
-TrainingLabelSource = Literal["TRACKING_REVIEW", "MANUAL", "HEURISTIC"]
+TrainingLabelSource = Literal["TRACKING_REVIEW", "MANUAL", "HEURISTIC", "QUIZ_AUTHOR", "EXPECTED_VALUE", "QUIZ_ATTEMPT"]
 DatasetType = Literal["recognition", "decision", "player_value"]
+DecisionOptionTrainingLabelValue = Literal["GOOD_DECISION", "BAD_DECISION"]
+DecisionAttemptTrainingLabelValue = Literal["GOOD_READ", "ACCEPTABLE_READ", "BAD_READ", "MISSED_READ"]
 
 
 class DetectionTrainingLabel(BaseModel):
@@ -52,6 +54,42 @@ class TrackTrainingLabel(BaseModel):
     source: TrainingLabelSource
     created_at: datetime = Field(default_factory=utc_now)
     notes: str | None = None
+
+
+class DecisionOptionTrainingLabel(BaseModel):
+    project_id: str
+    prompt_id: str
+    option_id: str
+    label: DecisionOptionTrainingLabelValue
+    source: TrainingLabelSource
+    created_at: datetime = Field(default_factory=utc_now)
+    rationale: str
+    trace: dict[str, Any] = Field(default_factory=dict)
+
+
+class CuratedTrainingSample(BaseModel):
+    sample_id: str
+    dataset_type: DatasetType
+    sample_type: str
+    project_id: str
+    label: str
+    source: TrainingLabelSource
+    trace: dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class CuratedTrainingLabel(BaseModel):
+    sample_id: str
+    dataset_type: DatasetType
+    target_type: str
+    target_id: str
+    project_id: str
+    label: str
+    source: TrainingLabelSource
+    rationale: str
+    trace: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
 
 
 class DecisionTrainingSample(BaseModel):
@@ -106,6 +144,13 @@ class DatasetManifest(BaseModel):
     skipped_projects: list[SkippedProject] = Field(default_factory=list)
     exported_at: datetime = Field(default_factory=utc_now)
     storage_paths: dict[str, str] = Field(default_factory=dict)
+    positive_sample_count: int = 0
+    negative_sample_count: int = 0
+    positive_negative_ratio: float | None = None
+    source_project_ids: list[str] = Field(default_factory=list)
+    skipped_project_ids: list[str] = Field(default_factory=list)
+    label_distribution: dict[str, int] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
     notes: str | None = None
 
 
@@ -116,6 +161,10 @@ class DatasetSummary(BaseModel):
     project_count: int = 0
     last_exported_at: datetime | None = None
     storage_paths: dict[str, str] = Field(default_factory=dict)
+    positive_sample_count: int = 0
+    negative_sample_count: int = 0
+    positive_negative_ratio: float | None = None
+    label_distribution: dict[str, int] = Field(default_factory=dict)
 
 
 class DatasetListResponse(BaseModel):
