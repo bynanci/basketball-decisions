@@ -5,6 +5,7 @@
       <nav>
         <RouterLink to="/">Home</RouterLink>
         <RouterLink to="/start">Choose training role</RouterLink>
+        <RouterLink to="/training">Training</RouterLink>
       </nav>
     </header>
     <main>
