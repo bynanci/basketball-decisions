@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, FiniteFloat, field_validator, model_valid
 from .base import utc_now
 
 ActionType = Literal["PASS", "DRIVE", "SHOT", "RESET", "HOLD"]
+QuizPromptMode = Literal["STILL_FRAME", "VIDEO_FREEZE"]
 
 
 class DecisionArrowPoint(BaseModel):
@@ -55,6 +56,11 @@ class QuizPrompt(BaseModel):
     timestamp_seconds: FiniteFloat
     image_url: str | None = None
     image_path: str | None = None
+    video_asset_id: str | None = None
+    clip_start_seconds: FiniteFloat | None = Field(default=None, ge=0)
+    freeze_frame_seconds: FiniteFloat | None = Field(default=None, ge=0)
+    clip_end_seconds: FiniteFloat | None = Field(default=None, ge=0)
+    mode: QuizPromptMode = "STILL_FRAME"
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
     created_at: datetime = Field(default_factory=utc_now)
@@ -75,6 +81,12 @@ class QuizPrompt(BaseModel):
         option_ids = [option.option_id for option in self.options]
         if len(set(option_ids)) != len(option_ids):
             raise ValueError("option_id values must be unique")
+        if self.mode == "VIDEO_FREEZE":
+            freeze_at = self.freeze_frame_seconds if self.freeze_frame_seconds is not None else self.timestamp_seconds
+            if self.clip_start_seconds is not None and self.clip_start_seconds > freeze_at:
+                raise ValueError("clip_start_seconds must be less than or equal to freeze_frame_seconds")
+            if self.clip_end_seconds is not None and self.clip_end_seconds < freeze_at:
+                raise ValueError("clip_end_seconds must be greater than or equal to freeze_frame_seconds")
         return self
 
 
@@ -87,6 +99,11 @@ class CreateQuizPromptRequest(BaseModel):
     timestamp_seconds: FiniteFloat
     image_url: str | None = None
     image_path: str | None = None
+    video_asset_id: str | None = None
+    clip_start_seconds: FiniteFloat | None = Field(default=None, ge=0)
+    freeze_frame_seconds: FiniteFloat | None = Field(default=None, ge=0)
+    clip_end_seconds: FiniteFloat | None = Field(default=None, ge=0)
+    mode: QuizPromptMode = "STILL_FRAME"
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
 
@@ -105,6 +122,12 @@ class CreateQuizPromptRequest(BaseModel):
         option_ids = [option.option_id for option in self.options]
         if len(set(option_ids)) != len(option_ids):
             raise ValueError("option_id values must be unique")
+        if self.mode == "VIDEO_FREEZE":
+            freeze_at = self.freeze_frame_seconds if self.freeze_frame_seconds is not None else self.timestamp_seconds
+            if self.clip_start_seconds is not None and self.clip_start_seconds > freeze_at:
+                raise ValueError("clip_start_seconds must be less than or equal to freeze_frame_seconds")
+            if self.clip_end_seconds is not None and self.clip_end_seconds < freeze_at:
+                raise ValueError("clip_end_seconds must be greater than or equal to freeze_frame_seconds")
         return self
 
 

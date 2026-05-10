@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
-import type { DecisionActionType, DecisionArrowPoint, DecisionQuizOption } from '../api/client'
+import type { DecisionActionType, DecisionArrowPoint, DecisionQuizOption, QuizPromptMode } from '../api/client'
 import ArrowDrawingOverlay from '../components/ArrowDrawingOverlay.vue'
 import { useProjectHydration } from '../composables/useProjectHydration'
 import { useProjectStore } from '../stores/projectStore'
@@ -16,6 +16,10 @@ projectStore.setActiveProject(props.projectId)
 
 const question = ref('What is the best decision here?')
 const explanation = ref('')
+const mode = ref<QuizPromptMode>('STILL_FRAME')
+const clipStartSec = ref<number | null>(null)
+const freezeFrameSec = ref<number | null>(null)
+const clipEndSec = ref<number | null>(null)
 const options = ref<DecisionQuizOption[]>([])
 const selectedOptionId = ref<string | null>(null)
 const isSaving = ref(false)
@@ -24,6 +28,8 @@ const actionTypes: DecisionActionType[] = ['PASS', 'DRIVE', 'SHOT', 'RESET', 'HO
 const project = computed(() => projectStore.getProject(props.projectId))
 const frameIndex = computed(() => Number(route.query.frameIndex))
 const selectedFrame = computed(() => project.value?.frames.find((frame) => frame.frame_index === frameIndex.value) ?? null)
+const hasVideoSource = computed(() => project.value?.videoAsset?.source_type === 'upload' && !!project.value.videoAsset.asset_id)
+const effectiveMode = computed<QuizPromptMode>(() => (mode.value === 'VIDEO_FREEZE' && hasVideoSource.value ? 'VIDEO_FREEZE' : 'STILL_FRAME'))
 const imageSrc = computed(() => (Number.isFinite(frameIndex.value) ? apiClient.frameImageUrl(props.projectId, frameIndex.value) : ''))
 const validationErrors = computed(() => {
   const errors: string[] = []
@@ -35,12 +41,24 @@ const validationErrors = computed(() => {
   if (options.value.some((option) => !isNormalizedPoint(option.start) || !isNormalizedPoint(option.end))) errors.push('Every arrow must stay within normalized image coordinates.')
   if (options.value.some((option) => option.expected_value !== null && !Number.isFinite(option.expected_value))) errors.push('Expected values must be valid numbers when provided.')
   if (options.value.some((option) => !option.label.trim() || !option.explanation.trim())) errors.push('Every option needs a label and explanation.')
+  if (effectiveMode.value === 'VIDEO_FREEZE') {
+    const freezeAt = freezeFrameSec.value ?? selectedFrame.value?.timestamp_seconds ?? null
+    if (freezeAt === null || !Number.isFinite(freezeAt)) errors.push('Freeze frame time is required for video mode.')
+    if (clipStartSec.value !== null && (!Number.isFinite(clipStartSec.value) || clipStartSec.value < 0)) errors.push('Clip start must be a non-negative number.')
+    if (freezeAt !== null && clipStartSec.value !== null && clipStartSec.value > freezeAt) errors.push('Clip start must be before the freeze frame.')
+    if (clipEndSec.value !== null && (!Number.isFinite(clipEndSec.value) || clipEndSec.value < (freezeAt ?? 0))) errors.push('Clip end must be after the freeze frame.')
+  }
   if (!explanation.value.trim()) errors.push('Summary explanation is required.')
   return errors
 })
 
 onMounted(async () => {
   await ensureProjectHydrated(props.projectId).catch(() => undefined)
+  if (selectedFrame.value) {
+    freezeFrameSec.value = selectedFrame.value.timestamp_seconds
+    clipStartSec.value = Math.max(0, Number((selectedFrame.value.timestamp_seconds - 3).toFixed(2)))
+    clipEndSec.value = Number((selectedFrame.value.timestamp_seconds + 1).toFixed(2))
+  }
 })
 
 function optionId(index: number) {
@@ -101,6 +119,11 @@ async function savePrompt() {
       timestamp_seconds: selectedFrame.value.timestamp_seconds,
       image_url: imageSrc.value,
       image_path: selectedFrame.value.image_path,
+      video_asset_id: effectiveMode.value === 'VIDEO_FREEZE' ? project.value?.videoAsset?.asset_id ?? null : null,
+      clip_start_seconds: effectiveMode.value === 'VIDEO_FREEZE' ? clipStartSec.value : null,
+      freeze_frame_seconds: effectiveMode.value === 'VIDEO_FREEZE' ? freezeFrameSec.value : null,
+      clip_end_seconds: effectiveMode.value === 'VIDEO_FREEZE' ? clipEndSec.value : null,
+      mode: effectiveMode.value,
       options: options.value,
       explanation: explanation.value
     })
@@ -152,6 +175,21 @@ async function savePrompt() {
         <textarea v-model="explanation" placeholder="Explain why the correct decision is best."></textarea>
       </label>
 
+      <h2>Playback mode</h2>
+      <label>
+        Mode
+        <select v-model="mode">
+          <option value="STILL_FRAME">Still frame</option>
+          <option value="VIDEO_FREEZE" :disabled="!hasVideoSource">Video freeze</option>
+        </select>
+      </label>
+      <p v-if="!hasVideoSource" class="muted">Upload a local MP4 to enable video-freeze prompts. This prompt will save as a still frame.</p>
+      <div v-if="effectiveMode === 'VIDEO_FREEZE'" class="time-grid">
+        <label>Clip start (seconds)<input v-model.number="clipStartSec" type="number" min="0" step="0.1" /></label>
+        <label>Freeze frame (seconds)<input v-model.number="freezeFrameSec" type="number" min="0" step="0.1" /></label>
+        <label>Clip end (seconds)<input v-model.number="clipEndSec" type="number" min="0" step="0.1" /></label>
+      </div>
+
       <h2>Options</h2>
       <article v-for="option in options" :key="option.option_id" :class="['option-card', { selected: option.option_id === selectedOptionId }]">
         <header>
@@ -185,6 +223,12 @@ async function savePrompt() {
   border-radius: 12px;
   overflow: hidden;
   position: relative;
+}
+
+.time-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .image-stage img {

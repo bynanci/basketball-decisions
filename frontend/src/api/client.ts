@@ -251,6 +251,7 @@ export interface ProjectTracksResponse {
 }
 
 export type DecisionActionType = 'PASS' | 'DRIVE' | 'SHOT' | 'RESET' | 'HOLD'
+export type QuizPromptMode = 'STILL_FRAME' | 'VIDEO_FREEZE'
 
 export interface DecisionArrowPoint {
   x: number
@@ -277,6 +278,11 @@ export interface QuizPrompt {
   timestamp_seconds: number
   image_url?: string | null
   image_path?: string | null
+  video_asset_id?: string | null
+  clip_start_seconds?: number | null
+  freeze_frame_seconds?: number | null
+  clip_end_seconds?: number | null
+  mode: QuizPromptMode
   options: DecisionQuizOption[]
   explanation: string
   created_at: string
@@ -290,6 +296,11 @@ export interface CreateQuizPromptRequest {
   timestamp_seconds: number
   image_url?: string | null
   image_path?: string | null
+  video_asset_id?: string | null
+  clip_start_seconds?: number | null
+  freeze_frame_seconds?: number | null
+  clip_end_seconds?: number | null
+  mode: QuizPromptMode
   options: DecisionQuizOption[]
   explanation: string
 }
@@ -359,6 +370,7 @@ export const apiClient = {
       body: JSON.stringify(payload)
     }),
   frameImageUrl: (projectId: string, frameIndex: number) => `${API_BASE_URL}/projects/${projectId}/frames/${frameIndex}`,
+  videoSourceUrl: (projectId: string) => `${API_BASE_URL}/projects/${projectId}/video/source`,
   saveCalibration: (projectId: string, payload: SaveCalibrationRequest) =>
     request<SaveCalibrationResponse>(`/projects/${projectId}/calibration`, {
       method: 'POST',
