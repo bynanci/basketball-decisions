@@ -354,3 +354,29 @@ YouTube and official league highlights are **reference-only by default**. Import
 Local Lab dataset exports for recognition and decision training include only projects where `source.allowed_for_training` is `true`. Projects with missing source metadata, unknown licenses, YouTube reference-only licenses, unconfirmed rights, or reference-only usage scopes are skipped and listed in the export manifest with a reason. Export manifests also summarize included/skipped project counts plus source license and usage-scope distributions.
 
 The user is responsible for confirming rights, license terms, and permitted use before training, local storage, redistribution, or import. NBA, EuroLeague, NCAA, and YouTube highlight clips should not be bulk-trained or redistributed unless permission or a license explicitly allows that use.
+
+## Reference Video Breakdown Importer
+
+The M8 Reference Video Breakdown Importer lets users register online teaching, breakdown, and highlight videos as source-governed reference metadata, then manually extract basketball concepts into authoring drafts. The frontend routes are `/reference-videos` for the library and create form, and `/reference-videos/:referenceId` for notes and draft conversion. The backend API is mounted under `/api/reference-videos`.
+
+Reference video storage is local JSON only under `backend/app/data/reference_videos/`:
+
+- `reference_videos.json` stores metadata such as title, URL, source type, license, usage scope, tags, notes, and training eligibility.
+- `breakdown_notes.json` stores manually authored timestamped concepts, good reads, bad reads, coaching cues, role/situation context, tags, and confidence.
+- `quiz_prompt_drafts.json` stores draft quiz prompts generated from breakdown notes.
+- `decision_rule_drafts.json` stores draft decision-rule candidates generated from breakdown notes.
+
+Important governance behavior:
+
+- YouTube videos are stored as metadata only.
+- The importer does **not** download YouTube videos or other remote media.
+- YouTube reference videos default to `license_type=YOUTUBE_REFERENCE_ONLY`, `usage_scope=REFERENCE_ONLY`, and `allowed_for_training=false`.
+- Reference-only videos, breakdown notes, quiz prompt drafts, and decision rule drafts are **not** training data and are not included in Local Lab dataset exports.
+- Drafts are authoring aids only. Human review and approval are required before any concept becomes a governed training sample through the existing source-governed training workflow.
+
+Breakdown notes can be converted into draft assets:
+
+- Quiz drafts ask: `In this {situation_type}, what is the best read for the {court_role}?` They include at least option A from the note's `good_read`, option B from the note's `bad_read`, and an explanation from `coaching_cue`.
+- Rule drafts copy the note's role and situation, use `concept` as the condition, use `good_read` and `bad_read` as positive/negative cues, set `suggested_weight=1.0`, and keep `coaching_cue` as the explanation.
+
+Local Lab also displays reference-only source, prompt draft, and rule draft counts so users can see authoring progress without confusing drafts with exportable training data.

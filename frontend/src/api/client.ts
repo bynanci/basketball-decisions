@@ -549,6 +549,112 @@ export interface DecisionEventsBuildSummary {
   opportunity_cost_avg: number
 }
 
+export type BreakdownConfidence = 'LOW' | 'MEDIUM' | 'HIGH'
+export type DraftStatus = 'DRAFT' | 'APPROVED' | 'REJECTED'
+
+export interface ReferenceVideo {
+  reference_id: string
+  source_id: string
+  title: string
+  url: string
+  source_type: 'YOUTUBE' | 'URL'
+  license_type: SourceLicenseType
+  usage_scope: UsageScope
+  allowed_for_training: boolean
+  tags: string[]
+  notes?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateReferenceVideoRequest {
+  title: string
+  url: string
+  source_type?: 'YOUTUBE' | 'URL' | null
+  license_type?: SourceLicenseType | null
+  usage_scope?: UsageScope | null
+  allowed_for_training?: boolean | null
+  tags?: string[]
+  notes?: string | null
+}
+
+export interface ReferenceVideoListResponse {
+  reference_videos: ReferenceVideo[]
+}
+
+export interface ReferenceBreakdownNote {
+  note_id: string
+  reference_id: string
+  timestamp_sec?: number | null
+  timestamp_label?: string | null
+  court_role: CourtRoleTarget
+  situation_type: SituationType
+  concept: string
+  good_read: string
+  bad_read: string
+  coaching_cue: string
+  tags: string[]
+  confidence: BreakdownConfidence
+  created_at: string
+  updated_at: string
+}
+
+export interface UpsertReferenceBreakdownNoteRequest {
+  timestamp_sec?: number | null
+  timestamp_label?: string | null
+  court_role: CourtRoleTarget
+  situation_type: SituationType
+  concept: string
+  good_read: string
+  bad_read: string
+  coaching_cue: string
+  tags?: string[]
+  confidence: BreakdownConfidence
+}
+
+export interface QuizPromptDraftOption {
+  option_id: string
+  label: string
+  is_correct: boolean
+}
+
+export interface QuizPromptDraft {
+  draft_id: string
+  reference_id: string
+  source_note_id: string
+  question: string
+  court_role_target: CourtRoleTarget
+  situation_type: SituationType
+  role_instruction: string
+  options: QuizPromptDraftOption[]
+  explanation: string
+  status: DraftStatus
+  created_at: string
+  updated_at: string
+}
+
+export interface DecisionRuleDraft {
+  draft_id: string
+  reference_id: string
+  source_note_id: string
+  court_role: CourtRoleTarget
+  situation_type: SituationType
+  condition_text: string
+  positive_cue: string
+  negative_cue: string
+  suggested_weight: number
+  explanation: string
+  status: DraftStatus
+  created_at: string
+  updated_at: string
+}
+
+export interface ReferenceVideoDraftSummary {
+  reference_only_source_count: number
+  quiz_prompt_draft_count: number
+  decision_rule_draft_count: number
+}
+
 export function normalizeApiErrorPayload(status: number, payload?: Partial<ApiErrorResponse> | null): ApiErrorResponse {
   return {
     code: payload?.code ?? 'HTTP_ERROR',
@@ -646,5 +752,22 @@ export const apiClient = {
     request<QuizAttemptResponse>(`/projects/${projectId}/quiz-prompts/${promptId}/attempts`, {
       method: 'POST',
       body: JSON.stringify(payload)
-    })
+    }),
+  listReferenceVideos: () => request<ReferenceVideoListResponse>('/reference-videos'),
+  createReferenceVideo: (payload: CreateReferenceVideoRequest) =>
+    request<ReferenceVideo>('/reference-videos', { method: 'POST', body: JSON.stringify(payload) }),
+  listReferenceNotes: (referenceId: string) => request<ReferenceBreakdownNote[]>(`/reference-videos/${referenceId}/notes`),
+  createReferenceNote: (referenceId: string, payload: UpsertReferenceBreakdownNoteRequest) =>
+    request<ReferenceBreakdownNote>(`/reference-videos/${referenceId}/notes`, { method: 'POST', body: JSON.stringify(payload) }),
+  updateReferenceNote: (referenceId: string, noteId: string, payload: UpsertReferenceBreakdownNoteRequest) =>
+    request<ReferenceBreakdownNote>(`/reference-videos/${referenceId}/notes/${noteId}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteReferenceNote: (referenceId: string, noteId: string) =>
+    request<{ status: string; note_id: string }>(`/reference-videos/${referenceId}/notes/${noteId}`, { method: 'DELETE' }),
+  convertReferenceNoteToQuizDraft: (referenceId: string, noteId: string) =>
+    request<QuizPromptDraft>(`/reference-videos/${referenceId}/notes/${noteId}/quiz-draft`, { method: 'POST' }),
+  convertReferenceNoteToRuleDraft: (referenceId: string, noteId: string) =>
+    request<DecisionRuleDraft>(`/reference-videos/${referenceId}/notes/${noteId}/rule-draft`, { method: 'POST' }),
+  listReferenceQuizDrafts: (referenceId: string) => request<QuizPromptDraft[]>(`/reference-videos/${referenceId}/quiz-drafts`),
+  listReferenceRuleDrafts: (referenceId: string) => request<DecisionRuleDraft[]>(`/reference-videos/${referenceId}/rule-drafts`),
+  getReferenceVideoSummary: () => request<ReferenceVideoDraftSummary>('/local-lab/reference-video-summary')
 }
