@@ -199,6 +199,8 @@ def test_attempt_returns_correctness_and_explanations(client: TestClient, tmp_pa
         "selected_expected_value": 0.82,
         "correct_expected_value": 1.18,
         "opportunity_cost": 0.36,
+        "score": 28,
+        "scoring_mode": "EXPECTED_VALUE",
         "selected_explanation": "Explanation for A",
         "correct_explanation": "Explanation for C",
         "summary_explanation": "Hit the cutter for the highest-value look.",
@@ -206,8 +208,8 @@ def test_attempt_returns_correctness_and_explanations(client: TestClient, tmp_pa
     assert (tmp_path / "project-1" / "quiz_attempts.json").exists()
 
 
-def test_opportunity_cost_null_when_expected_values_missing(client: TestClient, tmp_path: Path) -> None:
-    prompt = create_prompt(client, tmp_path, valid_prompt_payload(expected_values=False))
+def test_attempt_scores_with_expected_values(client: TestClient, tmp_path: Path) -> None:
+    prompt = create_prompt(client, tmp_path)
 
     response = client.post(
         f"/api/projects/project-1/quiz-prompts/{prompt['prompt_id']}/attempts",
@@ -215,7 +217,54 @@ def test_opportunity_cost_null_when_expected_values_missing(client: TestClient, 
     )
 
     assert response.status_code == 200
-    assert response.json()["opportunity_cost"] is None
+    attempt = response.json()
+    assert attempt["opportunity_cost"] == 0.36
+    assert attempt["score"] == 28
+    assert attempt["scoring_mode"] == "EXPECTED_VALUE"
+
+
+def test_attempt_scores_with_correctness_when_expected_values_missing(client: TestClient, tmp_path: Path) -> None:
+    prompt = create_prompt(client, tmp_path, valid_prompt_payload(expected_values=False))
+
+    incorrect_response = client.post(
+        f"/api/projects/project-1/quiz-prompts/{prompt['prompt_id']}/attempts",
+        json={"selected_option_id": "A"},
+    )
+    correct_response = client.post(
+        f"/api/projects/project-1/quiz-prompts/{prompt['prompt_id']}/attempts",
+        json={"selected_option_id": "C"},
+    )
+
+    assert incorrect_response.status_code == 200
+    incorrect_attempt = incorrect_response.json()
+    assert incorrect_attempt["opportunity_cost"] is None
+    assert incorrect_attempt["score"] == 0
+    assert incorrect_attempt["scoring_mode"] == "CORRECTNESS_ONLY"
+    assert correct_response.status_code == 200
+    correct_attempt = correct_response.json()
+    assert correct_attempt["opportunity_cost"] is None
+    assert correct_attempt["score"] == 100
+    assert correct_attempt["scoring_mode"] == "CORRECTNESS_ONLY"
+
+
+def test_attempt_opportunity_cost_cannot_be_negative(client: TestClient, tmp_path: Path) -> None:
+    payload = valid_prompt_payload()
+    payload["options"] = [
+        option("A", expected_value=1.35),
+        option("C", is_correct=True, expected_value=1.18),
+    ]
+    prompt = create_prompt(client, tmp_path, payload)
+
+    response = client.post(
+        f"/api/projects/project-1/quiz-prompts/{prompt['prompt_id']}/attempts",
+        json={"selected_option_id": "A"},
+    )
+
+    assert response.status_code == 200
+    attempt = response.json()
+    assert attempt["opportunity_cost"] == 0
+    assert attempt["score"] == 100
+    assert attempt["scoring_mode"] == "EXPECTED_VALUE"
 
 
 def test_create_video_freeze_prompt_persists_playback_fields(client: TestClient, tmp_path: Path) -> None:

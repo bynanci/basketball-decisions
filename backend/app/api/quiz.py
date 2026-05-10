@@ -146,9 +146,17 @@ def submit_quiz_attempt(project_id: str, prompt_id: str, payload: QuizAttemptReq
             "Submit one of the option_id values returned with the prompt.",
         )
     correct = next(option for option in prompt.options if option.is_correct)
+    expected_values = [option.expected_value for option in prompt.options]
+    has_expected_values = all(value is not None for value in expected_values)
     opportunity_cost = None
-    if selected.expected_value is not None and correct.expected_value is not None:
-        opportunity_cost = round(max(0.0, correct.expected_value - selected.expected_value), 4)
+    if has_expected_values and selected.expected_value is not None:
+        best_expected_value = max(value for value in expected_values if value is not None)
+        opportunity_cost = round(max(0.0, best_expected_value - selected.expected_value), 4)
+        score = max(0, round(100 - opportunity_cost * 200))
+        scoring_mode = "EXPECTED_VALUE"
+    else:
+        score = 100 if selected.option_id == correct.option_id else 0
+        scoring_mode = "CORRECTNESS_ONLY"
 
     response = QuizAttemptResponse(
         prompt_id=prompt.prompt_id,
@@ -158,6 +166,8 @@ def submit_quiz_attempt(project_id: str, prompt_id: str, payload: QuizAttemptReq
         selected_expected_value=selected.expected_value,
         correct_expected_value=correct.expected_value,
         opportunity_cost=opportunity_cost,
+        score=score,
+        scoring_mode=scoring_mode,
         selected_explanation=selected.explanation,
         correct_explanation=correct.explanation,
         summary_explanation=prompt.explanation,
