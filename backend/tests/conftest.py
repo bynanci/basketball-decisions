@@ -18,6 +18,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(projects, "DATA_DIR", tmp_path)
     monkeypatch.setattr(local_lab, "DATA_DIR", tmp_path)
     monkeypatch.setattr(local_lab, "DATASETS_DIR", tmp_path / "datasets")
+    monkeypatch.setattr(local_lab, "RECOGNITION_MODELS_DIR", tmp_path / "models" / "recognition")
     monkeypatch.setattr(sources, "SOURCE_REGISTRY_PATH", tmp_path / "source_registry.json")
     monkeypatch.setattr(reference_videos, "REFERENCE_VIDEO_DIR", tmp_path / "reference_videos")
     monkeypatch.setattr(reference_videos, "REFERENCE_VIDEOS_PATH", tmp_path / "reference_videos" / "reference_videos.json")

@@ -8,6 +8,8 @@ import {
   type DatasetSummary,
   type DecisionEventsBuildSummary,
   type LocalLabProjectArtifact,
+  type RecognitionModelInfo,
+  type RecognitionModelRegistry,
   type ReferenceVideoDraftSummary,
   type VideoSourceRecord,
   isApiClientError
@@ -25,7 +27,10 @@ const isBuildingDecisionEvents = ref(false)
 const isSeedingSources = ref(false)
 const isCuratingRecognition = ref(false)
 const isCuratingDecision = ref(false)
+const isTrainingRecognition = ref(false)
 const decisionEventsSummary = ref<DecisionEventsBuildSummary | null>(null)
+const recognitionModelRegistry = ref<RecognitionModelRegistry | null>(null)
+const latestRecognitionModel = ref<RecognitionModelInfo | null>(null)
 const lastExportManifest = ref<DatasetManifest | null>(null)
 const statusMessage = ref('')
 const errorMessage = ref('')
@@ -112,18 +117,21 @@ async function refreshLocalLab() {
   isLoading.value = true
   errorMessage.value = ''
   try {
-    const [projectResponse, datasetResponse, healthResponse, sourceResponse, referenceSummaryResponse] = await Promise.all([
+    const [projectResponse, datasetResponse, healthResponse, sourceResponse, referenceSummaryResponse, recognitionModelResponse] = await Promise.all([
       apiClient.listLocalLabProjects(),
       apiClient.listDatasets(),
       apiClient.getDatasetHealth(),
       apiClient.listSources(),
-      apiClient.getReferenceVideoSummary()
+      apiClient.getReferenceVideoSummary(),
+      apiClient.getRecognitionModelRegistry()
     ])
     projects.value = projectResponse.projects
     datasets.value = datasetResponse.datasets
     datasetHealth.value = healthResponse
     sourceRegistry.value = sourceResponse
     referenceVideoSummary.value = referenceSummaryResponse
+    recognitionModelRegistry.value = recognitionModelResponse
+    latestRecognitionModel.value = recognitionModelResponse.active_model ?? recognitionModelResponse.models[recognitionModelResponse.models.length - 1] ?? null
   } catch (error) {
     showError(error, 'Could not load the Local Lab registry.')
   } finally {
@@ -196,6 +204,22 @@ async function curateDecisionDataset() {
   }
 }
 
+async function trainRecognitionBaseline() {
+  isTrainingRecognition.value = true
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    const model = await apiClient.trainRecognitionBaseline()
+    latestRecognitionModel.value = model
+    statusMessage.value = `Recognition baseline ${model.version} trained with F1 ${formatNumber(model.metrics?.f1 ?? 0)} and accuracy ${formatNumber(model.metrics?.accuracy ?? 0)}.`
+    await refreshLocalLab()
+  } catch (error) {
+    showError(error, 'Could not train the recognition baseline.')
+  } finally {
+    isTrainingRecognition.value = false
+  }
+}
+
 async function buildDecisionEvents() {
   isBuildingDecisionEvents.value = true
   statusMessage.value = ''
@@ -249,6 +273,9 @@ onMounted(refreshLocalLab)
       <button type="button" :disabled="isCuratingDecision" @click="curateDecisionDataset">
         {{ isCuratingDecision ? 'Curating…' : 'Curate Decision Dataset' }}
       </button>
+      <button type="button" :disabled="isTrainingRecognition" @click="trainRecognitionBaseline">
+        {{ isTrainingRecognition ? 'Training…' : 'Train Recognition Baseline' }}
+      </button>
       <button type="button" :disabled="isBuildingDecisionEvents" @click="buildDecisionEvents">
         {{ isBuildingDecisionEvents ? 'Building…' : 'Build Decision Events' }}
       </button>
@@ -282,6 +309,26 @@ onMounted(refreshLocalLab)
     </div>
   </section>
 
+
+  <section class="card recognition-model-card">
+    <div class="table-header">
+      <div>
+        <p class="eyebrow">Recognition Baseline</p>
+        <h2>Local model registry</h2>
+        <p class="muted">CPU-friendly scikit-learn baseline. It recommends false-positive risk only; it does not train YOLO or mutate tracks.</p>
+      </div>
+      <span>Active: {{ recognitionModelRegistry?.active_version ?? 'None' }}</span>
+    </div>
+    <dl v-if="latestRecognitionModel?.metrics" class="model-metrics">
+      <div><dt>Version</dt><dd>{{ latestRecognitionModel.version }}</dd></div>
+      <div><dt>Accuracy</dt><dd>{{ formatNumber(latestRecognitionModel.metrics.accuracy) }}</dd></div>
+      <div><dt>Precision</dt><dd>{{ formatNumber(latestRecognitionModel.metrics.precision) }}</dd></div>
+      <div><dt>Recall</dt><dd>{{ formatNumber(latestRecognitionModel.metrics.recall) }}</dd></div>
+      <div><dt>F1</dt><dd>{{ formatNumber(latestRecognitionModel.metrics.f1) }}</dd></div>
+      <div><dt>Train/test</dt><dd>{{ latestRecognitionModel.metrics.train_sample_count }} / {{ latestRecognitionModel.metrics.test_sample_count }}</dd></div>
+    </dl>
+    <p v-else class="muted">No trained recognition baseline is registered yet.</p>
+  </section>
 
   <section class="card dataset-health-section">
     <div class="table-header">
@@ -579,6 +626,7 @@ onMounted(refreshLocalLab)
   font-weight: 800;
 }
 
+.model-metrics,
 .curation-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -628,6 +676,7 @@ onMounted(refreshLocalLab)
   gap: 1rem;
 }
 
+.recognition-model-card dl,
 .reference-summary-card dl {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -798,3 +847,4 @@ td small {
   margin-top: 0.25rem;
 }
 </style>
+

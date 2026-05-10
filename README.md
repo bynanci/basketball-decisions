@@ -401,3 +401,47 @@ Breakdown notes can be converted into draft assets:
 - Rule drafts copy the note's role and situation, use `concept` as the condition, use `good_read` and `bad_read` as positive/negative cues, set `suggested_weight=1.0`, and keep `coaching_cue` as the explanation.
 
 Local Lab also displays reference-only source, prompt draft, and rule draft counts so users can see authoring progress without confusing drafts with exportable training data.
+
+## Recognition Baseline Trainer
+
+The M10 Recognition Baseline Trainer adds a lightweight local classifier for false-positive detection/track risk. It is intentionally scoped as a CPU-friendly baseline, not a detector training pipeline.
+
+Key properties:
+
+- **Local model only:** training reads the curated recognition JSONL dataset from `backend/app/data/datasets/recognition/` and writes model artifacts to `backend/app/data/models/recognition/`.
+- **CPU-friendly:** the backend uses scikit-learn when it is installed and returns a clear `501` error with `debug_hint: install scikit-learn` when it is not available.
+- **Not YOLO:** the trainer does not train YOLO, download weights, require CUDA, or require a GPU.
+- **Recommendations only:** model scoring returns false-positive risk recommendations per detection/track and does not delete, clean, or mutate tracking artifacts.
+
+Train the baseline from curated recognition samples:
+
+```bash
+curl -X POST "http://localhost:8000/api/local-lab/models/recognition/train-baseline"
+```
+
+Training validates that the curated dataset has at least 100 total positive/negative recognition samples, at least 10 positive samples (`PLAYER`, `VALID_PLAYER_TRACK`), and at least 10 negative samples (`FALSE_POSITIVE`, `FALSE_POSITIVE_TRACK`). When possible, the train/test split is grouped by `project_id` so test rows come from held-out projects rather than random rows.
+
+The active model registry is available at:
+
+```bash
+curl "http://localhost:8000/api/local-lab/models/recognition"
+```
+
+The registry records the active model version and points to the versioned artifacts:
+
+```text
+backend/app/data/models/recognition/model_registry.json
+backend/app/data/models/recognition/v001/model.pkl
+backend/app/data/models/recognition/v001/metrics.json
+backend/app/data/models/recognition/v001/feature_schema.json
+```
+
+`metrics.json` includes accuracy, precision, recall, F1, confusion matrix, train/test sample counts, and feature importance when exposed by the fitted classifier.
+
+Score a project with the active trained model:
+
+```bash
+curl -X POST "http://localhost:8000/api/local-lab/models/recognition/score-project/{project_id}"
+```
+
+The response mirrors the recognition quality scoring shape and includes `model_version` plus model-based false-positive risk for each detection and track. Raw tracking, review patches, cleaned tracking, and projected-track artifacts are left unchanged.

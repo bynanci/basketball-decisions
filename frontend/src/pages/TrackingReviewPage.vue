@@ -23,6 +23,7 @@ const notes = ref('')
 const isLoadingReview = ref(false)
 const isSaving = ref(false)
 const isScoring = ref(false)
+const isModelScoring = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
 const errorHint = ref('')
@@ -30,6 +31,8 @@ const saveMessage = ref('')
 const recognitionMessage = ref('')
 const detectionScores = ref<DetectionRecognitionScore[]>([])
 const trackScores = ref<TrackRecognitionScore[]>([])
+const modelDetectionScores = ref<DetectionRecognitionScore[]>([])
+const modelTrackScores = ref<TrackRecognitionScore[]>([])
 
 const rawTracking = computed(() => review.value?.tracking ?? null)
 const detections = computed(() => rawTracking.value?.detections ?? project.value?.detections ?? [])
@@ -48,6 +51,8 @@ const rawTrackCount = computed(() => tracks.value.length)
 const cleanedTrackCount = computed(() => cleanedTracking.value?.tracks.length ?? 0)
 const detectionScoreById = computed(() => new Map(detectionScores.value.map((score) => [score.detection_id, score])))
 const trackScoreById = computed(() => new Map(trackScores.value.map((score) => [score.track_id, score])))
+const modelDetectionScoreById = computed(() => new Map(modelDetectionScores.value.map((score) => [score.detection_id, score])))
+const modelTrackScoreById = computed(() => new Map(modelTrackScores.value.map((score) => [score.track_id, score])))
 
 const trackSummaries = computed(() =>
   tracks.value
@@ -55,7 +60,8 @@ const trackSummaries = computed(() =>
       track,
       detectionCount: detections.value.filter((detection) => detection.track_id === track.track_id).length,
       pointCount: track.points.length,
-      score: trackScoreById.value.get(track.track_id) ?? null
+      score: trackScoreById.value.get(track.track_id) ?? null,
+      modelScore: modelTrackScoreById.value.get(track.track_id) ?? null
     }))
     .sort((a, b) => b.pointCount - a.pointCount || a.track.track_id.localeCompare(b.track.track_id))
 )
@@ -142,6 +148,10 @@ function scoreForDetection(detection: Detection) {
   return detectionScoreById.value.get(detection.detection_id) ?? null
 }
 
+function modelScoreForDetection(detection: Detection) {
+  return modelDetectionScoreById.value.get(detection.detection_id) ?? null
+}
+
 function formatRisk(score?: DetectionRecognitionScore | TrackRecognitionScore | null) {
   if (!score) return ''
   return `${Math.round(score.false_positive_risk * 100)}% false-positive risk`
@@ -163,6 +173,25 @@ async function scoreRecognitionQuality() {
     showError(error, 'Could not score recognition quality.')
   } finally {
     isScoring.value = false
+  }
+}
+
+async function scoreWithRecognitionModel() {
+  if (isModelScoring.value) return
+  isModelScoring.value = true
+  recognitionMessage.value = ''
+  errorMessage.value = ''
+  errorCode.value = ''
+  errorHint.value = ''
+  try {
+    const response = await apiClient.scoreRecognitionModel(props.projectId)
+    modelDetectionScores.value = response.detection_scores
+    modelTrackScores.value = response.track_scores
+    recognitionMessage.value = `Model ${response.model_version ?? response.summary.model_version ?? 'active'} scored ${response.detection_scores.length} detections and ${response.track_scores.length} tracks. High risk: ${response.summary.high_risk_detection_count} detections, ${response.summary.high_risk_track_count} tracks.`
+  } catch (error) {
+    showError(error, 'Could not score with the trained recognition model.')
+  } finally {
+    isModelScoring.value = false
   }
 }
 
@@ -211,6 +240,7 @@ async function saveReview() {
     </div>
     <div class="hero-actions">
       <button type="button" :disabled="isScoring || !hasTracking" @click="scoreRecognitionQuality">{{ isScoring ? 'Scoring…' : 'Score Recognition Quality' }}</button>
+      <button type="button" :disabled="isModelScoring || !hasTracking" @click="scoreWithRecognitionModel">{{ isModelScoring ? 'Scoring…' : 'Score with trained model' }}</button>
       <RouterLink class="button secondary" :to="`/projects/${projectId}/tracking`">Raw tracking</RouterLink>
       <RouterLink class="button secondary" :to="`/projects/${projectId}`">Project</RouterLink>
     </div>
@@ -289,8 +319,12 @@ async function saveReview() {
             <strong>{{ detection.track_id ?? 'untracked' }}</strong>
             <span v-if="scoreForDetection(detection)" class="risk-detail">
               <span class="risk-badge" :class="riskClass(scoreForDetection(detection)?.recommended_label)">{{ scoreForDetection(detection)?.recommended_label }}</span>
-              <small>{{ formatRisk(scoreForDetection(detection)) }}</small>
+              <small>Rule: {{ formatRisk(scoreForDetection(detection)) }}</small>
               <small v-for="reason in scoreForDetection(detection)?.reasons" :key="reason">{{ reason }}</small>
+            </span>
+            <span v-if="modelScoreForDetection(detection)" class="risk-detail model-risk-detail">
+              <span class="risk-badge" :class="riskClass(modelScoreForDetection(detection)?.recommended_label)">Model {{ modelScoreForDetection(detection)?.recommended_label }}</span>
+              <small>{{ formatRisk(modelScoreForDetection(detection)) }}</small>
             </span>
             <code>{{ detection.detection_id }}</code>
           </label>
@@ -308,8 +342,12 @@ async function saveReview() {
               <small>{{ summary.pointCount }} points · {{ summary.detectionCount }} detections</small>
               <span v-if="summary.score" class="risk-detail">
                 <span class="risk-badge" :class="riskClass(summary.score.recommended_label)">{{ summary.score.recommended_label }}</span>
-                <small>{{ formatRisk(summary.score) }}</small>
+                <small>Rule: {{ formatRisk(summary.score) }}</small>
                 <small v-for="reason in summary.score.reasons" :key="reason">{{ reason }}</small>
+              </span>
+              <span v-if="summary.modelScore" class="risk-detail model-risk-detail">
+                <span class="risk-badge" :class="riskClass(summary.modelScore.recommended_label)">Model {{ summary.modelScore.recommended_label }}</span>
+                <small>{{ formatRisk(summary.modelScore) }}</small>
               </span>
             </span>
           </label>
@@ -456,6 +494,11 @@ async function saveReview() {
 .qc-row code {
   color: #475569;
   margin-left: auto;
+}
+
+.model-risk-detail {
+  border-left: 3px solid #6366f1;
+  padding-left: 0.5rem;
 }
 
 .risk-detail {

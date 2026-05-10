@@ -331,6 +331,8 @@ export interface DetectionRecognitionScore {
   recommended_label: 'LOW' | 'MEDIUM' | 'HIGH' | string
   reasons: string[]
   features: DetectionRecognitionFeatures
+  model_version?: string | null
+  scoring_source?: 'RULE' | 'MODEL' | string
 }
 
 export interface TrackRecognitionScore {
@@ -339,16 +341,50 @@ export interface TrackRecognitionScore {
   recommended_label: 'LOW' | 'MEDIUM' | 'HIGH' | string
   reasons: string[]
   features: TrackRecognitionFeatures
+  model_version?: string | null
+  scoring_source?: 'RULE' | 'MODEL' | string
 }
 
 export interface RecognitionScoreProjectResponse {
   project_id: string
+  model_version?: string | null
+  scoring_source?: 'RULE' | 'MODEL' | string
   detection_scores: DetectionRecognitionScore[]
   track_scores: TrackRecognitionScore[]
   summary: {
     high_risk_detection_count: number
     high_risk_track_count: number
+    model_version?: string | null
+    scoring_source?: 'RULE' | 'MODEL' | string
   }
+}
+
+export interface RecognitionModelMetrics {
+  accuracy: number
+  precision: number
+  recall: number
+  f1: number
+  confusion_matrix: number[][]
+  train_sample_count: number
+  test_sample_count: number
+  feature_importance?: Record<string, number> | null
+}
+
+export interface RecognitionModelInfo {
+  version: string
+  active: boolean
+  created_at: string
+  model_path: string
+  metrics_path: string
+  feature_schema_path: string
+  metrics?: RecognitionModelMetrics | null
+}
+
+export interface RecognitionModelRegistry {
+  active_version?: string | null
+  updated_at: string
+  models: RecognitionModelInfo[]
+  active_model?: RecognitionModelInfo | null
 }
 
 export type DecisionActionType = 'PASS' | 'DRIVE' | 'SHOT' | 'RESET' | 'HOLD'
@@ -747,8 +783,12 @@ export const apiClient = {
   curateRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/curate', { method: 'POST' }),
   curateDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/curate', { method: 'POST' }),
   buildDecisionEvents: () => request<DecisionEventsBuildSummary>('/local-lab/decision-events/build', { method: 'POST' }),
+  getRecognitionModelRegistry: () => request<RecognitionModelRegistry>('/local-lab/models/recognition'),
+  trainRecognitionBaseline: () => request<RecognitionModelInfo>('/local-lab/models/recognition/train-baseline', { method: 'POST' }),
   scoreRecognitionQuality: (projectId: string) =>
     request<RecognitionScoreProjectResponse>(`/local-lab/recognition/score-project/${projectId}`, { method: 'POST' }),
+  scoreRecognitionModel: (projectId: string) =>
+    request<RecognitionScoreProjectResponse>(`/local-lab/models/recognition/score-project/${projectId}`, { method: 'POST' }),
   getProjectBundle: (projectId: string) => request<ProjectBundleResponse>(`/projects/${projectId}/bundle`),
   getProjectSource: (projectId: string) => request<VideoSourceRecord>(`/projects/${projectId}/source`),
   updateProjectSource: (projectId: string, payload: VideoSourceRecord) =>
