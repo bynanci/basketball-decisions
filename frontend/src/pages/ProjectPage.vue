@@ -13,7 +13,7 @@ const props = defineProps<{
 }>()
 
 const projectStore = useProjectStore()
-const { ensureProjectHydrated, loading: isHydrating, error: hydrationError, errorCode: hydrationErrorCode, errorHint: hydrationErrorHint } = useProjectHydration()
+const { ensureProjectHydrated, isHydrating, hydrationError, hydrationErrorCode, hydrationErrorHint } = useProjectHydration()
 projectStore.setActiveProject(props.projectId)
 const project = computed(() => projectStore.getProject(props.projectId))
 const isExtracting = ref(false)
@@ -21,7 +21,7 @@ const errorMessage = ref('')
 const errorCode = ref('')
 const errorHint = ref('')
 const hasCalibration = computed(() => !!project.value?.calibration)
-const hasTracking = computed(() => !!project.value && (project.value.detections.length > 0 || project.value.tracks.length > 0))
+const hasTracking = computed(() => !!project.value && (project.value.detections.length > 0 || project.value.tracks.length > 0 || project.value.projectedTracks.length > 0))
 const hasProjectedTracks = computed(() => (project.value?.projectedTracks.length ?? 0) > 0)
 const quizPrompts = ref<QuizPrompt[]>([])
 const isLoadingQuizPrompts = ref(false)
@@ -112,8 +112,12 @@ async function extractFrames() {
         <div><dt>Source</dt><dd>{{ project.videoAsset.source_type }}</dd></div>
         <div v-if="project.videoAsset.filename"><dt>File</dt><dd>{{ project.videoAsset.filename }}</dd></div>
         <div v-if="project.videoAsset.width && project.videoAsset.height"><dt>Size</dt><dd>{{ project.videoAsset.width }} × {{ project.videoAsset.height }}</dd></div>
+        <div v-if="project.videoAsset.duration_seconds"><dt>Duration</dt><dd>{{ project.videoAsset.duration_seconds.toFixed(2) }}s</dd></div>
+        <div v-if="project.videoAsset.fps"><dt>FPS</dt><dd>{{ project.videoAsset.fps }}</dd></div>
+        <div v-if="project.videoAsset.frame_count"><dt>Frames</dt><dd>{{ project.videoAsset.frame_count }}</dd></div>
       </dl>
       <VideoPlayer :video-src="project?.videoPreviewUrl" :title="project?.videoFileName ?? project?.youtubeUrl ?? 'No video selected'" />
+      <p v-if="project?.videoAsset && !project.videoPreviewUrl" class="muted">Video metadata was restored from backend storage. Upload previews are browser-only and are not restored after refresh.</p>
       <button type="button" class="extract-button" :disabled="!project?.videoAsset || isExtracting" @click="extractFrames">
         {{ isExtracting ? 'Extracting…' : 'Extract Frames' }}
       </button>

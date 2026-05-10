@@ -12,7 +12,7 @@ const props = defineProps<{
 }>()
 
 const projectStore = useProjectStore()
-const { ensureProjectHydrated, loading: isHydrating, error: hydrationError, errorCode: hydrationErrorCode, errorHint: hydrationErrorHint } = useProjectHydration()
+const { ensureProjectHydrated, isHydrating, hydrationError, hydrationErrorCode, hydrationErrorHint } = useProjectHydration()
 projectStore.setActiveProject(props.projectId)
 const project = computed(() => projectStore.getProject(props.projectId))
 const isRunning = ref(false)

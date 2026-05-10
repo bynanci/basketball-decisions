@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { normalizeApiErrorPayload } from '../client'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { apiClient, normalizeApiErrorPayload } from '../client'
 
 describe('normalizeApiErrorPayload', () => {
   it('keeps typed API errors intact', () => {
@@ -18,5 +18,40 @@ describe('normalizeApiErrorPayload', () => {
       details: {},
       debug_hint: null
     })
+  })
+})
+
+describe('apiClient.getProjectBundle', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('requests the backend project bundle endpoint', async () => {
+    const payload = {
+      project: {
+        schema_version: '1.0',
+        project_id: 'project-1',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        name: 'Hydrated Project',
+        description: null,
+        metadata: {},
+        original_input: {},
+        pipeline_output: {},
+        debug_metadata: {}
+      },
+      video: null,
+      frames: null,
+      calibration: null,
+      tracking: null,
+      projected_tracks: null
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiClient.getProjectBundle('project-1')).resolves.toEqual(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/projects/project-1/bundle', { headers: expect.any(Headers) })
   })
 })

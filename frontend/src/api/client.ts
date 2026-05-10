@@ -53,11 +53,11 @@ export interface ProjectCreateResponse {
 
 export interface ProjectBundleResponse {
   project: Project
-  video: VideoAsset | null
-  frames: ExtractFramesResponse | null
-  calibration: Calibration | null
-  tracking: RunTrackingResponse | null
-  projected_tracks: ProjectTracksResponse | null
+  video?: VideoAsset | null
+  frames?: ExtractFramesResponse | null
+  calibration?: Calibration | null
+  tracking?: RunTrackingResponse | null
+  projected_tracks?: ProjectTracksResponse | null
 }
 
 export interface ListProjectsResponse {

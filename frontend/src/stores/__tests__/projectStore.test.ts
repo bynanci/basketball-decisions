@@ -98,4 +98,31 @@ describe('projectStore.hydrateProjectFromBundle', () => {
 
     expect(store.getProject('project-1')?.videoPreviewUrl).toBe('blob:local-preview')
   })
+
+  it('preserves existing tracking arrays when optional tracking artifacts are missing', () => {
+    const store = useProjectStore()
+    store.addProject({ id: 'project-1', name: 'Local Project', source: 'upload' })
+    store.setTracks('project-1', {
+      detections: [
+        {
+          detection_id: 'existing-detection',
+          frame_id: 'frame-1',
+          frame_index: 1,
+          box: { x: 1, y: 2, width: 3, height: 4 },
+          confidence: 0.8,
+          class_name: 'player',
+          metadata: {}
+        }
+      ],
+      tracks: [{ track_id: 'existing-track', points: [], metadata: {} }],
+      projectedTracks: [{ track_id: 'existing-projected-track', points: [], metadata: {} }]
+    })
+
+    store.hydrateProjectFromBundle(bundle({ tracking: null, projected_tracks: null }))
+
+    expect(store.getProject('project-1')?.detections).toHaveLength(1)
+    expect(store.getProject('project-1')?.tracks).toHaveLength(1)
+    expect(store.getProject('project-1')?.projectedTracks).toHaveLength(1)
+  })
+
 })

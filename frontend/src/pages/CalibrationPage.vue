@@ -14,7 +14,7 @@ const props = defineProps<{
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
-const { ensureProjectHydrated, loading: isHydrating, error: hydrationError, errorCode: hydrationErrorCode, errorHint: hydrationErrorHint } = useProjectHydration()
+const { ensureProjectHydrated, isHydrating, hydrationError, hydrationErrorCode, hydrationErrorHint } = useProjectHydration()
 projectStore.setActiveProject(props.projectId)
 
 const project = computed(() => projectStore.getProject(props.projectId))
@@ -185,7 +185,7 @@ function continueToTracking() {
     <small v-if="errorHint">{{ errorHint }}</small>
   </section>
 
-  <section v-if="shouldSelectFrame || savedCalibrationFrameMissing" class="card">
+  <section v-if="(frameIndex === null && (project?.frames.length ?? 0) > 0) || savedCalibrationFrameMissing" class="card">
     <h2>Available frames</h2>
     <p class="status">Choose one frame to calibrate; the image overlay appears after selection.</p>
     <div class="frame-strip">
@@ -215,7 +215,7 @@ function continueToTracking() {
     </div>
   </section>
 
-  <section v-else-if="!shouldSelectFrame && !savedCalibrationFrameMissing" class="card">
+  <section v-else-if="!isHydrating && !selectedFrameMissing && !shouldSelectFrame && !savedCalibrationFrameMissing && !frameSrc" class="card">
     <VideoPlayer :video-src="project?.videoPreviewUrl" title="Calibration frame" />
   </section>
 </template>
