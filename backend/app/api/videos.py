@@ -10,11 +10,66 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import FileResponse
 
 from app.api.common import api_error, assert_path_child, read_json, require_project_dir, write_json_model
-from app.models import ExtractFramesRequest, ExtractFramesResponse, FrameAsset, VideoAsset, YouTubeVideoRequest
+from app.models import (
+    ExtractFramesRequest,
+    ExtractFramesResponse,
+    FrameAsset,
+    LeagueTag,
+    SourceLicenseType,
+    SourceType,
+    UsageScope,
+    VideoAsset,
+    VideoSourceRecord,
+    YouTubeVideoRequest,
+)
 from app.pipeline.frame_extractor import FrameExtractionError, extract_frames
 
 router = APIRouter(prefix="/projects/{project_id}/video", tags=["videos"])
 frames_router = APIRouter(prefix="/projects/{project_id}/frames", tags=["frames"])
+
+
+def _write_upload_source(directory: Path, project_id: str, asset_id: str, filename: str | None) -> None:
+    source = VideoSourceRecord(
+        project_id=project_id,
+        source_id=asset_id,
+        source_type=SourceType.UPLOAD,
+        title=filename,
+        license_type=SourceLicenseType.OWNED,
+        rights_confirmed=True,
+        allowed_for_training=True,
+        allowed_for_redistribution=False,
+        allowed_for_local_storage=True,
+        league_tag=LeagueTag.UNKNOWN,
+        usage_scope=UsageScope.TRAINING,
+        notes="Default source governance for a user-uploaded local file.",
+    )
+    write_json_model(directory / "source.json", source)
+
+
+def _write_youtube_source(
+    directory: Path,
+    project_id: str,
+    asset_id: str,
+    payload: YouTubeVideoRequest,
+    title: str | None = None,
+    downloaded_with_permission: bool = False,
+) -> None:
+    source = VideoSourceRecord(
+        project_id=project_id,
+        source_id=asset_id,
+        source_type=SourceType.YOUTUBE,
+        source_url=payload.url,
+        title=title,
+        license_type=SourceLicenseType.YOUTUBE_REFERENCE_ONLY,
+        rights_confirmed=payload.rights_confirmed,
+        allowed_for_training=False,
+        allowed_for_redistribution=False,
+        allowed_for_local_storage=downloaded_with_permission,
+        league_tag=LeagueTag.UNKNOWN,
+        usage_scope=UsageScope.REFERENCE_ONLY,
+        notes="YouTube imports default to reference-only until the user records a training-eligible license or permission.",
+    )
+    write_json_model(directory / "source.json", source)
 
 
 def _validate_body_project_id(path_project_id: str, body_project_id: str) -> None:
@@ -58,6 +113,7 @@ async def upload_video(project_id: str, file: UploadFile = File(...)) -> VideoAs
         debug_metadata={"todo": "Probe video metadata with ffprobe/OpenCV in a later pipeline step."},
     )
     write_json_model(directory / "video.json", video)
+    _write_upload_source(directory, project_id, asset_id, video.filename)
     return video
 
 
@@ -104,13 +160,18 @@ def get_video_source(project_id: str) -> FileResponse:
 def create_youtube_video(project_id: str, payload: YouTubeVideoRequest) -> VideoAsset:
     directory = require_project_dir(project_id)
     if not payload.rights_confirmed:
-        raise api_error(
-            400,
-            "YOUTUBE_RIGHTS_NOT_CONFIRMED",
-            "You must confirm you have the rights or permission to process this video.",
-            {"url": payload.url, "rights_confirmed": payload.rights_confirmed},
-            "Confirm rights permission before submitting a YouTube source.",
+        asset_id = str(uuid4())
+        video = VideoAsset(
+            project_id=project_id,
+            asset_id=asset_id,
+            source_type="youtube",
+            uri=payload.url,
+            original_input=payload.model_dump(),
+            pipeline_output={"downloader": None, "reference_only": True},
         )
+        write_json_model(directory / "video.json", video)
+        _write_youtube_source(directory, project_id, asset_id, payload, downloaded_with_permission=False)
+        return video
 
     if importlib.util.find_spec("yt_dlp") is None:
         raise api_error(
@@ -140,6 +201,7 @@ def create_youtube_video(project_id: str, payload: YouTubeVideoRequest) -> Video
         pipeline_output={"downloader": "yt_dlp", "title": info.get("title")},
     )
     write_json_model(directory / "video.json", video)
+    _write_youtube_source(directory, project_id, asset_id, payload, title=info.get("title"), downloaded_with_permission=True)
     return video
 
 

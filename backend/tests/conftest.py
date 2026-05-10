@@ -17,4 +17,5 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(common, "DATA_DIR", tmp_path)
     monkeypatch.setattr(projects, "DATA_DIR", tmp_path)
     monkeypatch.setattr(local_lab, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(local_lab, "DATASETS_DIR", tmp_path / "datasets")
     return TestClient(app)

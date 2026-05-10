@@ -51,9 +51,37 @@ export interface ProjectCreateResponse {
   storage_path: string
 }
 
+export type SourceType = 'UPLOAD' | 'YOUTUBE' | 'URL' | 'DATASET' | 'MANUAL_IMPORT'
+export type SourceLicenseType = 'OWNED' | 'PERMISSION_GRANTED' | 'PUBLIC_DOMAIN' | 'CREATIVE_COMMONS' | 'RESEARCH_DATASET' | 'YOUTUBE_REFERENCE_ONLY' | 'UNKNOWN'
+export type UsageScope = 'TRAINING' | 'EVALUATION' | 'REFERENCE_ONLY' | 'DEMO_ONLY'
+export type LeagueTag = 'NBA' | 'EUROLEAGUE' | 'NCAA' | 'LOCAL' | 'OTHER' | 'UNKNOWN'
+
+export interface VideoSourceRecord {
+  schema_version?: string
+  project_id: string
+  created_at?: string
+  updated_at?: string
+  original_input?: Record<string, unknown>
+  pipeline_output?: Record<string, unknown>
+  debug_metadata?: Record<string, unknown>
+  source_id: string
+  source_type: SourceType
+  source_url?: string | null
+  title?: string | null
+  license_type: SourceLicenseType
+  rights_confirmed: boolean
+  allowed_for_training: boolean
+  allowed_for_redistribution: boolean
+  allowed_for_local_storage: boolean
+  league_tag: LeagueTag
+  usage_scope: UsageScope
+  notes?: string | null
+}
+
 export interface ProjectBundleResponse {
   project: Project
   video?: VideoAsset | null
+  source?: VideoSourceRecord | null
   frames?: ExtractFramesResponse | null
   calibration?: Calibration | null
   tracking?: RunTrackingResponse | null
@@ -462,6 +490,7 @@ export interface LocalLabProjectArtifact {
   quiz_prompt_count: number
   quiz_attempt_count: number
   updated_at?: string | null
+  source?: VideoSourceRecord | null
 }
 
 export interface LocalLabProjectsResponse {
@@ -488,6 +517,9 @@ export interface DatasetManifest {
   exported_at: string
   storage_paths: Record<string, string>
   notes?: string | null
+  included_project_count: number
+  skipped_project_count: number
+  skipped_projects: Array<{ project_id: string; name?: string | null; reason: string }>
 }
 
 export interface DatasetListResponse {
@@ -541,6 +573,9 @@ export const apiClient = {
   scoreRecognitionQuality: (projectId: string) =>
     request<RecognitionScoreProjectResponse>(`/local-lab/recognition/score-project/${projectId}`, { method: 'POST' }),
   getProjectBundle: (projectId: string) => request<ProjectBundleResponse>(`/projects/${projectId}/bundle`),
+  getProjectSource: (projectId: string) => request<VideoSourceRecord>(`/projects/${projectId}/source`),
+  updateProjectSource: (projectId: string, payload: VideoSourceRecord) =>
+    request<VideoSourceRecord>(`/projects/${projectId}/source`, { method: 'PUT', body: JSON.stringify(payload) }),
   createProject: (payload: ProjectCreateRequest) =>
     request<ProjectCreateResponse>('/projects', { method: 'POST', body: JSON.stringify(payload) }),
   uploadVideo: (projectId: string, file: File) => {

@@ -30,8 +30,10 @@ from app.models import (
     RecognitionScoreProjectResponse,
     RecognitionTrainingSample,
     RunTrackingResponse,
+    SkippedProject,
     TrackReviewPatch,
     TrackTrainingLabel,
+    VideoSourceRecord,
 )
 from app.models.base import utc_now
 from app.pipeline.recognition_quality import score_project_recognition
@@ -122,9 +124,33 @@ def list_local_lab_projects() -> LocalLabProjectsResponse:
                 quiz_prompt_count=_safe_count_json_list(directory / "quiz_prompts.json", _PROMPTS_ADAPTER),
                 quiz_attempt_count=_safe_count_json_list(directory / "quiz_attempts.json", _ATTEMPTS_ADAPTER),
                 updated_at=_latest_artifact_timestamp(directory, project),
+                source=VideoSourceRecord.model_validate(read_json(directory / "source.json")) if (directory / "source.json").exists() else None,
             )
         )
     return LocalLabProjectsResponse(projects=projects)
+
+
+def _training_source_skip_reason(directory: Path, project: Project) -> str | None:
+    source_path = directory / "source.json"
+    if not source_path.exists():
+        return "Missing source governance metadata; defaulting to not eligible for training."
+    source = VideoSourceRecord.model_validate(read_json(source_path))
+    if not source.allowed_for_training:
+        return f"Source is not allowed for training (license={source.license_type}, usage_scope={source.usage_scope})."
+    return None
+
+
+def _training_eligible_project_dirs() -> tuple[list[Path], list[SkippedProject]]:
+    eligible: list[Path] = []
+    skipped: list[SkippedProject] = []
+    for directory in _project_dirs():
+        project = Project.model_validate_json((directory / "project.json").read_text(encoding="utf-8"))
+        reason = _training_source_skip_reason(directory, project)
+        if reason is None:
+            eligible.append(directory)
+        else:
+            skipped.append(SkippedProject(project_id=project.project_id, name=project.name, reason=reason))
+    return eligible, skipped
 
 
 def _tracking_path(directory: Path) -> Path:
@@ -189,7 +215,9 @@ def export_recognition_dataset() -> DatasetManifest:
     project_ids: set[str] = set()
     created_at = utc_now()
 
-    for directory in _project_dirs():
+    eligible_dirs, skipped_projects = _training_eligible_project_dirs()
+
+    for directory in eligible_dirs:
         tracking_path = directory / "tracking.json"
         review_path = directory / "tracking_review_patch.json"
         if not tracking_path.exists() or not review_path.exists():
@@ -255,6 +283,9 @@ def export_recognition_dataset() -> DatasetManifest:
         sample_count=len(samples),
         label_count=len(labels),
         project_count=len(project_ids),
+        included_project_count=len(project_ids),
+        skipped_project_count=len(skipped_projects),
+        skipped_projects=skipped_projects,
         exported_at=created_at,
         storage_paths=_dataset_storage_paths("recognition"),
         notes="Recognition labels are derived from tracking review exclusions plus heuristic valid-track labels.",
@@ -272,7 +303,9 @@ def export_decision_dataset() -> DatasetManifest:
     label_project_ids: set[str] = set()
     created_at = utc_now()
 
-    for directory in _project_dirs():
+    eligible_dirs, skipped_projects = _training_eligible_project_dirs()
+
+    for directory in eligible_dirs:
         prompts = _read_json_list(directory / "quiz_prompts.json", _PROMPTS_ADAPTER)
         attempts = _read_json_list(directory / "quiz_attempts.json", _ATTEMPTS_ADAPTER)
         for prompt in prompts:
@@ -319,6 +352,9 @@ def export_decision_dataset() -> DatasetManifest:
         sample_count=len(samples),
         label_count=len(labels),
         project_count=len(prompt_project_ids | label_project_ids),
+        included_project_count=len(prompt_project_ids | label_project_ids),
+        skipped_project_count=len(skipped_projects),
+        skipped_projects=skipped_projects,
         exported_at=created_at,
         storage_paths=_dataset_storage_paths("decision"),
         notes="Decision samples come from quiz prompts; labels come from quiz attempts.",

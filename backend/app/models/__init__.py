@@ -11,6 +11,7 @@ from .dataset import (
     LocalLabProjectArtifact,
     LocalLabProjectsResponse,
     RecognitionTrainingSample,
+    SkippedProject,
     TrackTrainingLabel,
 )
 from .calibration import (
@@ -23,6 +24,7 @@ from .calibration import (
 )
 from .errors import ApiErrorResponse
 from .project import Project, ProjectBundleResponse, ProjectCreateRequest, ProjectCreateResponse
+from .source import LeagueTag, SourceLicenseType, SourceType, UsageScope, VideoSourceRecord
 from .quiz import (
     CreateQuizPromptRequest,
     CourtRoleTarget,
@@ -84,6 +86,7 @@ __all__ = [
     "LocalLabProjectArtifact",
     "LocalLabProjectsResponse",
     "RecognitionTrainingSample",
+    "SkippedProject",
     "TrackTrainingLabel",
     "Calibration",
     "CourtKeypointPair",
@@ -102,6 +105,7 @@ __all__ = [
     "FreezeFrame",
     "ImagePoint",
     "PlayerTrack",
+    "LeagueTag",
     "Project",
     "ProjectBundleResponse",
     "ProjectCreateRequest",
@@ -125,6 +129,8 @@ __all__ = [
     "QuizScoringMode",
     "SituationType",
     "RunTrackingRequest",
+    "SourceLicenseType",
+    "SourceType",
     "RunTrackingResponse",
     "RecognitionScoreProjectResponse",
     "RecognitionScoreSummary",
@@ -133,7 +139,9 @@ __all__ = [
     "TrackPoint",
     "TrackRecognitionFeatures",
     "TrackRecognitionScore",
+    "UsageScope",
     "VideoAsset",
+    "VideoSourceRecord",
     "YouTubeVideoRequest",
     "VideoSourceType",
 ]

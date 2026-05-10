@@ -9,7 +9,8 @@ import type {
   ProjectedPlayerTrack,
   RunTrackingResponse,
   TrackReviewResponse,
-  VideoAsset
+  VideoAsset,
+  VideoSourceRecord
 } from '../api/client'
 
 export type ProjectSource = 'upload' | 'youtube'
@@ -23,6 +24,7 @@ export interface ProjectRecord {
   videoAsset?: VideoAsset | null
   videoPreviewUrl?: string
   videoFileName?: string
+  sourceGovernance?: VideoSourceRecord | null
   frames: FrameAsset[]
   calibration?: Calibration | null
   calibrationPairs: CourtKeypointPair[]
@@ -49,6 +51,7 @@ function createEmptyProject(input: Omit<Partial<ProjectRecord>, 'frames' | 'cali
     videoAsset: input.videoAsset ?? null,
     videoPreviewUrl: input.videoPreviewUrl,
     videoFileName: input.videoFileName,
+    sourceGovernance: input.sourceGovernance ?? null,
     frames: [],
     calibration: null,
     calibrationPairs: [],
@@ -89,6 +92,10 @@ export const useProjectStore = defineStore('projectStore', {
       project.videoAsset = videoAsset
       project.videoPreviewUrl = preview?.url ?? project.videoPreviewUrl
       project.videoFileName = preview?.fileName ?? videoAsset.filename ?? project.videoFileName
+    },
+    setSourceGovernance(projectId: string, sourceGovernance: VideoSourceRecord) {
+      const project = this.getProject(projectId)
+      if (project) project.sourceGovernance = sourceGovernance
     },
     setFrames(projectId: string, frames: FrameAsset[]) {
       const project = this.getProject(projectId)
@@ -133,6 +140,7 @@ export const useProjectStore = defineStore('projectStore', {
       project.source = source
       project.description = bundle.project.description
       project.videoAsset = bundle.video
+      project.sourceGovernance = bundle.source ?? null
       project.videoFileName = bundle.video?.filename ?? project.videoFileName
       project.frames = bundle.frames?.frames ?? []
       project.calibration = bundle.calibration

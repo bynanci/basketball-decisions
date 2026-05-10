@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import {
   apiClient,
+  type DatasetManifest,
   type DatasetSummary,
   type DecisionEventsBuildSummary,
   type LocalLabProjectArtifact,
@@ -15,6 +16,7 @@ const isExportingRecognition = ref(false)
 const isExportingDecision = ref(false)
 const isBuildingDecisionEvents = ref(false)
 const decisionEventsSummary = ref<DecisionEventsBuildSummary | null>(null)
+const lastExportManifest = ref<DatasetManifest | null>(null)
 const statusMessage = ref('')
 const errorMessage = ref('')
 const errorCode = ref('')
@@ -71,7 +73,8 @@ async function exportRecognitionDataset() {
   errorMessage.value = ''
   try {
     const manifest = await apiClient.exportRecognitionDataset()
-    statusMessage.value = `Recognition dataset exported with ${manifest.sample_count} samples and ${manifest.label_count} labels.`
+    lastExportManifest.value = manifest
+    statusMessage.value = `Recognition dataset exported with ${manifest.sample_count} samples and ${manifest.label_count} labels. Included ${manifest.included_project_count} projects; skipped ${manifest.skipped_project_count}.`
     await refreshLocalLab()
   } catch (error) {
     showError(error, 'Could not export the recognition dataset.')
@@ -86,7 +89,8 @@ async function exportDecisionDataset() {
   errorMessage.value = ''
   try {
     const manifest = await apiClient.exportDecisionDataset()
-    statusMessage.value = `Decision dataset exported with ${manifest.sample_count} samples and ${manifest.label_count} labels.`
+    lastExportManifest.value = manifest
+    statusMessage.value = `Decision dataset exported with ${manifest.sample_count} samples and ${manifest.label_count} labels. Included ${manifest.included_project_count} projects; skipped ${manifest.skipped_project_count}.`
     await refreshLocalLab()
   } catch (error) {
     showError(error, 'Could not export the decision dataset.')
@@ -134,6 +138,16 @@ onMounted(refreshLocalLab)
       <button class="secondary" type="button" :disabled="isLoading" @click="refreshLocalLab">Refresh</button>
     </div>
     <p v-if="statusMessage" class="success-message">{{ statusMessage }}</p>
+
+    <div v-if="lastExportManifest" class="export-summary">
+      <strong>Last export summary</strong>
+      <p>{{ datasetTitle(lastExportManifest.dataset_type) }} included {{ lastExportManifest.included_project_count }} projects and skipped {{ lastExportManifest.skipped_project_count }}.</p>
+      <ul v-if="lastExportManifest.skipped_projects.length">
+        <li v-for="project in lastExportManifest.skipped_projects" :key="project.project_id">
+          <strong>{{ project.name ?? project.project_id }}</strong>: {{ project.reason }}
+        </li>
+      </ul>
+    </div>
     <div v-if="errorMessage" class="error-card" role="alert">
       <strong>{{ errorCode }}</strong>
       <p>{{ errorMessage }}</p>
@@ -202,6 +216,10 @@ onMounted(refreshLocalLab)
           <tr>
             <th>Project</th>
             <th>Video</th>
+            <th>License</th>
+            <th>Usage</th>
+            <th>Training</th>
+            <th>League</th>
             <th>Frames</th>
             <th>Calibration</th>
             <th>Tracking</th>
@@ -219,7 +237,11 @@ onMounted(refreshLocalLab)
               <strong>{{ project.name }}</strong>
               <small>{{ project.project_id }}</small>
             </td>
-            <td>{{ boolLabel(project.has_video) }}</td>
+            <td>{{ boolLabel(project.has_video) }} <span v-if="project.source?.usage_scope === 'REFERENCE_ONLY'" class="warning-badge">Reference only</span></td>
+            <td>{{ project.source?.license_type ?? 'Missing' }}</td>
+            <td>{{ project.source?.usage_scope ?? 'Missing' }}</td>
+            <td>{{ project.source ? boolLabel(project.source.allowed_for_training) : 'No' }}</td>
+            <td>{{ project.source?.league_tag ?? 'UNKNOWN' }}</td>
             <td>{{ project.frame_count }}</td>
             <td>{{ boolLabel(project.has_calibration) }}</td>
             <td>{{ boolLabel(project.has_tracking) }}</td>
@@ -231,7 +253,7 @@ onMounted(refreshLocalLab)
             <td>{{ formatDate(project.updated_at) }}</td>
           </tr>
           <tr v-if="projects.length === 0">
-            <td colspan="11">No local projects found yet.</td>
+            <td colspan="15">No local projects found yet.</td>
           </tr>
         </tbody>
       </table>
@@ -240,6 +262,25 @@ onMounted(refreshLocalLab)
 </template>
 
 <style scoped>
+
+.export-summary {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0.85rem;
+}
+
+.warning-badge {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  color: #92400e;
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-left: 0.35rem;
+  padding: 0.15rem 0.45rem;
+}
 .local-lab-hero {
   display: grid;
   gap: 1rem;

@@ -342,3 +342,13 @@ backend/app/data/datasets/player_value/player_decision_events.jsonl
 ```
 
 and returns a summary with `event_count`, `avg_raw_score`, `avg_role_adjusted_score`, and `opportunity_cost_avg`. The Local Lab page also includes a **Build Decision Events** button and summary card for these values.
+
+## Data Source Governance
+
+Basketball Decisions stores per-project source governance metadata in local JSON at `backend/app/data/projects/{project_id}/source.json`. This record captures the source type, license, rights confirmation, usage scope, league tag, local-storage permission, redistribution permission, and whether the project is explicitly allowed for ML training.
+
+YouTube highlights are **reference-only by default**. Importing a YouTube URL does not make that clip training-eligible; users must confirm they have the rights or permission and update the source governance record to a training-compatible license and usage scope before it can be exported for ML datasets.
+
+Local Lab dataset exports for recognition and decision training include only projects where `allowed_for_training` is `true`. Projects with missing source metadata, unknown licenses, YouTube reference-only licenses, unconfirmed rights, or reference-only usage scopes are skipped and listed in the export manifest with a reason.
+
+The user is responsible for confirming rights, license terms, and permitted use. NBA, EuroLeague, NCAA, and YouTube highlight clips should not be bulk-trained or redistributed unless permission or a license explicitly allows that use.

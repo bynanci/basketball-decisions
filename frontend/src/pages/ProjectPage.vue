@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
-import type { QuizPrompt } from '../api/client'
+import type { LeagueTag, QuizPrompt, SourceLicenseType, UsageScope, VideoSourceRecord } from '../api/client'
 import Court2DView from '../components/Court2DView.vue'
 import VideoPlayer from '../components/VideoPlayer.vue'
 import { useProjectHydration } from '../composables/useProjectHydration'
@@ -28,6 +28,28 @@ const isLoadingQuizPrompts = ref(false)
 const quizErrorMessage = ref('')
 const quizErrorCode = ref('')
 const quizErrorHint = ref('')
+
+const licenseOptions: SourceLicenseType[] = ['OWNED', 'PERMISSION_GRANTED', 'PUBLIC_DOMAIN', 'CREATIVE_COMMONS', 'RESEARCH_DATASET', 'YOUTUBE_REFERENCE_ONLY', 'UNKNOWN']
+const usageScopeOptions: UsageScope[] = ['TRAINING', 'EVALUATION', 'REFERENCE_ONLY', 'DEMO_ONLY']
+const leagueTagOptions: LeagueTag[] = ['NBA', 'EUROLEAGUE', 'NCAA', 'LOCAL', 'OTHER', 'UNKNOWN']
+const isSavingSource = ref(false)
+const sourceSaveMessage = ref('')
+const sourceForm = ref<VideoSourceRecord | null>(null)
+const sourceValidationHint = computed(() => {
+  const source = sourceForm.value
+  if (!source) return ''
+  if (source.allowed_for_training && ['UNKNOWN', 'YOUTUBE_REFERENCE_ONLY'].includes(source.license_type)) return 'Training requires a license other than UNKNOWN or YOUTUBE_REFERENCE_ONLY.'
+  if (source.allowed_for_training && !source.rights_confirmed) return 'Training requires rights confirmation.'
+  if (source.allowed_for_training && source.usage_scope === 'REFERENCE_ONLY') return 'Reference-only sources cannot be used for training.'
+  return ''
+})
+const canSaveSource = computed(() => !!sourceForm.value && !sourceValidationHint.value && !isSavingSource.value)
+
+function cloneSource(source?: VideoSourceRecord | null) {
+  sourceForm.value = source ? { ...source } : null
+}
+
+watch(() => project.value?.sourceGovernance, (source) => cloneSource(source), { immediate: true })
 
 onMounted(() => {
   void ensureProjectHydrated(props.projectId, { force: true }).catch(() => undefined)
@@ -96,6 +118,25 @@ async function extractFrames() {
     isExtracting.value = false
   }
 }
+async function saveSourceGovernance() {
+  if (!sourceForm.value || !canSaveSource.value) return
+  isSavingSource.value = true
+  sourceSaveMessage.value = ''
+  errorMessage.value = ''
+  errorCode.value = ''
+  errorHint.value = ''
+  try {
+    const response = await apiClient.updateProjectSource(props.projectId, sourceForm.value)
+    projectStore.setSourceGovernance(props.projectId, response)
+    cloneSource(response)
+    sourceSaveMessage.value = 'Source governance saved.'
+  } catch (error) {
+    showError(error)
+  } finally {
+    isSavingSource.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -124,6 +165,49 @@ async function extractFrames() {
     <strong>{{ errorCode }}</strong>
     <p>{{ errorMessage }}</p>
     <small v-if="errorHint">{{ errorHint }}</small>
+  </section>
+
+
+  <section class="card source-governance-card">
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Data Source Governance</p>
+        <h2>Source Governance</h2>
+      </div>
+      <span v-if="project?.sourceGovernance?.usage_scope === 'REFERENCE_ONLY'" class="warning-badge">Reference only</span>
+    </div>
+    <p class="muted">Dataset exports only include projects whose source is explicitly allowed for training.</p>
+    <p v-if="!sourceForm" class="muted">No source governance record exists yet. Upload or import a video, then review the source policy.</p>
+    <form v-else class="source-form" @submit.prevent="saveSourceGovernance">
+      <label>
+        License type
+        <select v-model="sourceForm.license_type">
+          <option v-for="option in licenseOptions" :key="option" :value="option">{{ option }}</option>
+        </select>
+      </label>
+      <label>
+        Usage scope
+        <select v-model="sourceForm.usage_scope">
+          <option v-for="option in usageScopeOptions" :key="option" :value="option">{{ option }}</option>
+        </select>
+      </label>
+      <label>
+        League tag
+        <select v-model="sourceForm.league_tag">
+          <option v-for="option in leagueTagOptions" :key="option" :value="option">{{ option }}</option>
+        </select>
+      </label>
+      <label class="checkbox-label"><input v-model="sourceForm.rights_confirmed" type="checkbox" /> Rights confirmed</label>
+      <label class="checkbox-label"><input v-model="sourceForm.allowed_for_training" type="checkbox" /> Allowed for training</label>
+      <label class="checkbox-label"><input v-model="sourceForm.allowed_for_local_storage" type="checkbox" /> Allowed for local storage</label>
+      <label class="full-width">
+        Notes
+        <textarea v-model="sourceForm.notes" rows="3" placeholder="Record permissions, source context, or license notes." />
+      </label>
+      <p v-if="sourceValidationHint" class="error-text">{{ sourceValidationHint }}</p>
+      <p v-if="sourceSaveMessage" class="success-message">{{ sourceSaveMessage }}</p>
+      <button type="submit" :disabled="!canSaveSource">{{ isSavingSource ? 'Saving…' : 'Save source governance' }}</button>
+    </form>
   </section>
 
   <section class="grid">
@@ -197,6 +281,68 @@ async function extractFrames() {
 </template>
 
 <style scoped>
+
+.source-governance-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.section-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.warning-badge {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  color: #92400e;
+  font-weight: 800;
+  padding: 0.25rem 0.65rem;
+}
+
+.source-form {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.source-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+
+.source-form select,
+.source-form textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.6rem;
+}
+
+.checkbox-label {
+  align-items: center;
+  display: flex !important;
+  gap: 0.5rem !important;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.error-text {
+  color: #b91c1c;
+  font-weight: 700;
+  grid-column: 1 / -1;
+}
+
+.success-message {
+  color: #166534;
+  font-weight: 700;
+  grid-column: 1 / -1;
+}
 .secondary {
   background: #475569;
   margin-left: 0.75rem;
