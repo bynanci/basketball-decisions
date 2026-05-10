@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { apiClient, type DatasetSummary, type LocalLabProjectArtifact, isApiClientError } from '../api/client'
+import {
+  apiClient,
+  type DatasetSummary,
+  type DecisionEventsBuildSummary,
+  type LocalLabProjectArtifact,
+  isApiClientError
+} from '../api/client'
 
 const projects = ref<LocalLabProjectArtifact[]>([])
 const datasets = ref<DatasetSummary[]>([])
 const isLoading = ref(false)
 const isExportingRecognition = ref(false)
 const isExportingDecision = ref(false)
+const isBuildingDecisionEvents = ref(false)
+const decisionEventsSummary = ref<DecisionEventsBuildSummary | null>(null)
 const statusMessage = ref('')
 const errorMessage = ref('')
 const errorCode = ref('')
@@ -20,6 +28,10 @@ function boolLabel(value: boolean) {
 function formatDate(value?: string | null) {
   if (!value) return 'Never'
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
 }
 
 function datasetTitle(value: string) {
@@ -83,6 +95,21 @@ async function exportDecisionDataset() {
   }
 }
 
+async function buildDecisionEvents() {
+  isBuildingDecisionEvents.value = true
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    const summary = await apiClient.buildDecisionEvents()
+    decisionEventsSummary.value = summary
+    statusMessage.value = `Built ${summary.event_count} explainable decision events.`
+  } catch (error) {
+    showError(error, 'Could not build decision events.')
+  } finally {
+    isBuildingDecisionEvents.value = false
+  }
+}
+
 onMounted(refreshLocalLab)
 </script>
 
@@ -91,8 +118,8 @@ onMounted(refreshLocalLab)
     <p class="eyebrow">Local Lab</p>
     <h1>Local data memory layer</h1>
     <p>
-      Review saved project artifacts and export JSONL datasets for future local ML training. No cloud sync, database, model training, or
-      player value scoring is run from this page.
+      Review saved project artifacts, export JSONL datasets for future local ML training, and build local rule-based decision events. No cloud
+      sync, database, learned model training, or learned player value scoring is run from this page.
     </p>
     <div class="button-row">
       <button type="button" :disabled="isExportingRecognition" @click="exportRecognitionDataset">
@@ -101,6 +128,9 @@ onMounted(refreshLocalLab)
       <button type="button" :disabled="isExportingDecision" @click="exportDecisionDataset">
         {{ isExportingDecision ? 'Exporting…' : 'Export Decision Dataset' }}
       </button>
+      <button type="button" :disabled="isBuildingDecisionEvents" @click="buildDecisionEvents">
+        {{ isBuildingDecisionEvents ? 'Building…' : 'Build Decision Events' }}
+      </button>
       <button class="secondary" type="button" :disabled="isLoading" @click="refreshLocalLab">Refresh</button>
     </div>
     <p v-if="statusMessage" class="success-message">{{ statusMessage }}</p>
@@ -108,6 +138,32 @@ onMounted(refreshLocalLab)
       <strong>{{ errorCode }}</strong>
       <p>{{ errorMessage }}</p>
     </div>
+  </section>
+
+  <section class="card decision-events-card">
+    <div>
+      <p class="eyebrow">Decision Engine v1</p>
+      <h2>Explainable decision events</h2>
+      <p>Build role-adjusted, rule-based events from saved quiz attempts and write them to the local player value dataset.</p>
+    </div>
+    <dl>
+      <div>
+        <dt>Event count</dt>
+        <dd>{{ decisionEventsSummary ? decisionEventsSummary.event_count : 'Not built' }}</dd>
+      </div>
+      <div>
+        <dt>Avg raw score</dt>
+        <dd>{{ decisionEventsSummary ? formatNumber(decisionEventsSummary.avg_raw_score) : '—' }}</dd>
+      </div>
+      <div>
+        <dt>Avg role adjusted score</dt>
+        <dd>{{ decisionEventsSummary ? formatNumber(decisionEventsSummary.avg_role_adjusted_score) : '—' }}</dd>
+      </div>
+      <div>
+        <dt>Avg opportunity cost</dt>
+        <dd>{{ decisionEventsSummary ? formatNumber(decisionEventsSummary.opportunity_cost_avg) : '—' }}</dd>
+      </div>
+    </dl>
   </section>
 
   <section class="summary-grid">
@@ -198,6 +254,32 @@ onMounted(refreshLocalLab)
 .success-message {
   color: #166534;
   font-weight: 700;
+}
+
+.decision-events-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.decision-events-card dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 0;
+}
+
+.decision-events-card div {
+  min-width: 0;
+}
+
+.decision-events-card dt {
+  color: #64748b;
+}
+
+.decision-events-card dd {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0.25rem 0 0;
 }
 
 .summary-grid {

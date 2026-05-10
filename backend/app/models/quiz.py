@@ -42,6 +42,7 @@ SituationType = Literal[
 QuizPromptMode = Literal["STILL_FRAME", "VIDEO_FREEZE"]
 QuizQuestionMode = Literal["FREEZE_FRAME", "QUICK_DECISION", "ROLE_READ"]
 QuizScoringMode = Literal["EXPECTED_VALUE", "CORRECTNESS_ONLY"]
+DecisionEvaluationSource = Literal["MANUAL_EXPECTED_VALUE", "RULE_BASED"]
 UserRole = Literal["COACH", "PLAYER", "ANALYST", "FAN"]
 
 
@@ -281,6 +282,50 @@ class QuizAttemptRecord(QuizAttemptResponse):
     project_id: str
     user_role: UserRole | None = None
     attempted_at: datetime = Field(default_factory=utc_now)
+
+
+class DecisionEvent(BaseModel):
+    """Explainable Decision Engine v1 event generated from a quiz attempt."""
+
+    project_id: str
+    prompt_id: str
+    attempt_id: str
+    frame_id: str
+    frame_index: int
+    user_role: UserRole | None = None
+    court_role_target: CourtRoleTarget
+    situation_type: SituationType
+    question_mode: QuizQuestionMode
+    selected_option_id: str | None = None
+    correct_option_id: str
+    is_correct: bool
+    selected_expected_value: FiniteFloat | None = None
+    best_expected_value: FiniteFloat | None = None
+    opportunity_cost: FiniteFloat | None = None
+    raw_score: int = Field(ge=0, le=100)
+    role_adjusted_score: int = Field(ge=0, le=100)
+    response_time_ms: int | None = Field(default=None, ge=0)
+    timed_out: bool = False
+    evaluation_source: DecisionEvaluationSource
+    explanations: list[str]
+    created_at: datetime = Field(default_factory=utc_now)
+
+    @field_validator("project_id", "prompt_id", "attempt_id", "frame_id", "correct_option_id")
+    @classmethod
+    def require_non_empty_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("selected_option_id")
+    @classmethod
+    def normalize_optional_selected_option_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
 
 
 # Backward-compatible extension-point names retained for imports/tests that may

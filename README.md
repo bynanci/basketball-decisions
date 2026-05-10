@@ -316,4 +316,29 @@ Recognition export (`POST /api/local-lab/datasets/recognition/export`) reads eac
 
 Decision export (`POST /api/local-lab/datasets/decision/export`) reads `quiz_prompts.json` as `DecisionTrainingSample` rows and reads `quiz_attempts.json` as `DecisionAttemptTrainingLabel` rows. The exporter writes `decision/samples.jsonl`, `decision/labels.jsonl`, and `decision/dataset_manifest.json`.
 
-Dataset summaries are available from `GET /api/local-lab/datasets` and are displayed as Local Lab cards next to export buttons. This layer is intentionally a registry/export step only; no real ML training, YOLO fine-tuning, cloud sync, or player value scoring is implemented yet.
+Dataset summaries are available from `GET /api/local-lab/datasets` and are displayed as Local Lab cards next to export buttons. This layer is intentionally local-only; no real ML training, YOLO fine-tuning, cloud sync, or learned player value model is implemented yet.
+
+## Decision Engine v1
+
+Decision Engine v1 turns saved quiz attempts into explainable, local JSONL decision events for downstream player-value experiments. It is deterministic and intentionally does **not** train or call a learned EPV model yet.
+
+The engine evaluates each `quiz_attempts.json` record against its matching prompt in `quiz_prompts.json`:
+
+- **Manual expected values first:** when every quiz option has an `expected_value`, the engine uses the selected option value, the best option value, and the opportunity cost to compute the raw score as `max(0, round(100 - opportunity_cost * 200))`.
+- **Rule-based fallback:** when expected values are incomplete or absent, the engine falls back to correctness-only scoring (`100` for correct, `0` for incorrect).
+- **Role-adjusted score:** the event adds deterministic adjustments for timeouts, `ROLE_READ` correctness, fast responses, and near-optimal incorrect answers with low opportunity cost.
+- **Explainability:** every event includes an `explanations` array describing whether manual expected value or rule-based scoring was used and which role/time adjustments were applied.
+
+Build local decision events from the API:
+
+```bash
+curl -X POST "http://localhost:8000/api/local-lab/decision-events/build"
+```
+
+The endpoint iterates all local projects, reads quiz prompts and attempts, writes JSONL to:
+
+```text
+backend/app/data/datasets/player_value/player_decision_events.jsonl
+```
+
+and returns a summary with `event_count`, `avg_raw_score`, `avg_role_adjusted_score`, and `opportunity_cost_avg`. The Local Lab page also includes a **Build Decision Events** button and summary card for these values.

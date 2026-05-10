@@ -16,6 +16,8 @@ from app.models import (
     DatasetManifest,
     DatasetSummary,
     DecisionAttemptTrainingLabel,
+    DecisionEvent,
+    DecisionEventsBuildSummary,
     DecisionTrainingSample,
     DetectionTrainingLabel,
     ExtractFramesResponse,
@@ -33,6 +35,7 @@ from app.models import (
 )
 from app.models.base import utc_now
 from app.pipeline.recognition_quality import score_project_recognition
+from app.services.decision_engine import evaluate_attempt
 
 router = APIRouter(prefix="/local-lab", tags=["local-lab"])
 
@@ -170,6 +173,12 @@ def score_project_recognition_quality(project_id: str) -> RecognitionScoreProjec
 def _write_jsonl(path: Path, rows) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(row.model_dump_json() + "\n" for row in rows), encoding="utf-8")
+
+
+def _average(values: list[float | int]) -> float:
+    if not values:
+        return 0.0
+    return round(sum(values) / len(values), 4)
 
 
 @router.post("/datasets/recognition/export", response_model=DatasetManifest)
@@ -316,6 +325,34 @@ def export_decision_dataset() -> DatasetManifest:
     )
     write_json_model(directory / "dataset_manifest.json", manifest)
     return manifest
+
+
+@router.post("/decision-events/build", response_model=DecisionEventsBuildSummary)
+def build_decision_events() -> DecisionEventsBuildSummary:
+    _ensure_dataset_dirs()
+    events: list[DecisionEvent] = []
+
+    for directory in _project_dirs():
+        prompts = _read_json_list(directory / "quiz_prompts.json", _PROMPTS_ADAPTER)
+        attempts = _read_json_list(directory / "quiz_attempts.json", _ATTEMPTS_ADAPTER)
+        prompt_by_id = {prompt.prompt_id: prompt for prompt in prompts}
+
+        for attempt in attempts:
+            prompt = prompt_by_id.get(attempt.prompt_id)
+            if prompt is None:
+                continue
+            events.append(evaluate_attempt(prompt, attempt))
+
+    output_path = DATASETS_DIR / "player_value" / "player_decision_events.jsonl"
+    _write_jsonl(output_path, events)
+
+    opportunity_costs = [event.opportunity_cost for event in events if event.opportunity_cost is not None]
+    return DecisionEventsBuildSummary(
+        event_count=len(events),
+        avg_raw_score=_average([event.raw_score for event in events]),
+        avg_role_adjusted_score=_average([event.role_adjusted_score for event in events]),
+        opportunity_cost_avg=_average(opportunity_costs),
+    )
 
 
 def _summary_for_dataset(dataset_type: str) -> DatasetSummary:
