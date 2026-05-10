@@ -6,6 +6,7 @@ import {
   type DatasetSummary,
   type DecisionEventsBuildSummary,
   type LocalLabProjectArtifact,
+  type ReferenceVideoDraftSummary,
   type VideoSourceRecord,
   isApiClientError
 } from '../api/client'
@@ -13,6 +14,7 @@ import {
 const projects = ref<LocalLabProjectArtifact[]>([])
 const datasets = ref<DatasetSummary[]>([])
 const sourceRegistry = ref<VideoSourceRecord[]>([])
+const referenceVideoSummary = ref<ReferenceVideoDraftSummary>({ reference_only_source_count: 0, quiz_prompt_draft_count: 0, decision_rule_draft_count: 0 })
 const isLoading = ref(false)
 const isExportingRecognition = ref(false)
 const isExportingDecision = ref(false)
@@ -82,10 +84,16 @@ async function refreshLocalLab() {
   isLoading.value = true
   errorMessage.value = ''
   try {
-    const [projectResponse, datasetResponse, sourceResponse] = await Promise.all([apiClient.listLocalLabProjects(), apiClient.listDatasets(), apiClient.listSources()])
+    const [projectResponse, datasetResponse, sourceResponse, referenceSummaryResponse] = await Promise.all([
+      apiClient.listLocalLabProjects(),
+      apiClient.listDatasets(),
+      apiClient.listSources(),
+      apiClient.getReferenceVideoSummary()
+    ])
     projects.value = projectResponse.projects
     datasets.value = datasetResponse.datasets
     sourceRegistry.value = sourceResponse
+    referenceVideoSummary.value = referenceSummaryResponse
   } catch (error) {
     showError(error, 'Could not load the Local Lab registry.')
   } finally {
@@ -309,6 +317,28 @@ onMounted(refreshLocalLab)
     </dl>
   </section>
 
+  <section class="card reference-summary-card">
+    <div>
+      <p class="eyebrow">Reference-only authoring</p>
+      <h2>Reference Video Breakdown Importer</h2>
+      <p class="muted">These counts are metadata and drafts only. They are excluded from Local Lab training exports unless separately approved through governed training workflows.</p>
+    </div>
+    <dl>
+      <div>
+        <dt>Reference-only sources</dt>
+        <dd>{{ referenceVideoSummary.reference_only_source_count }}</dd>
+      </div>
+      <div>
+        <dt>Prompt drafts</dt>
+        <dd>{{ referenceVideoSummary.quiz_prompt_draft_count }}</dd>
+      </div>
+      <div>
+        <dt>Rule drafts</dt>
+        <dd>{{ referenceVideoSummary.decision_rule_draft_count }}</dd>
+      </div>
+    </dl>
+  </section>
+
   <section class="summary-grid">
     <article v-for="dataset in sortedDatasets" :key="dataset.dataset_type" class="card dataset-card">
       <p class="eyebrow">{{ datasetTitle(dataset.dataset_type) }}</p>
@@ -485,6 +515,28 @@ onMounted(refreshLocalLab)
 }
 
 .decision-events-card dd {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0.25rem 0 0;
+}
+
+.reference-summary-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.reference-summary-card dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 0;
+}
+
+.reference-summary-card dt {
+  color: #64748b;
+}
+
+.reference-summary-card dd {
   font-size: 1.5rem;
   font-weight: 800;
   margin: 0.25rem 0 0;

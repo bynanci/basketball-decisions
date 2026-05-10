@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from pydantic import TypeAdapter, ValidationError
 
 from app.api.common import DATA_DIR, api_error, read_json, write_json_model
+from app.api.reference_videos import reference_video_summary
 from app.models import (
     DatasetListResponse,
     DatasetManifest,
@@ -36,6 +37,7 @@ from app.models import (
     TrackReviewPatch,
     TrackTrainingLabel,
     VideoSourceRecord,
+    ReferenceVideoDraftSummary,
 )
 from app.models.base import utc_now
 from app.models.tracking import Detection, PlayerTrack
@@ -872,3 +874,8 @@ def _summary_for_dataset(dataset_type: str) -> DatasetSummary:
 @router.get("/datasets", response_model=DatasetListResponse)
 def list_datasets() -> DatasetListResponse:
     return DatasetListResponse(datasets=[_summary_for_dataset(dataset_type) for dataset_type in DATASET_TYPES])
+
+
+@router.get("/reference-video-summary", response_model=ReferenceVideoDraftSummary)
+def get_reference_video_summary() -> ReferenceVideoDraftSummary:
+    return reference_video_summary()

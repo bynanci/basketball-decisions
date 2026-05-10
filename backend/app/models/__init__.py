@@ -28,6 +28,17 @@ from .calibration import (
 from .errors import ApiErrorResponse
 from .project import Project, ProjectBundleResponse, ProjectCreateRequest, ProjectCreateResponse
 from .source import LeagueTag, SourceLicenseType, SourceType, UsageScope, VideoSourceRecord
+from .reference_video import (
+    CreateReferenceVideoRequest,
+    DecisionRuleDraft,
+    QuizPromptDraft,
+    QuizPromptDraftOption,
+    ReferenceBreakdownNote,
+    ReferenceVideo,
+    ReferenceVideoDraftSummary,
+    ReferenceVideoListResponse,
+    UpsertReferenceBreakdownNoteRequest,
+)
 from .quiz import (
     CreateQuizPromptRequest,
     CourtRoleTarget,
@@ -91,6 +102,15 @@ __all__ = [
     "DetectionTrainingLabel",
     "LocalLabProjectArtifact",
     "LocalLabProjectsResponse",
+    "CreateReferenceVideoRequest",
+    "DecisionRuleDraft",
+    "QuizPromptDraft",
+    "QuizPromptDraftOption",
+    "ReferenceBreakdownNote",
+    "ReferenceVideo",
+    "ReferenceVideoDraftSummary",
+    "ReferenceVideoListResponse",
+    "UpsertReferenceBreakdownNoteRequest",
     "RecognitionTrainingSample",
     "SkippedProject",
     "TrackTrainingLabel",
