@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { apiClient, isApiClientError, type RunTrackingResponse } from '../api/client'
+import { apiClient, isApiClientError } from '../api/client'
 import Court2DView from '../components/Court2DView.vue'
 import TrackOverlay from '../components/TrackOverlay.vue'
 import VideoPlayer from '../components/VideoPlayer.vue'
@@ -19,8 +19,8 @@ const isRunning = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
 const errorHint = ref('')
-const pipelineOutput = ref<RunTrackingResponse['pipeline_output'] | null>(null)
-const debugMetadata = ref<RunTrackingResponse['debug_metadata'] | null>(null)
+const pipelineOutput = computed(() => project.value?.trackingPipelineOutput ?? null)
+const debugMetadata = computed(() => project.value?.trackingDebugMetadata ?? null)
 
 const hasBackendResult = computed(() => !!project.value && (project.value.detections.length > 0 || project.value.tracks.length > 0 || project.value.projectedTracks.length > 0))
 const detections = computed(() => project.value?.detections ?? [])
@@ -71,16 +71,14 @@ async function runTracking() {
       iou_threshold: 0.3,
       max_players: 10
     })
-    pipelineOutput.value = runResponse.pipeline_output ?? null
-    debugMetadata.value = runResponse.debug_metadata ?? null
     const tracksResponse = await apiClient.getTracks(props.projectId)
     projectStore.setTracks(props.projectId, {
       detections: tracksResponse.tracking?.detections ?? runResponse.detections,
       tracks: tracksResponse.tracking?.tracks ?? runResponse.tracks,
-      projectedTracks: tracksResponse.projected_tracks
+      projectedTracks: tracksResponse.projected_tracks,
+      pipelineOutput: tracksResponse.tracking?.pipeline_output ?? runResponse.pipeline_output ?? null,
+      debugMetadata: tracksResponse.tracking?.debug_metadata ?? runResponse.debug_metadata ?? null
     })
-    pipelineOutput.value = tracksResponse.tracking?.pipeline_output ?? pipelineOutput.value
-    debugMetadata.value = tracksResponse.tracking?.debug_metadata ?? debugMetadata.value
   } catch (error) {
     showError(error)
   } finally {
