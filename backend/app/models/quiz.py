@@ -16,6 +16,7 @@ from .base import utc_now
 
 ActionType = Literal["PASS", "DRIVE", "SHOT", "RESET", "HOLD"]
 QuizPromptMode = Literal["STILL_FRAME", "VIDEO_FREEZE"]
+QuizScoringMode = Literal["EXPECTED_VALUE", "CORRECTNESS_ONLY"]
 
 
 class DecisionArrowPoint(BaseModel):
@@ -143,6 +144,16 @@ class QuizAttemptRequest(BaseModel):
 
 
 class QuizAttemptResponse(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def hydrate_legacy_scoring(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "score" not in data and "is_correct" in data:
+                data = {**data, "score": 100 if data["is_correct"] else 0}
+            if "scoring_mode" not in data:
+                data = {**data, "scoring_mode": "CORRECTNESS_ONLY"}
+        return data
+
     prompt_id: str
     selected_option_id: str
     correct_option_id: str
@@ -150,6 +161,8 @@ class QuizAttemptResponse(BaseModel):
     selected_expected_value: FiniteFloat | None = None
     correct_expected_value: FiniteFloat | None = None
     opportunity_cost: FiniteFloat | None = None
+    score: int = Field(ge=0, le=100)
+    scoring_mode: QuizScoringMode
     selected_explanation: str
     correct_explanation: str
     summary_explanation: str

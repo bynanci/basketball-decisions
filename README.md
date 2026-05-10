@@ -235,14 +235,21 @@ Player flow:
 
 1. Open a saved prompt from **Existing Quiz Prompts** on the project page.
 2. Click one arrow on the freeze frame.
-3. Review the selected option, correct option, correctness, optional expected-value opportunity cost, option explanations, and summary explanation.
+3. Review the selected option, correct option, score, scoring mode, optional expected-value opportunity cost, option explanations, and summary explanation.
+
+Attempt scoring:
+
+- Manual expected values are coach/analyst-entered estimates saved on quiz options. They are not model-generated.
+- When all options have manual `expected_value`, attempts use expected-value scoring: `opportunity_cost = max(0, best_expected_value - selected_expected_value)` and `score = max(0, round(100 - opportunity_cost * 200))`.
+- When expected values are missing, attempts fall back to correctness-only scoring: score is `100` for the correct option and `0` for an incorrect option, with `opportunity_cost` set to `null`.
+- A learned EPV model is future work; no EPV model is implemented in this MVP.
 
 Quiz prompts are stored locally under `backend/data/projects/{project_id}/quiz_prompts.json`; attempts are appended to `backend/data/projects/{project_id}/quiz_attempts.json`. This is local development JSON storage, not a production quiz database.
 
 Limitations intentionally kept out of scope for this MVP:
 
 - Still image only; no video freeze playback yet.
-- No EPV model; `expected_value` is manually entered and optional.
+- No EPV model; `expected_value` is manually entered and optional, even though recommended for richer scoring.
 - No multi-question sessions.
 - No user accounts or respondent identity.
 - No coach annotation workflow.

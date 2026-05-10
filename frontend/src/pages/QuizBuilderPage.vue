@@ -191,6 +191,7 @@ async function savePrompt() {
       </div>
 
       <h2>Options</h2>
+      <p class="muted">Manual expected value is temporary until EPV model exists.</p>
       <article v-for="option in options" :key="option.option_id" :class="['option-card', { selected: option.option_id === selectedOptionId }]">
         <header>
           <strong>{{ option.option_id }}</strong>
@@ -198,7 +199,7 @@ async function savePrompt() {
         </header>
         <label>Label <input v-model="option.label" /></label>
         <label>Action type <select v-model="option.action_type"><option v-for="action in actionTypes" :key="action" :value="action">{{ action }}</option></select></label>
-        <label>Expected value (optional) <input type="number" step="0.01" :value="formatExpectedValueInput(option.expected_value)" @input="updateExpectedValue(option, $event)" /></label>
+        <label>Expected value (optional, recommended) <input type="number" step="0.01" :value="formatExpectedValueInput(option.expected_value)" @input="updateExpectedValue(option, $event)" /></label>
         <label>Option explanation <textarea v-model="option.explanation" placeholder="What does this option create or miss?"></textarea></label>
       </article>
       <p v-if="!options.length" class="muted">No arrows yet.</p>

@@ -2,12 +2,14 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { DecisionQuizOption, QuizAttemptResponse } from '../api/client'
+import { formatResultNumber, formatScore, isFiniteNumber } from './quizResultFormatting'
 
 const props = defineProps<{
   projectId: string
   result: QuizAttemptResponse
   selectedOption?: DecisionQuizOption | null
   correctOption?: DecisionQuizOption | null
+  options?: DecisionQuizOption[]
 }>()
 
 const emit = defineEmits<{
@@ -19,14 +21,9 @@ const correctOptionLabel = computed(() => formatOption(props.correctOption, prop
 const hasSelectedExpectedValue = computed(() => isFiniteNumber(props.result.selected_expected_value))
 const hasCorrectExpectedValue = computed(() => isFiniteNumber(props.result.correct_expected_value))
 const hasOpportunityCost = computed(() => isFiniteNumber(props.result.opportunity_cost))
-
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === 'number' && Number.isFinite(value)
-}
-
-function formatNumber(value: number | null | undefined) {
-  return isFiniteNumber(value) ? value.toFixed(2) : ''
-}
+const scoringModeLabel = computed(() => props.result.scoring_mode === 'EXPECTED_VALUE' ? 'Expected value' : 'Correctness only')
+const epvOptions = computed(() => props.options ?? [])
+const hasEpvComparison = computed(() => epvOptions.value.length > 0 && epvOptions.value.every((option) => isFiniteNumber(option.expected_value)))
 
 function formatOption(option: DecisionQuizOption | null | undefined, fallbackOptionId: string) {
   if (!option) return fallbackOptionId
@@ -44,6 +41,14 @@ function formatOption(option: DecisionQuizOption | null | undefined, fallbackOpt
     </header>
 
     <dl class="result-metrics">
+      <div class="score-metric">
+        <dt>Score</dt>
+        <dd>{{ formatScore(result.score) }}</dd>
+      </div>
+      <div>
+        <dt>Scoring mode</dt>
+        <dd>{{ scoringModeLabel }}</dd>
+      </div>
       <div>
         <dt>Selected option</dt>
         <dd>{{ selectedOptionLabel }}</dd>
@@ -58,17 +63,29 @@ function formatOption(option: DecisionQuizOption | null | undefined, fallbackOpt
       </div>
       <div v-if="hasSelectedExpectedValue">
         <dt>Selected expected value</dt>
-        <dd>{{ formatNumber(result.selected_expected_value) }}</dd>
+        <dd>{{ formatResultNumber(result.selected_expected_value) }}</dd>
       </div>
       <div v-if="hasCorrectExpectedValue">
         <dt>Correct expected value</dt>
-        <dd>{{ formatNumber(result.correct_expected_value) }}</dd>
+        <dd>{{ formatResultNumber(result.correct_expected_value) }}</dd>
       </div>
       <div v-if="hasOpportunityCost">
         <dt>Opportunity cost</dt>
-        <dd>{{ formatNumber(result.opportunity_cost) }} EPV</dd>
+        <dd>{{ formatResultNumber(result.opportunity_cost) }} EPV</dd>
       </div>
     </dl>
+
+    <section v-if="hasEpvComparison" class="epv-comparison" aria-labelledby="epv-comparison-title">
+      <h3 id="epv-comparison-title">EPV comparison</h3>
+      <ol>
+        <li v-for="option in epvOptions" :key="option.option_id" :class="{ selected: option.option_id === result.selected_option_id, correct: option.option_id === result.correct_option_id }">
+          <span><strong>{{ option.option_id }}</strong> {{ option.label }}</span>
+          <span class="epv-value">{{ formatResultNumber(option.expected_value) }}</span>
+          <small v-if="option.option_id === result.selected_option_id">Selected</small>
+          <small v-if="option.option_id === result.correct_option_id">Correct</small>
+        </li>
+      </ol>
+    </section>
 
     <div class="explanation-block">
       <h3>Selected explanation</h3>
@@ -138,6 +155,11 @@ function formatOption(option: DecisionQuizOption | null | undefined, fallbackOpt
   padding: 0.75rem;
 }
 
+.result-metrics .score-metric {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+
 .result-metrics dt {
   color: #475569;
   font-size: 0.78rem;
@@ -147,6 +169,47 @@ function formatOption(option: DecisionQuizOption | null | undefined, fallbackOpt
 
 .result-metrics dd {
   margin: 0;
+}
+
+.epv-comparison {
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 0.9rem;
+}
+
+.epv-comparison h3 {
+  margin: 0 0 0.6rem;
+}
+
+.epv-comparison ol {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.epv-comparison li {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  padding: 0.65rem;
+}
+
+.epv-comparison li.selected {
+  border-color: #f97316;
+}
+
+.epv-comparison li.correct {
+  border-color: #22c55e;
+}
+
+.epv-value {
+  font-weight: 800;
 }
 
 .explanation-block h3 {

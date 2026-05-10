@@ -268,6 +268,7 @@ export interface TrackReviewResponse {
 
 export type DecisionActionType = 'PASS' | 'DRIVE' | 'SHOT' | 'RESET' | 'HOLD'
 export type QuizPromptMode = 'STILL_FRAME' | 'VIDEO_FREEZE'
+export type QuizScoringMode = 'EXPECTED_VALUE' | 'CORRECTNESS_ONLY'
 
 export interface DecisionArrowPoint {
   x: number
@@ -333,6 +334,8 @@ export interface QuizAttemptResponse {
   selected_expected_value?: number | null
   correct_expected_value?: number | null
   opportunity_cost?: number | null
+  score: number
+  scoring_mode: QuizScoringMode
   selected_explanation: string
   correct_explanation: string
   summary_explanation: string

@@ -186,6 +186,7 @@ function retry() {
         :result="result"
         :selected-option="selectedOption"
         :correct-option="correctOption"
+        :options="prompt.options"
         @retry="retry"
       />
       <div v-else class="pending-result" aria-live="polite">

@@ -69,6 +69,11 @@ async function loadQuizPrompts() {
   }
 }
 
+
+function hasPromptExpectedValues(prompt: QuizPrompt) {
+  return prompt.options.length > 0 && prompt.options.every((option) => typeof option.expected_value === 'number' && Number.isFinite(option.expected_value))
+}
+
 async function extractFrames() {
   const videoAsset = project.value?.videoAsset
   if (!videoAsset || isExtracting.value) return
@@ -183,7 +188,7 @@ async function extractFrames() {
     <div v-else class="quiz-list">
       <article v-for="prompt in quizPrompts" :key="prompt.prompt_id" class="quiz-card">
         <strong>{{ prompt.question }}</strong>
-        <span>Frame {{ prompt.frame_index }} · {{ prompt.options.length }} options</span>
+        <span>Frame {{ prompt.frame_index }} · {{ prompt.options.length }} options · {{ hasPromptExpectedValues(prompt) ? 'Expected values entered' : 'Expected values missing' }}</span>
         <RouterLink class="button small" :to="`/projects/${projectId}/quiz/${prompt.prompt_id}`">Play</RouterLink>
       </article>
     </div>
