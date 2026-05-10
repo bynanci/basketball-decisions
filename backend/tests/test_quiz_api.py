@@ -26,6 +26,14 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     return TestClient(app)
 
 
+
+
+def write_project_without_frames(tmp_path: Path, project_id: str = "project-1") -> Path:
+    directory = tmp_path / project_id
+    write_json_model(directory / "project.json", Project(project_id=project_id, name="Quiz test"))
+    return directory
+
+
 def write_project(tmp_path: Path, project_id: str = "project-1") -> Path:
     directory = tmp_path / project_id
     write_json_model(directory / "project.json", Project(project_id=project_id, name="Quiz test"))
@@ -190,6 +198,17 @@ def test_cannot_create_prompt_with_out_of_range_arrow_coordinates(client: TestCl
 
     assert response.status_code == 422
     assert response.json()["code"] == "REQUEST_VALIDATION_ERROR"
+
+
+
+
+def test_cannot_create_prompt_before_frame_extraction(client: TestClient, tmp_path: Path) -> None:
+    write_project_without_frames(tmp_path)
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=valid_prompt_payload())
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "FRAME_INDEX_NOT_FOUND"
 
 
 def test_can_create_valid_prompt(client: TestClient, tmp_path: Path) -> None:

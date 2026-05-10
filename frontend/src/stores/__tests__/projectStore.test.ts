@@ -67,6 +67,14 @@ function bundle(overrides: Partial<ProjectBundleResponse> = {}): ProjectBundleRe
       projected_tracks: [{ track_id: 'track-1', points: [], metadata: {} }],
       storage_paths: {}
     },
+    tracking_review: {
+      project_id: 'project-1',
+      tracking: { project_id: 'project-1', detections: [], tracks: [] },
+      review_patch: { excluded_detection_ids: [], excluded_track_ids: ['track-2'], track_id_aliases: {}, notes: null },
+      cleaned_tracking: { project_id: 'project-1', detections: [], tracks: [] },
+      cleaned_projected_tracks: [{ track_id: 'track-1', points: [], metadata: {} }],
+      storage_paths: {}
+    },
     ...overrides
   }
 }
@@ -92,6 +100,7 @@ describe('projectStore.hydrateProjectFromBundle', () => {
     expect(project?.projectedTracks).toHaveLength(1)
     expect(project?.trackingPipelineOutput?.detector_mode).toBe('hydrated-detector')
     expect(project?.trackingDebugMetadata?.detector).toEqual({ mode: 'hydrated-debug-detector' })
+    expect(project?.trackingReview?.review_patch.excluded_track_ids).toEqual(['track-2'])
   })
 
   it('preserves an existing browser-only video preview URL', () => {
@@ -116,7 +125,7 @@ describe('projectStore.hydrateProjectFromBundle', () => {
     expect(store.getProject('project-1')?.trackingDebugMetadata?.detector).toEqual({ mode: 'run-debug-detector' })
   })
 
-  it('preserves existing tracking arrays and metadata when optional tracking artifacts are missing', () => {
+  it('clears existing tracking arrays and metadata when backend tracking artifacts are missing', () => {
     const store = useProjectStore()
     store.addProject({ id: 'project-1', name: 'Local Project', source: 'upload' })
     store.setTracks('project-1', {
@@ -137,13 +146,14 @@ describe('projectStore.hydrateProjectFromBundle', () => {
       debugMetadata: { detector: { mode: 'existing-debug-detector' } }
     })
 
-    store.hydrateProjectFromBundle(bundle({ tracking: null, projected_tracks: null }))
+    store.hydrateProjectFromBundle(bundle({ tracking: null, projected_tracks: null, tracking_review: null }))
 
-    expect(store.getProject('project-1')?.detections).toHaveLength(1)
-    expect(store.getProject('project-1')?.tracks).toHaveLength(1)
-    expect(store.getProject('project-1')?.projectedTracks).toHaveLength(1)
-    expect(store.getProject('project-1')?.trackingPipelineOutput?.detector_mode).toBe('existing-detector')
-    expect(store.getProject('project-1')?.trackingDebugMetadata?.detector).toEqual({ mode: 'existing-debug-detector' })
+    expect(store.getProject('project-1')?.detections).toHaveLength(0)
+    expect(store.getProject('project-1')?.tracks).toHaveLength(0)
+    expect(store.getProject('project-1')?.projectedTracks).toHaveLength(0)
+    expect(store.getProject('project-1')?.trackingPipelineOutput).toBeNull()
+    expect(store.getProject('project-1')?.trackingDebugMetadata).toBeNull()
+    expect(store.getProject('project-1')?.trackingReview).toBeNull()
   })
 
 })
