@@ -118,9 +118,9 @@ export const useProjectStore = defineStore('projectStore', {
       project.frames = bundle.frames?.frames ?? []
       project.calibration = bundle.calibration
       project.calibrationPairs = bundle.calibration?.keypoint_pairs ?? []
-      project.detections = bundle.tracking?.detections ?? []
-      project.tracks = bundle.tracking?.tracks ?? []
-      project.projectedTracks = bundle.projected_tracks?.projected_tracks ?? []
+      project.detections = bundle.tracking?.detections ?? project.detections ?? []
+      project.tracks = bundle.tracking?.tracks ?? project.tracks ?? []
+      project.projectedTracks = bundle.projected_tracks?.projected_tracks ?? project.projectedTracks ?? []
 
       if (!existing) {
         this.projects.push(project)

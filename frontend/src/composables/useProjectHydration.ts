@@ -2,54 +2,68 @@ import { readonly, ref } from 'vue'
 import { apiClient, isApiClientError } from '../api/client'
 import { useProjectStore } from '../stores/projectStore'
 
-const loading = ref(false)
-const error = ref<string | null>(null)
-const errorCode = ref<string | null>(null)
-const errorHint = ref<string | null>(null)
+const isHydrating = ref(false)
+const hydrationError = ref<string | null>(null)
+const hydrationErrorCode = ref<string | null>(null)
+const hydrationErrorHint = ref<string | null>(null)
 const hydratedProjectIds = new Set<string>()
 
-function hasEnoughData(projectId: string): boolean {
+export interface ProjectHydrationOptions {
+  force?: boolean
+}
+
+function hasBasicMetadata(projectId: string): boolean {
   const projectStore = useProjectStore()
   const project = projectStore.getProject(projectId)
-  return !!project && hydratedProjectIds.has(projectId)
+  return !!project?.id && !!project.name
+}
+
+export function markProjectHydrationStale(projectId: string) {
+  hydratedProjectIds.delete(projectId)
 }
 
 export function useProjectHydration() {
   const projectStore = useProjectStore()
 
-  async function ensureProjectHydrated(projectId: string): Promise<void> {
+  async function ensureProjectHydrated(projectId: string, options: ProjectHydrationOptions = {}): Promise<void> {
     projectStore.setActiveProject(projectId)
-    error.value = null
-    errorCode.value = null
-    errorHint.value = null
-    if (hasEnoughData(projectId)) return
+    hydrationError.value = null
+    hydrationErrorCode.value = null
+    hydrationErrorHint.value = null
 
-    loading.value = true
+    if (!options.force && (hydratedProjectIds.has(projectId) || hasBasicMetadata(projectId))) return
+
+    isHydrating.value = true
     try {
       const bundle = await apiClient.getProjectBundle(projectId)
       projectStore.hydrateProjectFromBundle(bundle)
       hydratedProjectIds.add(projectId)
-    } catch (hydrationError) {
-      if (isApiClientError(hydrationError)) {
-        error.value = hydrationError.message
-        errorCode.value = hydrationError.code
-        errorHint.value = hydrationError.debug_hint ?? null
+    } catch (error) {
+      if (isApiClientError(error)) {
+        hydrationError.value = error.message
+        hydrationErrorCode.value = error.code
+        hydrationErrorHint.value = error.debug_hint ?? null
       } else {
-        error.value = hydrationError instanceof Error ? hydrationError.message : 'Could not hydrate project from backend.'
-        errorCode.value = 'PROJECT_HYDRATION_ERROR'
-        errorHint.value = null
+        hydrationError.value = error instanceof Error ? error.message : 'Could not hydrate project from backend.'
+        hydrationErrorCode.value = 'PROJECT_HYDRATION_ERROR'
+        hydrationErrorHint.value = null
       }
-      throw hydrationError
+      throw error
     } finally {
-      loading.value = false
+      isHydrating.value = false
     }
   }
 
   return {
     ensureProjectHydrated,
-    loading: readonly(loading),
-    error: readonly(error),
-    errorCode: readonly(errorCode),
-    errorHint: readonly(errorHint)
+    isHydrating: readonly(isHydrating),
+    hydrationError: readonly(hydrationError),
+    hydrationErrorCode: readonly(hydrationErrorCode),
+    hydrationErrorHint: readonly(hydrationErrorHint),
+    // Backward-compatible aliases for existing callers outside the hydrated pages.
+    loading: readonly(isHydrating),
+    error: readonly(hydrationError),
+    errorCode: readonly(hydrationErrorCode),
+    errorHint: readonly(hydrationErrorHint)
   }
 }
