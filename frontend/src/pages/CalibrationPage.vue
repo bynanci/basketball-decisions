@@ -24,9 +24,20 @@ const frameIndex = computed(() => {
   const parsed = value === undefined ? Number.NaN : Number(value)
   return Number.isFinite(parsed) ? parsed : null
 })
-const selectedFrame = computed(() => project.value?.frames.find((frame) => frame.frame_index === frameIndex.value) ?? null)
+const savedCalibrationFrameId = computed(() => project.value?.calibration?.frame_id ?? null)
+const savedCalibrationFrame = computed(() => {
+  if (!savedCalibrationFrameId.value) return null
+  return project.value?.frames.find((frame) => frame.frame_id === savedCalibrationFrameId.value) ?? null
+})
+const selectedFrame = computed(() => {
+  if (frameIndex.value !== null) {
+    return project.value?.frames.find((frame) => frame.frame_index === frameIndex.value) ?? null
+  }
+  return savedCalibrationFrame.value
+})
 const selectedFrameMissing = computed(() => frameIndex.value !== null && !selectedFrame.value && !isHydrating.value)
-const shouldSelectFrame = computed(() => frameIndex.value === null && (project.value?.frames.length ?? 0) > 0)
+const savedCalibrationFrameMissing = computed(() => frameIndex.value === null && !!savedCalibrationFrameId.value && !selectedFrame.value && !isHydrating.value)
+const shouldSelectFrame = computed(() => frameIndex.value === null && !savedCalibrationFrameId.value && (project.value?.frames.length ?? 0) > 0)
 const frameSrc = computed(() => (selectedFrame.value ? apiClient.frameImageUrl(props.projectId, selectedFrame.value.frame_index) : undefined))
 const imageNaturalWidth = ref(selectedFrame.value?.width ?? 100)
 const imageNaturalHeight = ref(selectedFrame.value?.height ?? 100)
@@ -145,7 +156,9 @@ function continueToTracking() {
     <h1>Calibration</h1>
     <p>Project {{ props.projectId }}: manually mark image points for known court keypoints. MVP does not run automatic court detection.</p>
     <p v-if="selectedFrame">Selected frame {{ selectedFrame.frame_index }} at {{ selectedFrame.timestamp_seconds.toFixed(2) }}s.</p>
+    <p v-if="selectedFrame && frameIndex === null && savedCalibrationFrameId" class="status">Restored the saved calibration frame from backend storage.</p>
     <p v-else-if="selectedFrameMissing" class="warning">Selected frame is not available. Extract frames again or return to Project page.</p>
+    <p v-else-if="savedCalibrationFrameMissing" class="warning">Saved calibration references a frame that is not in the extracted frame index. Re-extract frames or choose another frame below.</p>
     <p v-else-if="shouldSelectFrame" class="warning">Select an extracted frame below to start pixel-accurate calibration.</p>
     <p v-else class="warning">Extract frames on the project page, then choose a calibration frame.</p>
     <p class="status">{{ status }}</p>
@@ -172,7 +185,7 @@ function continueToTracking() {
     <small v-if="errorHint">{{ errorHint }}</small>
   </section>
 
-  <section v-if="shouldSelectFrame" class="card">
+  <section v-if="shouldSelectFrame || savedCalibrationFrameMissing" class="card">
     <h2>Available frames</h2>
     <p class="status">Choose one frame to calibrate; the image overlay appears after selection.</p>
     <div class="frame-strip">
@@ -202,7 +215,7 @@ function continueToTracking() {
     </div>
   </section>
 
-  <section v-else-if="!shouldSelectFrame" class="card">
+  <section v-else-if="!shouldSelectFrame && !savedCalibrationFrameMissing" class="card">
     <VideoPlayer :video-src="project?.videoPreviewUrl" title="Calibration frame" />
   </section>
 </template>

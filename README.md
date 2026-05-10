@@ -75,7 +75,7 @@ The bundle returns `project.json` plus any optional artifacts that exist locally
 Supported refresh/deep-link recovery paths include:
 
 - `/projects/:projectId` for project metadata, video metadata, frame counts, calibration status, tracking status, and projected-track status.
-- `/projects/:projectId/calibration?frameIndex=<frame_index>` for opening a saved extracted frame directly and recovering saved calibration keypoints/homography.
+- `/projects/:projectId/calibration?frameIndex=<frame_index>` for opening a saved extracted frame directly and recovering saved calibration keypoints/homography. If the query parameter is omitted after a calibration has been saved, the page restores the calibration frame from the persisted `frame_id`.
 - `/projects/:projectId/tracking` for recovering saved detections, tracks, and projected tracks when tracking has already run.
 
 The backend video `uri` is metadata only for hydration. The browser preview still uses a session-local object URL after upload; the frontend intentionally does **not** treat backend file paths as browser-playable video URLs until a proper streaming endpoint is added.
@@ -88,7 +88,7 @@ Recommended refresh-safe demo path:
 4. Refresh the project page to verify project/video/frame hydration.
 5. Select a calibration frame.
 6. Save calibration.
-7. Refresh the calibration page to verify keypoint/homography recovery.
+7. Refresh the calibration page to verify keypoint/homography recovery; also try removing `?frameIndex=...` from the URL to confirm the saved calibration frame is restored from backend storage.
 8. Run tracking.
 9. Refresh the tracking page to verify detection, track, and projected-track recovery.
 
