@@ -7,9 +7,11 @@ import ArrowDrawingOverlay from '../components/ArrowDrawingOverlay.vue'
 import QuizResultPanel from '../components/QuizResultPanel.vue'
 import { useProjectHydration } from '../composables/useProjectHydration'
 import { useProjectStore } from '../stores/projectStore'
+import { useRoleStore } from '../stores/roleStore'
 
 const props = defineProps<{ projectId: string; promptId: string }>()
 const projectStore = useProjectStore()
+const roleStore = useRoleStore()
 const { ensureProjectHydrated, loading: isHydrating } = useProjectHydration()
 projectStore.setActiveProject(props.projectId)
 
@@ -110,7 +112,10 @@ async function submitAttempt(optionId: string) {
   isSubmitting.value = true
   errorMessage.value = ''
   try {
-    result.value = await apiClient.submitQuizAttempt(props.projectId, prompt.value.prompt_id, { selected_option_id: optionId })
+    result.value = await apiClient.submitQuizAttempt(props.projectId, prompt.value.prompt_id, {
+      selected_option_id: optionId,
+      user_role: roleStore.roleProfile?.userRole ?? null
+    })
     selectedOptionId.value = result.value.selected_option_id
   } catch (error) {
     errorMessage.value = isApiClientError(error) ? error.message : 'Could not submit quiz attempt.'

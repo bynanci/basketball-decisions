@@ -31,6 +31,12 @@ const selectedOptionId = ref<string | null>(null)
 const isSaving = ref(false)
 const errorMessage = ref('')
 const actionTypes: DecisionActionType[] = ['PASS', 'DRIVE', 'SHOT', 'RESET', 'HOLD']
+const roleFeedbackFields = [
+  { key: 'coach', label: 'Coach feedback', placeholder: 'Use this as a skip-pass recognition drill.' },
+  { key: 'player', label: 'Player feedback', placeholder: 'Next time, check the low man before committing to the drive.' },
+  { key: 'analyst', label: 'Analyst feedback', placeholder: 'Tag this as a missed advantage read before the second-side action.' },
+  { key: 'fan', label: 'Fan feedback', placeholder: 'This is why the box score misses decision quality.' }
+] as const
 const courtRoles = COURT_ROLES as CourtRoleTarget[]
 const situationTypes = SITUATION_TYPES as SituationType[]
 const project = computed(() => projectStore.getProject(props.projectId))
@@ -90,6 +96,29 @@ function formatExpectedValueInput(value: number | null | undefined) {
   return typeof value === 'number' && Number.isFinite(value) ? String(value) : ''
 }
 
+function emptyRoleFeedback() {
+  return { coach: '', player: '', analyst: '', fan: '' }
+}
+
+function roleFeedbackValue(option: DecisionQuizOption, key: keyof ReturnType<typeof emptyRoleFeedback>) {
+  return option.role_feedback?.[key] ?? ''
+}
+
+function updateRoleFeedback(option: DecisionQuizOption, key: keyof ReturnType<typeof emptyRoleFeedback>, event: Event) {
+  option.role_feedback = { ...(option.role_feedback ?? emptyRoleFeedback()), [key]: (event.target as HTMLTextAreaElement).value }
+}
+
+function normalizeRoleFeedback(option: DecisionQuizOption) {
+  const feedback = option.role_feedback ?? emptyRoleFeedback()
+  const normalized = {
+    coach: feedback.coach?.trim() || null,
+    player: feedback.player?.trim() || null,
+    analyst: feedback.analyst?.trim() || null,
+    fan: feedback.fan?.trim() || null
+  }
+  return Object.values(normalized).some(Boolean) ? normalized : null
+}
+
 function createOption(payload: { start: DecisionArrowPoint; end: DecisionArrowPoint }) {
   if (options.value.length >= 5) {
     errorMessage.value = 'Maximum 5 arrows per prompt.'
@@ -104,7 +133,8 @@ function createOption(payload: { start: DecisionArrowPoint; end: DecisionArrowPo
     end: payload.end,
     expected_value: null,
     is_correct: options.value.length === 0,
-    explanation: ''
+    explanation: '',
+    role_feedback: emptyRoleFeedback()
   })
   selectedOptionId.value = id
   errorMessage.value = ''
@@ -131,6 +161,12 @@ async function savePrompt() {
   isSaving.value = true
   errorMessage.value = ''
   try {
+    const sanitizedOptions = options.value.map((option) => ({
+      ...option,
+      label: option.label.trim(),
+      explanation: option.explanation.trim(),
+      role_feedback: normalizeRoleFeedback(option)
+    }))
     const prompt = await apiClient.createQuizPrompt(props.projectId, {
       question: question.value,
       court_role_target: selectedCourtRole,
@@ -147,8 +183,8 @@ async function savePrompt() {
       freeze_frame_seconds: effectiveMode.value === 'VIDEO_FREEZE' ? freezeFrameSec.value : null,
       clip_end_seconds: effectiveMode.value === 'VIDEO_FREEZE' ? clipEndSec.value : null,
       mode: effectiveMode.value,
-      options: options.value,
-      explanation: explanation.value
+      options: sanitizedOptions,
+      explanation: explanation.value.trim()
     })
     await router.push(`/projects/${props.projectId}/quiz/${prompt.prompt_id}`)
   } catch (error) {
@@ -244,6 +280,14 @@ async function savePrompt() {
         <label>Action type <select v-model="option.action_type"><option v-for="action in actionTypes" :key="action" :value="action">{{ action }}</option></select></label>
         <label>Expected value (optional, recommended) <input type="number" step="0.01" :value="formatExpectedValueInput(option.expected_value)" @input="updateExpectedValue(option, $event)" /></label>
         <label>Option explanation <textarea v-model="option.explanation" placeholder="What does this option create or miss?"></textarea></label>
+        <details class="role-feedback-panel">
+          <summary>Role-specific feedback (optional)</summary>
+          <p class="muted">Leave blank to fall back to the general option explanation.</p>
+          <label v-for="field in roleFeedbackFields" :key="field.key">
+            {{ field.label }}
+            <textarea :value="roleFeedbackValue(option, field.key)" :placeholder="field.placeholder" @input="updateRoleFeedback(option, field.key, $event)"></textarea>
+          </label>
+        </details>
       </article>
       <p v-if="!options.length" class="muted">No arrows yet.</p>
 
@@ -318,6 +362,19 @@ textarea {
   display: inline;
   margin: 0;
   width: auto;
+}
+
+.role-feedback-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+}
+
+.role-feedback-panel summary {
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .validation-list {

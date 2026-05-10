@@ -291,6 +291,14 @@ export type SituationType =
   | 'OFF_BALL_RELOCATION'
 export type QuizPromptMode = 'STILL_FRAME' | 'VIDEO_FREEZE'
 export type QuizScoringMode = 'EXPECTED_VALUE' | 'CORRECTNESS_ONLY'
+export type QuizUserRole = 'COACH' | 'PLAYER' | 'ANALYST' | 'FAN'
+
+export interface DecisionRoleFeedback {
+  coach?: string | null
+  player?: string | null
+  analyst?: string | null
+  fan?: string | null
+}
 
 export interface DecisionArrowPoint {
   x: number
@@ -306,6 +314,7 @@ export interface DecisionQuizOption {
   expected_value?: number | null
   is_correct: boolean
   explanation: string
+  role_feedback?: DecisionRoleFeedback | null
 }
 
 export interface QuizPrompt {
@@ -354,6 +363,7 @@ export interface CreateQuizPromptRequest {
 
 export interface QuizAttemptRequest {
   selected_option_id: string
+  user_role?: QuizUserRole | null
 }
 
 export interface QuizAttemptResponse {
@@ -368,6 +378,8 @@ export interface QuizAttemptResponse {
   scoring_mode: QuizScoringMode
   selected_explanation: string
   correct_explanation: string
+  selected_role_feedback: string
+  correct_role_feedback: string
   summary_explanation: string
 }
 

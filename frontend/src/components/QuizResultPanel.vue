@@ -2,7 +2,10 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { DecisionQuizOption, QuizAttemptResponse } from '../api/client'
+import { useRoleStore } from '../stores/roleStore'
 import { formatResultNumber, formatScore, isFiniteNumber } from './quizResultFormatting'
+
+const roleStore = useRoleStore()
 
 const props = defineProps<{
   projectId: string
@@ -24,11 +27,21 @@ const hasOpportunityCost = computed(() => isFiniteNumber(props.result.opportunit
 const scoringModeLabel = computed(() => props.result.scoring_mode === 'EXPECTED_VALUE' ? 'Expected value' : 'Correctness only')
 const epvOptions = computed(() => props.options ?? [])
 const hasEpvComparison = computed(() => epvOptions.value.length > 0 && epvOptions.value.every((option) => isFiniteNumber(option.expected_value)))
+const userRoleLabel = computed(() => formatUserRole(roleStore.roleProfile?.userRole ?? 'selected role'))
+const selectedRoleFeedback = computed(() => props.result.selected_role_feedback?.trim() || props.result.selected_explanation || 'No feedback available.')
+const correctRoleFeedback = computed(() => props.result.correct_role_feedback?.trim() || props.result.correct_explanation || 'No feedback available.')
 
 function formatOption(option: DecisionQuizOption | null | undefined, fallbackOptionId: string) {
   if (!option) return fallbackOptionId
   const label = option.label.trim() || 'Decision'
   return `${option.option_id} — ${label}`
+}
+
+function formatUserRole(value: string) {
+  return value
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
 }
 </script>
 
@@ -87,18 +100,33 @@ function formatOption(option: DecisionQuizOption | null | undefined, fallbackOpt
       </ol>
     </section>
 
-    <div class="explanation-block">
-      <h3>Selected explanation</h3>
-      <p>{{ result.selected_explanation }}</p>
-    </div>
-    <div class="explanation-block">
-      <h3>Correct explanation</h3>
-      <p>{{ result.correct_explanation }}</p>
-    </div>
-    <div class="explanation-block">
-      <h3>Summary explanation</h3>
-      <p>{{ result.summary_explanation }}</p>
-    </div>
+    <section class="feedback-section" aria-labelledby="general-feedback-title">
+      <h3 id="general-feedback-title">General explanation</h3>
+      <div class="explanation-block">
+        <h4>Selected option</h4>
+        <p>{{ result.selected_explanation || 'No explanation available.' }}</p>
+      </div>
+      <div class="explanation-block">
+        <h4>Correct option</h4>
+        <p>{{ result.correct_explanation || 'No explanation available.' }}</p>
+      </div>
+      <div class="explanation-block">
+        <h4>Summary</h4>
+        <p>{{ result.summary_explanation || 'No summary available.' }}</p>
+      </div>
+    </section>
+
+    <section class="feedback-section role-feedback-block" aria-labelledby="role-feedback-title">
+      <h3 id="role-feedback-title">{{ userRoleLabel }} feedback</h3>
+      <div class="explanation-block">
+        <h4>Selected option</h4>
+        <p>{{ selectedRoleFeedback }}</p>
+      </div>
+      <div class="explanation-block">
+        <h4>Correct option</h4>
+        <p>{{ correctRoleFeedback }}</p>
+      </div>
+    </section>
 
     <footer class="result-actions">
       <button type="button" @click="emit('retry')">Retry</button>
@@ -212,8 +240,28 @@ function formatOption(option: DecisionQuizOption | null | undefined, fallbackOpt
   font-weight: 800;
 }
 
-.explanation-block h3 {
+.feedback-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+}
+
+.feedback-section h3 {
+  margin: 0;
+}
+
+.role-feedback-block {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.explanation-block h4 {
+  color: #475569;
+  font-size: 0.8rem;
   margin: 0 0 0.25rem;
+  text-transform: uppercase;
 }
 
 .explanation-block p {
