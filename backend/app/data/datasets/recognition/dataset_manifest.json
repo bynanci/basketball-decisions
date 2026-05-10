@@ -1,0 +1,14 @@
+{
+  "dataset_type": "recognition",
+  "schema_version": "1.0",
+  "sample_count": 0,
+  "label_count": 0,
+  "project_count": 0,
+  "exported_at": "1970-01-01T00:00:00Z",
+  "storage_paths": {
+    "manifest": "backend/app/data/datasets/recognition/dataset_manifest.json",
+    "samples": "backend/app/data/datasets/recognition/samples.jsonl",
+    "labels": "backend/app/data/datasets/recognition/labels.jsonl"
+  },
+  "notes": "Initialized local dataset registry; no export has been run yet."
+}

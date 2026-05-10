@@ -279,6 +279,7 @@ class QuizAttemptResponse(BaseModel):
 class QuizAttemptRecord(QuizAttemptResponse):
     attempt_id: str
     project_id: str
+    user_role: UserRole | None = None
     attempted_at: datetime = Field(default_factory=utc_now)
 
 

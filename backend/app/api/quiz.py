@@ -213,6 +213,6 @@ def submit_quiz_attempt(project_id: str, prompt_id: str, payload: QuizAttemptReq
         timed_out=payload.timed_out,
     )
     attempts = _read_attempts(project_id)
-    attempts.append(QuizAttemptRecord(project_id=project_id, attempt_id=str(uuid4()), **response.model_dump()))
+    attempts.append(QuizAttemptRecord(project_id=project_id, attempt_id=str(uuid4()), user_role=payload.user_role, **response.model_dump()))
     _write_attempts(project_id, attempts)
     return response
