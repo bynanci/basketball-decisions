@@ -267,6 +267,28 @@ export interface TrackReviewResponse {
 }
 
 export type DecisionActionType = 'PASS' | 'DRIVE' | 'SHOT' | 'RESET' | 'HOLD'
+export type CourtRoleTarget =
+  | 'BALL_HANDLER'
+  | 'OFF_BALL_SHOOTER'
+  | 'ROLLER'
+  | 'SCREENER'
+  | 'ON_BALL_DEFENDER'
+  | 'HELP_DEFENDER'
+  | 'LOW_MAN'
+  | 'TRAILER'
+  | 'WEAK_SIDE_WING'
+export type SituationType =
+  | 'PICK_AND_ROLL'
+  | 'SHORT_ROLL'
+  | 'SPOT_UP'
+  | 'CLOSEOUT_ATTACK'
+  | 'TRANSITION_3_ON_2'
+  | 'LATE_CLOCK'
+  | 'POST_DOUBLE'
+  | 'DRIVE_AND_KICK'
+  | 'HELP_ROTATION'
+  | 'LOW_MAN_DECISION'
+  | 'OFF_BALL_RELOCATION'
 export type QuizPromptMode = 'STILL_FRAME' | 'VIDEO_FREEZE'
 export type QuizScoringMode = 'EXPECTED_VALUE' | 'CORRECTNESS_ONLY'
 
@@ -290,6 +312,10 @@ export interface QuizPrompt {
   project_id: string
   prompt_id: string
   question: string
+  court_role_target: CourtRoleTarget
+  situation_type: SituationType
+  user_role_targets: CourtRoleTarget[]
+  role_instruction?: string | null
   frame_id: string
   frame_index: number
   timestamp_seconds: number
@@ -308,6 +334,10 @@ export interface QuizPrompt {
 
 export interface CreateQuizPromptRequest {
   question: string
+  court_role_target: CourtRoleTarget
+  situation_type: SituationType
+  user_role_targets?: CourtRoleTarget[]
+  role_instruction?: string | null
   frame_id: string
   frame_index: number
   timestamp_seconds: number
@@ -407,7 +437,13 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
-  listQuizPrompts: (projectId: string) => request<QuizPrompt[]>(`/projects/${projectId}/quiz-prompts`),
+  listQuizPrompts: (projectId: string, filters: { court_role?: CourtRoleTarget; situation_type?: SituationType } = {}) => {
+    const query = new URLSearchParams()
+    if (filters.court_role) query.set('court_role', filters.court_role)
+    if (filters.situation_type) query.set('situation_type', filters.situation_type)
+    const suffix = query.toString() ? `?${query.toString()}` : ''
+    return request<QuizPrompt[]>(`/projects/${projectId}/quiz-prompts${suffix}`)
+  },
   createQuizPrompt: (projectId: string, payload: CreateQuizPromptRequest) =>
     request<QuizPrompt>(`/projects/${projectId}/quiz-prompts`, {
       method: 'POST',

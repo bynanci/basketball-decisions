@@ -41,6 +41,7 @@ const correctOption = computed(() => prompt.value?.options.find((option) => opti
 const correctOptionId = computed(() => result.value?.correct_option_id ?? null)
 const incorrectOptionId = computed(() => (result.value && !result.value.is_correct ? result.value.selected_option_id : null))
 const canSelectArrow = computed(() => !!prompt.value && shouldShowArrows.value && !isSubmitting.value && !isAnswered.value)
+const roleInstruction = computed(() => prompt.value?.role_instruction?.trim() ?? '')
 
 onMounted(async () => {
   await ensureProjectHydrated(props.projectId).catch(() => undefined)
@@ -141,6 +142,7 @@ function retry() {
     <div class="card prompt-card">
       <div class="question-block">
         <span class="question-kicker">Question</span>
+        <p v-if="roleInstruction" class="role-instruction">{{ roleInstruction }}</p>
         <h2>{{ prompt.question }}</h2>
         <p v-if="!isAnswered" class="instruction">{{ canUseVideo && !isVideoAtFreeze ? 'Watch the clip until it freezes, then click the best decision arrow.' : 'Click the arrow that represents the best decision.' }}</p>
         <p v-else class="instruction">The correct arrow is highlighted in green. A wrong selected arrow is highlighted in red.</p>
@@ -231,6 +233,16 @@ function retry() {
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 1rem;
+}
+
+.role-instruction {
+  background: #eff6ff;
+  border-left: 4px solid #1f6feb;
+  border-radius: 10px;
+  color: #1e3a8a;
+  font-weight: 700;
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
 }
 
 .question-kicker {

@@ -5,16 +5,18 @@ from __future__ import annotations
 import json
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import TypeAdapter
 
 from app.api.common import api_error, require_project_dir
 from app.models import (
     CreateQuizPromptRequest,
+    CourtRoleTarget,
     QuizAttemptRecord,
     QuizAttemptRequest,
     QuizAttemptResponse,
     QuizPrompt,
+    SituationType,
 )
 from app.models.base import utc_now
 from app.models.video import ExtractFramesResponse
@@ -95,8 +97,17 @@ def _validate_frame_reference(project_id: str, payload: CreateQuizPromptRequest)
 
 
 @router.get("", response_model=list[QuizPrompt])
-def list_quiz_prompts(project_id: str) -> list[QuizPrompt]:
-    return _read_prompts(project_id)
+def list_quiz_prompts(
+    project_id: str,
+    court_role: CourtRoleTarget | None = Query(default=None),
+    situation_type: SituationType | None = Query(default=None),
+) -> list[QuizPrompt]:
+    prompts = _read_prompts(project_id)
+    if court_role is not None:
+        prompts = [prompt for prompt in prompts if prompt.court_role_target == court_role]
+    if situation_type is not None:
+        prompts = [prompt for prompt in prompts if prompt.situation_type == situation_type]
+    return prompts
 
 
 @router.post("", response_model=QuizPrompt)
@@ -107,6 +118,10 @@ def create_quiz_prompt(project_id: str, payload: CreateQuizPromptRequest) -> Qui
         project_id=project_id,
         prompt_id=str(uuid4()),
         question=payload.question,
+        court_role_target=payload.court_role_target,
+        situation_type=payload.situation_type,
+        user_role_targets=payload.user_role_targets,
+        role_instruction=payload.role_instruction,
         frame_id=payload.frame_id,
         frame_index=payload.frame_index,
         timestamp_seconds=payload.timestamp_seconds,

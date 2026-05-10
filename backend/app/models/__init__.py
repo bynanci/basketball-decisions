@@ -12,6 +12,7 @@ from .errors import ApiErrorResponse
 from .project import Project, ProjectBundleResponse, ProjectCreateRequest, ProjectCreateResponse
 from .quiz import (
     CreateQuizPromptRequest,
+    CourtRoleTarget,
     DecisionAnswer,
     DecisionArrowPoint,
     DecisionQuizOption,
@@ -23,6 +24,7 @@ from .quiz import (
     QuizPrompt,
     QuizPromptMode,
     QuizScoringMode,
+    SituationType,
 )
 from .projection import ProjectedPlayerTrack, ProjectedTrackPoint
 from .tracking import (
@@ -71,6 +73,7 @@ __all__ = [
     "TrackReviewPatch",
     "TrackReviewResponse",
     "CreateQuizPromptRequest",
+    "CourtRoleTarget",
     "DecisionArrowPoint",
     "QuizAttemptRecord",
     "QuizAttemptRequest",
@@ -78,6 +81,7 @@ __all__ = [
     "QuizPrompt",
     "QuizPromptMode",
     "QuizScoringMode",
+    "SituationType",
     "RunTrackingRequest",
     "RunTrackingResponse",
     "SaveCalibrationRequest",

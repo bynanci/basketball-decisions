@@ -15,6 +15,7 @@ from app.models import (
     ExtractFramesResponse,
     FrameAsset,
     Project,
+    QuizPrompt,
 )
 
 
@@ -62,6 +63,10 @@ def option(option_id: str, *, is_correct: bool = False, expected_value: float | 
 def valid_prompt_payload(*, expected_values: bool = True) -> dict:
     return {
         "question": "What is the best decision?",
+        "court_role_target": "BALL_HANDLER",
+        "situation_type": "PICK_AND_ROLL",
+        "user_role_targets": ["BALL_HANDLER"],
+        "role_instruction": "You are the ball handler. Read the help defender and choose the best next action.",
         "frame_id": "frame-1",
         "frame_index": 7,
         "timestamp_seconds": 2.8,
@@ -92,6 +97,44 @@ def test_quiz_models_reject_non_finite_expected_values() -> None:
 
     with pytest.raises(ValidationError):
         CreateQuizPromptRequest.model_validate(payload)
+
+
+def test_legacy_prompt_hydrates_default_role_fields() -> None:
+    payload = valid_prompt_payload()
+    payload.pop("court_role_target")
+    payload.pop("situation_type")
+    payload.pop("user_role_targets")
+    payload.pop("role_instruction")
+
+    prompt = QuizPrompt.model_validate({"project_id": "project-1", "prompt_id": "prompt-1", **payload})
+
+    assert prompt.court_role_target == "BALL_HANDLER"
+    assert prompt.situation_type == "PICK_AND_ROLL"
+    assert prompt.user_role_targets == []
+    assert prompt.role_instruction is None
+
+
+def test_cannot_create_prompt_without_role_fields(client: TestClient, tmp_path: Path) -> None:
+    write_project(tmp_path)
+    payload = valid_prompt_payload()
+    payload.pop("court_role_target")
+    payload.pop("situation_type")
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "REQUEST_VALIDATION_ERROR"
+
+
+def test_cannot_create_prompt_with_unknown_role_or_situation(client: TestClient, tmp_path: Path) -> None:
+    write_project(tmp_path)
+    payload = valid_prompt_payload()
+    payload["court_role_target"] = "POINT_GUARD"
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "REQUEST_VALIDATION_ERROR"
 
 
 def test_cannot_create_prompt_with_fewer_than_two_options(client: TestClient, tmp_path: Path) -> None:
@@ -170,6 +213,25 @@ def test_can_list_prompts(client: TestClient, tmp_path: Path) -> None:
     assert response.status_code == 200
     prompts = response.json()
     assert [item["prompt_id"] for item in prompts] == [prompt["prompt_id"]]
+
+
+def test_can_filter_prompts_by_court_role_and_situation_type(client: TestClient, tmp_path: Path) -> None:
+    first = create_prompt(client, tmp_path)
+    second_payload = valid_prompt_payload()
+    second_payload["court_role_target"] = "LOW_MAN"
+    second_payload["situation_type"] = "LOW_MAN_DECISION"
+    second = create_prompt(client, tmp_path, second_payload)
+
+    role_response = client.get("/api/projects/project-1/quiz-prompts?court_role=LOW_MAN")
+    situation_response = client.get("/api/projects/project-1/quiz-prompts?situation_type=PICK_AND_ROLL")
+    combined_response = client.get("/api/projects/project-1/quiz-prompts?court_role=LOW_MAN&situation_type=PICK_AND_ROLL")
+
+    assert role_response.status_code == 200
+    assert [item["prompt_id"] for item in role_response.json()] == [second["prompt_id"]]
+    assert situation_response.status_code == 200
+    assert [item["prompt_id"] for item in situation_response.json()] == [first["prompt_id"]]
+    assert combined_response.status_code == 200
+    assert combined_response.json() == []
 
 
 def test_can_fetch_prompt(client: TestClient, tmp_path: Path) -> None:
