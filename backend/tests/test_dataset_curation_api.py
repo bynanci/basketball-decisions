@@ -196,6 +196,10 @@ def test_curate_decision_dataset_labels_options_attempts_and_skips_reference_onl
     assert manifest["positive_sample_count"] == 3
     assert manifest["negative_sample_count"] == 2
     samples = [json.loads(line) for line in (tmp_path / "datasets" / "decision" / "curated_samples.jsonl").read_text().splitlines()]
+    labels = [json.loads(line) for line in (tmp_path / "datasets" / "decision" / "curated_labels.jsonl").read_text().splitlines()]
     assert all(sample["project_id"] == project_id for sample in samples)
     assert all(sample["trace"]["source_trace"]["allowed_for_training"] is True for sample in samples)
     assert all(sample["trace"]["source_trace"]["usage_scope"] == "TRAINING" for sample in samples)
+    bad_option_label = next(label for label in labels if label["target_type"] == "option" and label["label"] == "BAD_DECISION")
+    assert bad_option_label["source"] == "EXPECTED_VALUE"
+    assert bad_option_label["trace"]["lower_than_max_by_at_least_0_25"] is True

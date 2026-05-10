@@ -546,10 +546,10 @@ def _option_label(prompt: QuizPrompt, option) -> tuple[str | None, str | None, s
         return "GOOD_DECISION", "QUIZ_AUTHOR", "Option is marked correct by the quiz author.", trace
     if within_best:
         return "GOOD_DECISION", "EXPECTED_VALUE", "Option expected value is within 0.1 of the prompt maximum expected value.", trace
-    if not option.is_correct:
-        return "BAD_DECISION", "QUIZ_AUTHOR", "Option is not marked correct by the quiz author.", trace
     if below_best:
         return "BAD_DECISION", "EXPECTED_VALUE", "Option expected value is lower than the prompt maximum by at least 0.25.", trace
+    if not option.is_correct:
+        return "BAD_DECISION", "QUIZ_AUTHOR", "Option is not marked correct by the quiz author.", trace
     return None, None, None, trace
 
 
