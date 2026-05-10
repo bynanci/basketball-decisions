@@ -24,7 +24,7 @@ class DecisionArrowPoint(BaseModel):
     y: float = Field(ge=0, le=1)
 
 
-class DecisionOption(BaseModel):
+class DecisionQuizOption(BaseModel):
     """One selectable arrow decision option."""
 
     option_id: str
@@ -55,7 +55,7 @@ class QuizPrompt(BaseModel):
     timestamp_seconds: float
     image_url: str | None = None
     image_path: str | None = None
-    options: list[DecisionOption] = Field(min_length=2, max_length=5)
+    options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
@@ -87,7 +87,7 @@ class CreateQuizPromptRequest(BaseModel):
     timestamp_seconds: float
     image_url: str | None = None
     image_path: str | None = None
-    options: list[DecisionOption] = Field(min_length=2, max_length=5)
+    options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
 
     @field_validator("question", "frame_id", "explanation")
@@ -140,6 +140,8 @@ class QuizAttemptRecord(QuizAttemptResponse):
 
 # Backward-compatible extension-point names retained for imports/tests that may
 # still refer to the original lightweight quiz models.
+DecisionOption = DecisionQuizOption
+
 DecisionDirection = Literal["left", "right", "up", "down", "hold", "pass", "shoot", "drive", "unknown"]
 
 
