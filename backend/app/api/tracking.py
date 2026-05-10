@@ -14,6 +14,8 @@ from app.models import (
     ProjectedPlayerTrack,
     ProjectedTrackPoint,
     ProjectTracksResponse,
+    TrackReviewPatch,
+    TrackReviewResponse,
     RunTrackingRequest,
     RunTrackingResponse,
     TrackPoint,
@@ -23,6 +25,122 @@ from app.pipeline.projector import project_tracks_to_court
 from app.pipeline.tracker import track_frame_detections
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["tracking"])
+
+
+def _tracking_path(directory: Path) -> Path:
+    return directory / "tracking.json"
+
+
+def _review_patch_path(directory: Path) -> Path:
+    return directory / "tracking_review_patch.json"
+
+
+def _cleaned_tracking_path(directory: Path) -> Path:
+    return directory / "tracking_cleaned.json"
+
+
+def _cleaned_projected_tracks_path(directory: Path) -> Path:
+    return directory / "projected_tracks_cleaned.json"
+
+
+def _read_review_patch(directory: Path) -> TrackReviewPatch:
+    path = _review_patch_path(directory)
+    if not path.exists():
+        return TrackReviewPatch()
+    return TrackReviewPatch.model_validate(read_json(path))
+
+
+def _load_tracking_for_review(project_id: str) -> RunTrackingResponse:
+    directory = require_project_dir(project_id)
+    tracking_path = _tracking_path(directory)
+    if not tracking_path.exists():
+        raise api_error(
+            404,
+            "TRACKING_NOT_FOUND",
+            "No tracking output exists for this project.",
+            {"project_id": project_id},
+            "Run POST /api/projects/{project_id}/tracking/run before reviewing tracking quality.",
+        )
+    return RunTrackingResponse.model_validate(read_json(tracking_path))
+
+
+def _apply_review_patch(tracking: RunTrackingResponse, patch: TrackReviewPatch) -> RunTrackingResponse:
+    excluded_detection_ids = set(patch.excluded_detection_ids)
+    excluded_track_ids = set(patch.excluded_track_ids)
+    aliases = patch.track_id_aliases
+
+    cleaned_detections: list[Detection] = []
+    for detection in tracking.detections:
+        if detection.detection_id in excluded_detection_ids:
+            continue
+        original_track_id = detection.track_id
+        if original_track_id in excluded_track_ids:
+            continue
+        track_id = aliases.get(original_track_id, original_track_id) if original_track_id else None
+        metadata = {**detection.metadata, "tracking_review_status": "cleaned"}
+        if original_track_id and track_id != original_track_id:
+            metadata["original_track_id"] = original_track_id
+        cleaned_detections.append(detection.model_copy(update={"track_id": track_id, "metadata": metadata}))
+
+    cleaned_tracks: list[PlayerTrack] = []
+    for track in tracking.tracks:
+        if track.track_id in excluded_track_ids:
+            continue
+        points = [point for point in track.points if point.detection_id not in excluded_detection_ids]
+        if not points:
+            continue
+        track_id = aliases.get(track.track_id, track.track_id)
+        metadata = {**track.metadata, "tracking_review_status": "cleaned"}
+        if track_id != track.track_id:
+            metadata["original_track_id"] = track.track_id
+        cleaned_tracks.append(
+            track.model_copy(update={"track_id": track_id, "points": points, "metadata": metadata})
+        )
+
+    return tracking.model_copy(
+        update={
+            "detections": cleaned_detections,
+            "tracks": cleaned_tracks,
+            "original_input": {**tracking.original_input, "review_patch": patch.model_dump()},
+            "pipeline_output": {
+                **tracking.pipeline_output,
+                "raw_detection_count": len(tracking.detections),
+                "raw_track_count": len(tracking.tracks),
+                "cleaned_detection_count": len(cleaned_detections),
+                "cleaned_track_count": len(cleaned_tracks),
+                "excluded_detection_count": len(excluded_detection_ids),
+                "excluded_track_count": len(excluded_track_ids),
+            },
+            "debug_metadata": {**tracking.debug_metadata, "tracking_review": patch.model_dump()},
+        }
+    )
+
+
+def _build_review_response(
+    project_id: str, tracking: RunTrackingResponse, patch: TrackReviewPatch
+) -> TrackReviewResponse:
+    directory = require_project_dir(project_id)
+    cleaned_path = _cleaned_tracking_path(directory)
+    cleaned_tracking = RunTrackingResponse.model_validate(read_json(cleaned_path)) if cleaned_path.exists() else None
+    cleaned_projected_tracks: list[ProjectedPlayerTrack] = []
+    cleaned_projection_path = _cleaned_projected_tracks_path(directory)
+    if cleaned_projection_path.exists():
+        cleaned_projection = ProjectTracksResponse.model_validate(read_json(cleaned_projection_path))
+        cleaned_projected_tracks = cleaned_projection.projected_tracks
+
+    return TrackReviewResponse(
+        project_id=project_id,
+        tracking=tracking,
+        review_patch=patch,
+        cleaned_tracking=cleaned_tracking,
+        cleaned_projected_tracks=cleaned_projected_tracks,
+        storage_paths={
+            "tracking": str(_tracking_path(directory)),
+            "review_patch": str(_review_patch_path(directory)),
+            "tracking_cleaned": str(cleaned_path),
+            "projected_tracks_cleaned": str(cleaned_projection_path),
+        },
+    )
 
 
 def _apply_homography(matrix: list[list[float]] | None, x: float, y: float) -> tuple[float, float]:
@@ -195,6 +313,38 @@ def run_tracking(project_id: str, payload: RunTrackingRequest) -> RunTrackingRes
     directory = require_project_dir(project_id)
     write_json_model(directory / "projected_tracks.json", ProjectTracksResponse(project_id=project_id, tracking=tracking, projected_tracks=projected_tracks))
     return tracking
+
+
+@router.get("/tracking/review", response_model=TrackReviewResponse)
+def get_tracking_review(project_id: str) -> TrackReviewResponse:
+    tracking = _load_tracking_for_review(project_id)
+    directory = require_project_dir(project_id)
+    patch = _read_review_patch(directory)
+    return _build_review_response(project_id, tracking, patch)
+
+
+@router.post("/tracking/review", response_model=TrackReviewResponse)
+def save_tracking_review(project_id: str, payload: TrackReviewPatch) -> TrackReviewResponse:
+    tracking = _load_tracking_for_review(project_id)
+    directory = require_project_dir(project_id)
+    cleaned_tracking = _apply_review_patch(tracking, payload)
+    cleaned_projected_tracks = _project_tracks(project_id, cleaned_tracking)
+
+    write_json_model(_review_patch_path(directory), payload)
+    write_json_model(_cleaned_tracking_path(directory), cleaned_tracking)
+    write_json_model(
+        _cleaned_projected_tracks_path(directory),
+        ProjectTracksResponse(
+            project_id=project_id,
+            tracking=cleaned_tracking,
+            projected_tracks=cleaned_projected_tracks,
+            storage_paths={
+                "tracking_cleaned": str(_cleaned_tracking_path(directory)),
+                "projected_tracks_cleaned": str(_cleaned_projected_tracks_path(directory)),
+            },
+        ),
+    )
+    return _build_review_response(project_id, tracking, payload)
 
 
 @router.get("/tracks", response_model=ProjectTracksResponse)

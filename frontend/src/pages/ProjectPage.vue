@@ -101,6 +101,7 @@ async function extractFrames() {
     <RouterLink class="button" :to="`/projects/${projectId}/pipeline`">Open pipeline</RouterLink>
     <RouterLink class="button secondary" :to="`/projects/${projectId}/calibration`">Calibrate court</RouterLink>
     <RouterLink class="button secondary" :to="`/projects/${projectId}/tracking`">Tracking</RouterLink>
+    <RouterLink v-if="hasTracking" class="button secondary" :to="`/projects/${projectId}/tracking-review`">Tracking Review</RouterLink>
   </section>
 
   <section v-if="isHydrating" class="card" aria-live="polite">

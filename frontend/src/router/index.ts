@@ -3,6 +3,7 @@ import HomePage from '../pages/HomePage.vue'
 import ProjectPage from '../pages/ProjectPage.vue'
 import CalibrationPage from '../pages/CalibrationPage.vue'
 import TrackingPage from '../pages/TrackingPage.vue'
+import TrackingReviewPage from '../pages/TrackingReviewPage.vue'
 import PipelinePage from '../pages/PipelinePage.vue'
 import QuizBuilderPage from '../pages/QuizBuilderPage.vue'
 import QuizPlayPage from '../pages/QuizPlayPage.vue'
@@ -15,6 +16,7 @@ export const router = createRouter({
     { path: '/projects/:projectId/calibration', name: 'calibration', component: CalibrationPage, props: true },
     { path: '/projects/:projectId/pipeline', name: 'pipeline', component: PipelinePage, props: true },
     { path: '/projects/:projectId/tracking', name: 'tracking', component: TrackingPage, props: true },
+    { path: '/projects/:projectId/tracking-review', name: 'tracking-review', component: TrackingReviewPage, props: true },
     { path: '/projects/:projectId/quiz-builder', name: 'quiz-builder', component: QuizBuilderPage, props: true },
     { path: '/projects/:projectId/quiz/:promptId', name: 'quiz-play', component: QuizPlayPage, props: true }
   ]

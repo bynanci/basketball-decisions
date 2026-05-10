@@ -115,13 +115,25 @@ const steps = computed<PipelineStep[]>(() => [
     status: statusFor(hasTracking.value, hasFrames.value),
     explanation: hasTracking.value ? 'Detections/tracks are present in hydrated state.' : 'Run backend detection/tracking on extracted frames.',
     action: hasFrames.value
-      ? { kind: 'link', label: hasTracking.value ? 'Review tracking' : 'Run tracking', to: `/projects/${props.projectId}/tracking` }
+      ? { kind: 'link', label: hasTracking.value ? 'View raw tracking' : 'Run tracking', to: `/projects/${props.projectId}/tracking` }
       : blockedAction('Extract frames before running tracking.'),
     disabledReason: hasFrames.value ? undefined : 'Tracking needs extracted frames.',
     warning: hasFrames.value && !hasCalibration.value ? 'Tracking can run without calibration, but 2D projection may not be meaningful until calibration is saved.' : undefined
   },
   {
     number: 7,
+    title: 'Tracking Quality Review',
+    status: statusFor(false, hasTracking.value),
+    explanation: hasTracking.value
+      ? 'Inspect raw detections and save cleaned tracking artifacts before trusting projected paths.'
+      : 'Run tracking before excluding false-positive detections or full tracks.',
+    action: hasTracking.value
+      ? { kind: 'link', label: 'Open QC review', to: `/projects/${props.projectId}/tracking-review` }
+      : blockedAction('Run tracking before quality review.'),
+    disabledReason: hasTracking.value ? undefined : 'No raw tracking artifact exists yet.'
+  },
+  {
+    number: 8,
     title: '2D Court Projection Available',
     status: statusFor(hasProjectedTracks.value, hasTracking.value && hasCalibration.value),
     explanation: hasProjectedTracks.value
@@ -137,7 +149,7 @@ const steps = computed<PipelineStep[]>(() => [
     disabledReason: hasProjectedTracks.value ? undefined : 'No projectedTracks artifact exists yet.'
   },
   {
-    number: 8,
+    number: 9,
     title: 'Decision Quiz Ready',
     status: 'NOT_STARTED',
     explanation: 'Future MVP step: build and play decision prompts from extracted frames and normalized arrows.',
