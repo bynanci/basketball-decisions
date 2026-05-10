@@ -2,20 +2,26 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
-import type { DecisionActionType, DecisionArrowPoint, DecisionQuizOption, QuizPromptMode } from '../api/client'
+import type { CourtRoleTarget, DecisionActionType, DecisionArrowPoint, DecisionQuizOption, QuizPromptMode, SituationType } from '../api/client'
 import ArrowDrawingOverlay from '../components/ArrowDrawingOverlay.vue'
 import { useProjectHydration } from '../composables/useProjectHydration'
 import { useProjectStore } from '../stores/projectStore'
+import { useRoleStore } from '../stores/roleStore'
+import { COURT_ROLES, SITUATION_TYPES } from '../types/roles'
 
 const props = defineProps<{ projectId: string }>()
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
+const roleStore = useRoleStore()
 const { ensureProjectHydrated, loading: isHydrating } = useProjectHydration()
 projectStore.setActiveProject(props.projectId)
 
 const question = ref('What is the best decision here?')
 const explanation = ref('')
+const courtRoleTarget = ref<CourtRoleTarget | ''>(roleStore.roleProfile?.courtRole ?? '')
+const situationType = ref<SituationType | ''>(roleStore.roleProfile?.situationTypes[0] ?? '')
+const roleInstruction = ref('')
 const mode = ref<QuizPromptMode>('STILL_FRAME')
 const clipStartSec = ref<number | null>(null)
 const freezeFrameSec = ref<number | null>(null)
@@ -25,6 +31,8 @@ const selectedOptionId = ref<string | null>(null)
 const isSaving = ref(false)
 const errorMessage = ref('')
 const actionTypes: DecisionActionType[] = ['PASS', 'DRIVE', 'SHOT', 'RESET', 'HOLD']
+const courtRoles = COURT_ROLES as CourtRoleTarget[]
+const situationTypes = SITUATION_TYPES as SituationType[]
 const project = computed(() => projectStore.getProject(props.projectId))
 const frameIndex = computed(() => Number(route.query.frameIndex))
 const selectedFrame = computed(() => project.value?.frames.find((frame) => frame.frame_index === frameIndex.value) ?? null)
@@ -35,6 +43,8 @@ const validationErrors = computed(() => {
   const errors: string[] = []
   if (!selectedFrame.value) errors.push('Select an extracted frame before building a quiz.')
   if (!question.value.trim()) errors.push('Question is required.')
+  if (!courtRoleTarget.value) errors.push('Court role is required.')
+  if (!situationType.value) errors.push('Situation type is required.')
   if (options.value.length < 2) errors.push('Draw at least 2 arrows.')
   if (options.value.length > 5) errors.push('Use no more than 5 arrows.')
   if (options.value.filter((option) => option.is_correct).length !== 1) errors.push('Mark exactly one option as correct.')
@@ -63,6 +73,13 @@ onMounted(async () => {
 
 function optionId(index: number) {
   return String.fromCharCode(65 + index)
+}
+
+function formatSelectLabel(value: string) {
+  return value
+    .split('_')
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(' ')
 }
 
 function isNormalizedPoint(point: DecisionArrowPoint) {
@@ -108,12 +125,18 @@ function updateExpectedValue(option: DecisionQuizOption, event: Event) {
 }
 
 async function savePrompt() {
-  if (!selectedFrame.value || validationErrors.value.length || isSaving.value) return
+  if (!selectedFrame.value || !courtRoleTarget.value || !situationType.value || validationErrors.value.length || isSaving.value) return
+  const selectedCourtRole = courtRoleTarget.value
+  const selectedSituationType = situationType.value
   isSaving.value = true
   errorMessage.value = ''
   try {
     const prompt = await apiClient.createQuizPrompt(props.projectId, {
       question: question.value,
+      court_role_target: selectedCourtRole,
+      situation_type: selectedSituationType,
+      user_role_targets: [selectedCourtRole],
+      role_instruction: roleInstruction.value.trim() || null,
       frame_id: selectedFrame.value.frame_id,
       frame_index: selectedFrame.value.frame_index,
       timestamp_seconds: selectedFrame.value.timestamp_seconds,
@@ -173,6 +196,26 @@ async function savePrompt() {
       <label>
         Summary explanation
         <textarea v-model="explanation" placeholder="Explain why the correct decision is best."></textarea>
+      </label>
+
+      <h2>Role context</h2>
+      <label>
+        Court role
+        <select v-model="courtRoleTarget">
+          <option value="" disabled>Select a court role</option>
+          <option v-for="role in courtRoles" :key="role" :value="role">{{ formatSelectLabel(role) }}</option>
+        </select>
+      </label>
+      <label>
+        Situation type
+        <select v-model="situationType">
+          <option value="" disabled>Select a situation type</option>
+          <option v-for="situation in situationTypes" :key="situation" :value="situation">{{ formatSelectLabel(situation) }}</option>
+        </select>
+      </label>
+      <label>
+        Role instruction
+        <textarea v-model="roleInstruction" placeholder="You are the ball handler. Read the help defender and choose the best next action."></textarea>
       </label>
 
       <h2>Playback mode</h2>

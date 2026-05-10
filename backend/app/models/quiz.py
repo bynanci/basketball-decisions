@@ -15,6 +15,30 @@ from pydantic import BaseModel, Field, FiniteFloat, field_validator, model_valid
 from .base import utc_now
 
 ActionType = Literal["PASS", "DRIVE", "SHOT", "RESET", "HOLD"]
+CourtRoleTarget = Literal[
+    "BALL_HANDLER",
+    "OFF_BALL_SHOOTER",
+    "ROLLER",
+    "SCREENER",
+    "ON_BALL_DEFENDER",
+    "HELP_DEFENDER",
+    "LOW_MAN",
+    "TRAILER",
+    "WEAK_SIDE_WING",
+]
+SituationType = Literal[
+    "PICK_AND_ROLL",
+    "SHORT_ROLL",
+    "SPOT_UP",
+    "CLOSEOUT_ATTACK",
+    "TRANSITION_3_ON_2",
+    "LATE_CLOCK",
+    "POST_DOUBLE",
+    "DRIVE_AND_KICK",
+    "HELP_ROTATION",
+    "LOW_MAN_DECISION",
+    "OFF_BALL_RELOCATION",
+]
 QuizPromptMode = Literal["STILL_FRAME", "VIDEO_FREEZE"]
 QuizScoringMode = Literal["EXPECTED_VALUE", "CORRECTNESS_ONLY"]
 
@@ -52,6 +76,10 @@ class QuizPrompt(BaseModel):
     project_id: str
     prompt_id: str
     question: str
+    court_role_target: CourtRoleTarget
+    situation_type: SituationType
+    user_role_targets: list[CourtRoleTarget] = Field(default_factory=list)
+    role_instruction: str | None = None
     frame_id: str
     frame_index: int
     timestamp_seconds: FiniteFloat
@@ -67,12 +95,33 @@ class QuizPrompt(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
+    @model_validator(mode="before")
+    @classmethod
+    def hydrate_legacy_role_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return {
+                "court_role_target": "BALL_HANDLER",
+                "situation_type": "PICK_AND_ROLL",
+                "user_role_targets": [],
+                "role_instruction": None,
+                **data,
+            }
+        return data
+
     @field_validator("project_id", "prompt_id", "question", "frame_id", "explanation")
     @classmethod
     def require_non_empty_text(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("must not be blank")
         return value
+
+    @field_validator("role_instruction")
+    @classmethod
+    def normalize_optional_role_instruction(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
 
     @model_validator(mode="after")
     def validate_single_correct_option(self) -> "QuizPrompt":
@@ -95,6 +144,10 @@ class CreateQuizPromptRequest(BaseModel):
     """Request body for creating a quiz prompt."""
 
     question: str
+    court_role_target: CourtRoleTarget
+    situation_type: SituationType
+    user_role_targets: list[CourtRoleTarget] = Field(default_factory=list)
+    role_instruction: str | None = None
     frame_id: str
     frame_index: int
     timestamp_seconds: FiniteFloat
@@ -114,6 +167,14 @@ class CreateQuizPromptRequest(BaseModel):
         if not value.strip():
             raise ValueError("must not be blank")
         return value
+
+    @field_validator("role_instruction")
+    @classmethod
+    def normalize_optional_role_instruction(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
 
     @model_validator(mode="after")
     def validate_single_correct_option(self) -> "CreateQuizPromptRequest":
