@@ -80,17 +80,20 @@ Supported refresh/deep-link recovery paths include:
 
 The backend video `uri` is metadata only for hydration. The browser preview still uses a session-local object URL after upload; the frontend intentionally does **not** treat backend file paths as browser-playable video URLs until a proper streaming endpoint is added.
 
-Recommended refresh-safe demo path:
+Recommended MVP Demo Path:
 
-1. Create a project.
-2. Upload an MP4.
+1. Create project.
+2. Upload MP4.
 3. Extract frames.
-4. Refresh the project page to verify project/video/frame hydration.
-5. Select a calibration frame.
-6. Save calibration.
-7. Refresh the calibration page to verify keypoint/homography recovery; also try removing `?frameIndex=...` from the URL to confirm the saved calibration frame is restored from backend storage.
-8. Run tracking.
-9. Refresh the tracking page to verify detection, track, and projected-track recovery.
+4. Refresh page to verify hydration.
+5. Open Pipeline Page.
+6. Select calibration frame.
+7. Mark 4+ keypoints.
+8. Save calibration.
+9. Run tracking.
+10. View 2D court projection.
+
+For coordinate conventions used by calibration, quiz arrows, homography projection, and court rendering, see [Coordinate System Guide](docs/coordinate-system.md).
 
 ## 3. Upload a local MP4
 

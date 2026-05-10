@@ -98,7 +98,8 @@ async function extractFrames() {
     <h1>{{ project?.name ?? 'Project' }}</h1>
     <p>Project id: {{ projectId }}</p>
     <p>Source: {{ project?.source ?? 'unknown' }} <span v-if="project?.videoFileName">· {{ project.videoFileName }}</span></p>
-    <RouterLink class="button" :to="`/projects/${projectId}/calibration`">Calibrate court</RouterLink>
+    <RouterLink class="button" :to="`/projects/${projectId}/pipeline`">Open pipeline</RouterLink>
+    <RouterLink class="button secondary" :to="`/projects/${projectId}/calibration`">Calibrate court</RouterLink>
     <RouterLink class="button secondary" :to="`/projects/${projectId}/tracking`">Tracking</RouterLink>
   </section>
 
