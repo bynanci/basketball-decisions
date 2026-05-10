@@ -24,6 +24,18 @@ function bundle(overrides: Partial<ProjectBundleResponse> = {}): ProjectBundleRe
       uri: '/backend/local/file.mp4',
       filename: 'file.mp4'
     },
+    source: {
+      project_id: 'project-1',
+      source_id: 'source-1',
+      source_type: 'UPLOAD',
+      license_type: 'OWNED',
+      rights_confirmed: true,
+      allowed_for_training: true,
+      allowed_for_redistribution: false,
+      allowed_for_local_storage: true,
+      league_tag: 'UNKNOWN',
+      usage_scope: 'TRAINING'
+    },
     frames: {
       schema_version: '1.0',
       project_id: 'project-1',
@@ -93,6 +105,7 @@ describe('projectStore.hydrateProjectFromBundle', () => {
     expect(project?.name).toBe('Hydrated Project')
     expect(project?.source).toBe('upload')
     expect(project?.videoAsset?.asset_id).toBe('video-1')
+    expect(project?.sourceGovernance?.allowed_for_training).toBe(true)
     expect(project?.frames).toHaveLength(1)
     expect(project?.calibrationPairs).toHaveLength(1)
     expect(project?.detections).toHaveLength(1)

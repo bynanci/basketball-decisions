@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from .base import utc_now
 from .quiz import CourtRoleTarget, DecisionQuizOption, QuizQuestionMode, SituationType, UserRole
+from .source import VideoSourceRecord
 
 DetectionTrainingLabelValue = Literal[
     "PLAYER",
@@ -88,12 +89,21 @@ class DecisionEventsBuildSummary(BaseModel):
     opportunity_cost_avg: float = 0.0
 
 
+class SkippedProject(BaseModel):
+    project_id: str
+    name: str | None = None
+    reason: str
+
+
 class DatasetManifest(BaseModel):
     dataset_type: DatasetType
     schema_version: str = "1.0"
     sample_count: int = 0
     label_count: int = 0
     project_count: int = 0
+    included_project_count: int = 0
+    skipped_project_count: int = 0
+    skipped_projects: list[SkippedProject] = Field(default_factory=list)
     exported_at: datetime = Field(default_factory=utc_now)
     storage_paths: dict[str, str] = Field(default_factory=dict)
     notes: str | None = None
@@ -125,6 +135,7 @@ class LocalLabProjectArtifact(BaseModel):
     quiz_prompt_count: int
     quiz_attempt_count: int
     updated_at: datetime | None = None
+    source: VideoSourceRecord | None = None
 
 
 class LocalLabProjectsResponse(BaseModel):

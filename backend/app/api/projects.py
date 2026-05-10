@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ValidationError
 
 from app.api.common import DATA_DIR, api_error, project_dir, read_json, require_project_dir, write_json_model
+from app.models.base import utc_now
 from app.models import (
     Calibration,
     ExtractFramesResponse,
@@ -19,6 +20,7 @@ from app.models import (
     TrackReviewPatch,
     TrackReviewResponse,
     VideoAsset,
+    VideoSourceRecord,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -103,12 +105,49 @@ def get_project_bundle(project_id: str) -> ProjectBundleResponse:
     return ProjectBundleResponse(
         project=project,
         video=_read_optional_artifact(directory, "video.json", VideoAsset),
+        source=_read_optional_artifact(directory, "source.json", VideoSourceRecord),
         frames=_read_optional_artifact(directory, "frames/index.json", ExtractFramesResponse),
         calibration=_read_optional_artifact(directory, "calibration.json", Calibration),
         tracking=_read_optional_artifact(directory, "tracking.json", RunTrackingResponse),
         projected_tracks=_read_optional_artifact(directory, "projected_tracks.json", ProjectTracksResponse),
         tracking_review=_read_tracking_review_artifact(directory, project_id),
     )
+
+
+@router.get("/{project_id}/source", response_model=VideoSourceRecord)
+def get_project_source(project_id: str) -> VideoSourceRecord:
+    """Return the source governance record for a project."""
+
+    directory = require_project_dir(project_id)
+    source_path = directory / "source.json"
+    if not source_path.exists():
+        raise api_error(
+            404,
+            "SOURCE_GOVERNANCE_NOT_FOUND",
+            "No source governance record exists for this project.",
+            {"project_id": project_id},
+            "Upload or import a video, or save source governance metadata before exporting training datasets.",
+        )
+    return VideoSourceRecord.model_validate(read_json(source_path))
+
+
+@router.put("/{project_id}/source", response_model=VideoSourceRecord)
+def update_project_source(project_id: str, payload: VideoSourceRecord) -> VideoSourceRecord:
+    """Persist a validated source governance record for a project."""
+
+    directory = require_project_dir(project_id)
+    if payload.project_id != project_id:
+        raise api_error(
+            400,
+            "PROJECT_ID_MISMATCH",
+            "Request body project_id must match the path project_id.",
+            {"path_project_id": project_id, "body_project_id": payload.project_id},
+            "Send the same project id in the URL and source governance payload.",
+        )
+    existing = VideoSourceRecord.model_validate(read_json(directory / "source.json")) if (directory / "source.json").exists() else None
+    source = payload.model_copy(update={"created_at": existing.created_at if existing else payload.created_at, "updated_at": utc_now()})
+    write_json_model(directory / "source.json", source)
+    return source
 
 
 @router.post("", response_model=ProjectCreateResponse)
