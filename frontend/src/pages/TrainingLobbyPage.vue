@@ -140,7 +140,10 @@ async function loadPrompts(projectId: Project['project_id']) {
         <h1>{{ roleProfile.userRole }} / {{ roleProfile.courtRole }}</h1>
         <p>Recommended prompts are filtered by your court role and selected situations.</p>
       </div>
-      <RouterLink class="button secondary-button" to="/start">Change role</RouterLink>
+      <div class="hero-actions">
+        <RouterLink class="button secondary-button" to="/start">Change role</RouterLink>
+        <RouterLink class="button" to="/situations">View Situation Preview</RouterLink>
+      </div>
     </section>
 
     <section class="card profile-summary">
@@ -257,6 +260,13 @@ async function loadPrompts(projectId: Project['project_id']) {
   margin: 0.2rem 0;
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
 .profile-summary {
   background: #f8fafc;
 }
@@ -353,6 +363,10 @@ select {
   .section-heading,
   .profile-summary {
     display: block;
+  }
+
+  .hero-actions {
+    justify-content: flex-start;
   }
 }
 </style>

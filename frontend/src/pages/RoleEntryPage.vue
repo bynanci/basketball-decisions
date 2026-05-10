@@ -62,7 +62,7 @@ function toggleSituation(situation: SituationType) {
   }
 }
 
-function saveAndContinue() {
+function saveRoleProfile(destination: '/training' | '/situations') {
   if (!selectedUserRole.value || !selectedCourtRole.value) return
 
   const profile: RoleProfile = {
@@ -72,7 +72,15 @@ function saveAndContinue() {
   }
 
   roleStore.setRoleProfile(profile)
-  router.push('/training')
+  router.push(destination)
+}
+
+function saveAndContinue() {
+  saveRoleProfile('/training')
+}
+
+function saveAndPreview() {
+  saveRoleProfile('/situations')
 }
 
 function clearProfile() {
@@ -166,6 +174,9 @@ function clearProfile() {
       <strong>Ready to continue?</strong>
       <p>Saving stores your profile in this browser for your next visit.</p>
     </div>
-    <button type="button" :disabled="!canContinue" @click="saveAndContinue">Continue to Training</button>
+    <div class="action-buttons">
+      <button type="button" :disabled="!canContinue" @click="saveAndContinue">Start Training</button>
+      <button type="button" class="secondary-button" :disabled="!canContinue" @click="saveAndPreview">View Role Situation Preview</button>
+    </div>
   </section>
 </template>

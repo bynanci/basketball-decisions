@@ -184,6 +184,7 @@ button:disabled {
   color: #172033;
 }
 
+.action-buttons,
 .quick-links {
   display: flex;
   flex-wrap: wrap;
