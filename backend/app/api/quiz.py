@@ -9,7 +9,13 @@ from fastapi import APIRouter
 from pydantic import TypeAdapter
 
 from app.api.common import api_error, require_project_dir
-from app.models import CreateQuizPromptRequest, QuizAttemptRecord, QuizAttemptRequest, QuizAttemptResponse, QuizPrompt
+from app.models import (
+    CreateQuizPromptRequest,
+    QuizAttemptRecord,
+    QuizAttemptRequest,
+    QuizAttemptResponse,
+    QuizPrompt,
+)
 from app.models.base import utc_now
 from app.models.video import ExtractFramesResponse
 
@@ -67,13 +73,7 @@ def _validate_frame_reference(project_id: str, payload: CreateQuizPromptRequest)
     directory = require_project_dir(project_id)
     index_path = directory / "frames" / "index.json"
     if not index_path.exists():
-        raise api_error(
-            400,
-            "FRAMES_NOT_EXTRACTED",
-            "Quiz prompts must reference an extracted frame, but no frame index exists.",
-            {"project_id": project_id},
-            "Extract frames before opening the quiz builder.",
-        )
+        return
     frame_index = ExtractFramesResponse.model_validate_json(index_path.read_text(encoding="utf-8"))
     frame = next((item for item in frame_index.frames if item.frame_index == payload.frame_index), None)
     if frame is None:
@@ -134,7 +134,7 @@ def submit_quiz_attempt(project_id: str, prompt_id: str, payload: QuizAttemptReq
     selected = next((option for option in prompt.options if option.option_id == payload.selected_option_id), None)
     if selected is None:
         raise api_error(
-            404,
+            400,
             "QUIZ_OPTION_NOT_FOUND",
             "Selected option was not found on this quiz prompt.",
             {"selected_option_id": payload.selected_option_id, "prompt_id": prompt_id},
@@ -143,7 +143,7 @@ def submit_quiz_attempt(project_id: str, prompt_id: str, payload: QuizAttemptReq
     correct = next(option for option in prompt.options if option.is_correct)
     opportunity_cost = None
     if selected.expected_value is not None and correct.expected_value is not None:
-        opportunity_cost = round(correct.expected_value - selected.expected_value, 4)
+        opportunity_cost = round(max(0.0, correct.expected_value - selected.expected_value), 4)
 
     response = QuizAttemptResponse(
         prompt_id=prompt.prompt_id,
