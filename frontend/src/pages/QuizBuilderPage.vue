@@ -18,8 +18,6 @@ const question = ref('What is the best decision here?')
 const explanation = ref('')
 const options = ref<DecisionQuizOption[]>([])
 const selectedOptionId = ref<string | null>(null)
-const imageNaturalWidth = ref(1280)
-const imageNaturalHeight = ref(720)
 const isSaving = ref(false)
 const errorMessage = ref('')
 const actionTypes: DecisionActionType[] = ['PASS', 'DRIVE', 'SHOT', 'RESET', 'HOLD']
@@ -41,15 +39,7 @@ const validationErrors = computed(() => {
 
 onMounted(async () => {
   await ensureProjectHydrated(props.projectId).catch(() => undefined)
-  if (selectedFrame.value?.width) imageNaturalWidth.value = selectedFrame.value.width
-  if (selectedFrame.value?.height) imageNaturalHeight.value = selectedFrame.value.height
 })
-
-function updateImageNaturalSize(event: Event) {
-  const image = event.target as HTMLImageElement
-  imageNaturalWidth.value = image.naturalWidth || imageNaturalWidth.value
-  imageNaturalHeight.value = image.naturalHeight || imageNaturalHeight.value
-}
 
 function optionId(index: number) {
   return String.fromCharCode(65 + index)
@@ -126,10 +116,8 @@ async function savePrompt() {
     <div class="card">
       <h2>Frame {{ selectedFrame.frame_index }} · {{ selectedFrame.timestamp_seconds.toFixed(2) }}s</h2>
       <div class="image-stage">
-        <img :src="imageSrc" :alt="`Frame ${selectedFrame.frame_index}`" @load="updateImageNaturalSize" />
+        <img :src="imageSrc" :alt="`Frame ${selectedFrame.frame_index}`" />
         <ArrowDrawingOverlay
-          :image-natural-width="imageNaturalWidth"
-          :image-natural-height="imageNaturalHeight"
           :options="options"
           :selected-option-id="selectedOptionId"
           @create-arrow="createOption"

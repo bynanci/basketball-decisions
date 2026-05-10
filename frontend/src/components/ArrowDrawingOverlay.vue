@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import type { DecisionArrowPoint, DecisionQuizOption } from '../api/client'
 
 const props = withDefaults(
   defineProps<{
-    imageNaturalWidth: number
-    imageNaturalHeight: number
     options: DecisionQuizOption[]
     readonly?: boolean
     selectedOptionId?: string | null
@@ -20,8 +18,7 @@ const emit = defineEmits<{
 
 const drawingStart = ref<DecisionArrowPoint | null>(null)
 const previewEnd = ref<DecisionArrowPoint | null>(null)
-const viewWidth = computed(() => props.imageNaturalWidth || 1000)
-const viewHeight = computed(() => props.imageNaturalHeight || 1000)
+const labelOffset = 0.014
 
 function clamp(value: number) {
   return Math.min(1, Math.max(0, value))
@@ -35,8 +32,12 @@ function pointerPoint(event: MouseEvent): DecisionArrowPoint {
   }
 }
 
-function denormalize(point: DecisionArrowPoint) {
-  return { x: point.x * viewWidth.value, y: point.y * viewHeight.value }
+function labelX(point: DecisionArrowPoint) {
+  return clamp(point.x + labelOffset)
+}
+
+function labelY(point: DecisionArrowPoint) {
+  return clamp(point.y - labelOffset)
 }
 
 function onPointerDown(event: MouseEvent) {
@@ -64,7 +65,7 @@ function onPointerUp(event: MouseEvent) {
 <template>
   <svg
     class="arrow-overlay"
-    :viewBox="`0 0 ${viewWidth} ${viewHeight}`"
+    viewBox="0 0 1 1"
     preserveAspectRatio="none"
     role="img"
     aria-label="Decision arrows"
@@ -84,23 +85,23 @@ function onPointerUp(event: MouseEvent) {
 
     <g v-for="option in options" :key="option.option_id" class="arrow-hit-target" @click.stop="emit('select-option', option.option_id)">
       <line
-        :x1="denormalize(option.start).x"
-        :y1="denormalize(option.start).y"
-        :x2="denormalize(option.end).x"
-        :y2="denormalize(option.end).y"
+        :x1="option.start.x"
+        :y1="option.start.y"
+        :x2="option.end.x"
+        :y2="option.end.y"
         class="arrow-line-hit"
       />
       <line
-        :x1="denormalize(option.start).x"
-        :y1="denormalize(option.start).y"
-        :x2="denormalize(option.end).x"
-        :y2="denormalize(option.end).y"
+        :x1="option.start.x"
+        :y1="option.start.y"
+        :x2="option.end.x"
+        :y2="option.end.y"
         :class="['arrow-line', { selected: option.option_id === selectedOptionId }]"
         :marker-end="option.option_id === selectedOptionId ? 'url(#decision-arrowhead-selected)' : 'url(#decision-arrowhead)'"
       />
       <text
-        :x="denormalize(option.end).x + 10"
-        :y="denormalize(option.end).y - 10"
+        :x="labelX(option.end)"
+        :y="labelY(option.end)"
         :class="['arrow-label', { selected: option.option_id === selectedOptionId }]"
       >
         {{ option.option_id }}. {{ option.label || 'Decision' }}
@@ -109,10 +110,10 @@ function onPointerUp(event: MouseEvent) {
 
     <line
       v-if="drawingStart && previewEnd"
-      :x1="denormalize(drawingStart).x"
-      :y1="denormalize(drawingStart).y"
-      :x2="denormalize(previewEnd).x"
-      :y2="denormalize(previewEnd).y"
+      :x1="drawingStart.x"
+      :y1="drawingStart.y"
+      :x2="previewEnd.x"
+      :y2="previewEnd.y"
       class="arrow-line preview"
       marker-end="url(#decision-arrowhead)"
     />
@@ -135,14 +136,16 @@ function onPointerUp(event: MouseEvent) {
 .arrow-line-hit {
   stroke: transparent;
   stroke-linecap: round;
-  stroke-width: 28;
+  stroke-width: 28px;
+  vector-effect: non-scaling-stroke;
 }
 
 .arrow-line {
   fill: none;
   stroke: #f97316;
   stroke-linecap: round;
-  stroke-width: 7;
+  stroke-width: 7px;
+  vector-effect: non-scaling-stroke;
 }
 
 .arrow-line.selected {
@@ -151,16 +154,18 @@ function onPointerUp(event: MouseEvent) {
 
 .arrow-line.preview {
   opacity: 0.7;
-  stroke-dasharray: 14 10;
+  stroke-dasharray: 14px 10px;
 }
 
 .arrow-label {
   fill: white;
+  dominant-baseline: text-after-edge;
   font-size: 34px;
   font-weight: 800;
   paint-order: stroke;
   stroke: #111827;
   stroke-width: 7px;
+  vector-effect: non-scaling-stroke;
 }
 
 .arrow-label.selected {

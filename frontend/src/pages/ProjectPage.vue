@@ -171,7 +171,7 @@ async function extractFrames() {
 
 
   <section class="card">
-    <h2>Existing Quiz Prompts</h2>
+    <h2>Decision Quiz Prompts</h2>
     <div v-if="quizErrorMessage" class="error-card" role="alert">
       <strong>{{ quizErrorCode }}</strong>
       <p>{{ quizErrorMessage }}</p>
