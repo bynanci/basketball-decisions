@@ -25,9 +25,12 @@ const hasTracking = computed(() => !!project.value && (project.value.detections.
 const hasProjectedTracks = computed(() => (project.value?.projectedTracks.length ?? 0) > 0)
 const quizPrompts = ref<QuizPrompt[]>([])
 const isLoadingQuizPrompts = ref(false)
+const quizErrorMessage = ref('')
+const quizErrorCode = ref('')
+const quizErrorHint = ref('')
 
 onMounted(() => {
-  void ensureProjectHydrated(props.projectId).catch(() => undefined)
+  void ensureProjectHydrated(props.projectId, { force: true }).catch(() => undefined)
   void loadQuizPrompts()
 })
 
@@ -45,10 +48,22 @@ function showError(error: unknown) {
 
 async function loadQuizPrompts() {
   isLoadingQuizPrompts.value = true
+  quizErrorMessage.value = ''
+  quizErrorCode.value = ''
+  quizErrorHint.value = ''
   try {
     quizPrompts.value = await apiClient.listQuizPrompts(props.projectId)
-  } catch {
+  } catch (error) {
     quizPrompts.value = []
+    if (isApiClientError(error)) {
+      quizErrorCode.value = error.code
+      quizErrorMessage.value = error.message
+      quizErrorHint.value = error.debug_hint ?? ''
+    } else {
+      quizErrorCode.value = 'QUIZ_PROMPTS_LOAD_ERROR'
+      quizErrorMessage.value = 'Could not load quiz prompts.'
+      quizErrorHint.value = error instanceof Error ? error.message : ''
+    }
   } finally {
     isLoadingQuizPrompts.value = false
   }
@@ -156,7 +171,12 @@ async function extractFrames() {
 
   <section class="card">
     <h2>Existing Quiz Prompts</h2>
-    <p v-if="isLoadingQuizPrompts" class="muted">Loading quiz prompts…</p>
+    <div v-if="quizErrorMessage" class="error-card" role="alert">
+      <strong>{{ quizErrorCode }}</strong>
+      <p>{{ quizErrorMessage }}</p>
+      <small v-if="quizErrorHint">{{ quizErrorHint }}</small>
+    </div>
+    <p v-else-if="isLoadingQuizPrompts" class="muted">Loading quiz prompts…</p>
     <p v-else-if="!quizPrompts.length" class="muted">No quiz prompts yet. Use Build Quiz on an extracted frame.</p>
     <div v-else class="quiz-list">
       <article v-for="prompt in quizPrompts" :key="prompt.prompt_id" class="quiz-card">

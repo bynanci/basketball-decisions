@@ -42,7 +42,7 @@ const detectorMode = computed(() => {
 })
 
 onMounted(() => {
-  void ensureProjectHydrated(props.projectId).catch(() => undefined)
+  void ensureProjectHydrated(props.projectId, { force: true }).catch(() => undefined)
 })
 
 function showError(error: unknown) {

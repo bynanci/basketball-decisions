@@ -18,6 +18,7 @@ const { ensureProjectHydrated, isHydrating, hydrationError, hydrationErrorCode, 
 projectStore.setActiveProject(props.projectId)
 
 const project = computed(() => projectStore.getProject(props.projectId))
+const hasResolvedHydration = ref(false)
 const frameIndex = computed(() => {
   const raw = route.query.frameIndex
   const value = Array.isArray(raw) ? raw[0] : raw
@@ -35,9 +36,9 @@ const selectedFrame = computed(() => {
   }
   return savedCalibrationFrame.value
 })
-const selectedFrameMissing = computed(() => frameIndex.value !== null && !selectedFrame.value && !isHydrating.value)
-const savedCalibrationFrameMissing = computed(() => frameIndex.value === null && !!savedCalibrationFrameId.value && !selectedFrame.value && !isHydrating.value)
-const shouldSelectFrame = computed(() => frameIndex.value === null && !savedCalibrationFrameId.value && (project.value?.frames.length ?? 0) > 0)
+const selectedFrameMissing = computed(() => frameIndex.value !== null && !selectedFrame.value && hasResolvedHydration.value && !isHydrating.value)
+const savedCalibrationFrameMissing = computed(() => frameIndex.value === null && !!savedCalibrationFrameId.value && !selectedFrame.value && hasResolvedHydration.value && !isHydrating.value)
+const shouldSelectFrame = computed(() => frameIndex.value === null && !savedCalibrationFrameId.value && (project.value?.frames.length ?? 0) > 0 && hasResolvedHydration.value && !isHydrating.value)
 const frameSrc = computed(() => (selectedFrame.value ? apiClient.frameImageUrl(props.projectId, selectedFrame.value.frame_index) : undefined))
 const imageNaturalWidth = ref(selectedFrame.value?.width ?? 100)
 const imageNaturalHeight = ref(selectedFrame.value?.height ?? 100)
@@ -76,7 +77,11 @@ const canSave = computed(() => pairs.value.length >= 4 && !!selectedFrame.value 
 const canContinue = computed(() => !!project.value?.calibration?.homography)
 
 onMounted(() => {
-  void ensureProjectHydrated(props.projectId).catch(() => undefined)
+  void ensureProjectHydrated(props.projectId, { force: true })
+    .catch(() => undefined)
+    .finally(() => {
+      hasResolvedHydration.value = true
+    })
 })
 
 function selectKeypoint(keypointId: string) {
