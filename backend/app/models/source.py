@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import Field, model_validator
+from datetime import datetime
+from typing import Any
 
-from .base import ProjectArtifact
+from pydantic import BaseModel, Field, model_validator
+
+from .base import utc_now
 
 
 class SourceType(StrEnum):
@@ -43,10 +46,18 @@ class LeagueTag(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
-class VideoSourceRecord(ProjectArtifact):
-    """Persisted data source governance record stored at source.json."""
+class VideoSourceRecord(BaseModel):
+    """Persisted data source governance record stored at source.json or in source_registry.json."""
 
+    schema_version: str = "1.0"
+    project_id: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+    original_input: dict[str, Any] = Field(default_factory=dict)
+    pipeline_output: dict[str, Any] = Field(default_factory=dict)
+    debug_metadata: dict[str, Any] = Field(default_factory=dict)
     source_id: str
+    name: str = "Untitled source"
     source_type: SourceType
     source_url: str | None = None
     title: str | None = None
@@ -69,6 +80,6 @@ class VideoSourceRecord(ProjectArtifact):
             raise ValueError("UNKNOWN and YOUTUBE_REFERENCE_ONLY licenses cannot be allowed for training.")
         if self.allowed_for_training and not self.rights_confirmed:
             raise ValueError("rights_confirmed must be true before a source can be allowed for training.")
-        if self.allowed_for_training and self.usage_scope == UsageScope.REFERENCE_ONLY:
-            raise ValueError("REFERENCE_ONLY sources cannot be allowed for training.")
+        if self.allowed_for_training and self.usage_scope in {UsageScope.REFERENCE_ONLY, UsageScope.DEMO_ONLY}:
+            raise ValueError("Only TRAINING or EVALUATION usage scopes can be allowed for training.")
         return self

@@ -6,15 +6,18 @@ import {
   type DatasetSummary,
   type DecisionEventsBuildSummary,
   type LocalLabProjectArtifact,
+  type VideoSourceRecord,
   isApiClientError
 } from '../api/client'
 
 const projects = ref<LocalLabProjectArtifact[]>([])
 const datasets = ref<DatasetSummary[]>([])
+const sourceRegistry = ref<VideoSourceRecord[]>([])
 const isLoading = ref(false)
 const isExportingRecognition = ref(false)
 const isExportingDecision = ref(false)
 const isBuildingDecisionEvents = ref(false)
+const isSeedingSources = ref(false)
 const isCuratingRecognition = ref(false)
 const isCuratingDecision = ref(false)
 const decisionEventsSummary = ref<DecisionEventsBuildSummary | null>(null)
@@ -78,9 +81,10 @@ async function refreshLocalLab() {
   isLoading.value = true
   errorMessage.value = ''
   try {
-    const [projectResponse, datasetResponse] = await Promise.all([apiClient.listLocalLabProjects(), apiClient.listDatasets()])
+    const [projectResponse, datasetResponse, sourceResponse] = await Promise.all([apiClient.listLocalLabProjects(), apiClient.listDatasets(), apiClient.listSources()])
     projects.value = projectResponse.projects
     datasets.value = datasetResponse.datasets
+    sourceRegistry.value = sourceResponse
   } catch (error) {
     showError(error, 'Could not load the Local Lab registry.')
   } finally {
@@ -168,6 +172,20 @@ async function buildDecisionEvents() {
   }
 }
 
+async function seedCandidateSources() {
+  isSeedingSources.value = true
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    sourceRegistry.value = await apiClient.seedCandidateSources()
+    statusMessage.value = `Seeded ${sourceRegistry.value.length} candidate source records. No media was downloaded.`
+  } catch (error) {
+    showError(error, 'Could not seed candidate source registry.')
+  } finally {
+    isSeedingSources.value = false
+  }
+}
+
 onMounted(refreshLocalLab)
 </script>
 
@@ -195,6 +213,9 @@ onMounted(refreshLocalLab)
       <button type="button" :disabled="isBuildingDecisionEvents" @click="buildDecisionEvents">
         {{ isBuildingDecisionEvents ? 'Building…' : 'Build Decision Events' }}
       </button>
+      <button type="button" :disabled="isSeedingSources" @click="seedCandidateSources">
+        {{ isSeedingSources ? 'Seeding…' : 'Seed Candidate Sources' }}
+      </button>
       <button class="secondary" type="button" :disabled="isLoading" @click="refreshLocalLab">Refresh</button>
     </div>
     <p v-if="statusMessage" class="success-message">{{ statusMessage }}</p>
@@ -219,6 +240,45 @@ onMounted(refreshLocalLab)
     <div v-if="errorMessage" class="error-card" role="alert">
       <strong>{{ errorCode }}</strong>
       <p>{{ errorMessage }}</p>
+    </div>
+  </section>
+
+
+  <section class="card">
+    <div class="table-header">
+      <div>
+        <p class="eyebrow">Source Registry</p>
+        <h2>Candidate source governance</h2>
+      </div>
+      <span>{{ sourceRegistry.length }} sources</span>
+    </div>
+    <p class="muted">Candidate entries are metadata only. Do not bulk-download league or YouTube highlights, and verify rights before importing datasets.</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>License</th>
+            <th>Usage</th>
+            <th>Training</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="source in sourceRegistry" :key="source.source_id">
+            <td><strong>{{ source.name }}</strong><small v-if="source.source_url">{{ source.source_url }}</small></td>
+            <td>{{ source.source_type }}</td>
+            <td>{{ source.license_type }}</td>
+            <td>{{ source.usage_scope }}</td>
+            <td>{{ boolLabel(source.allowed_for_training) }}</td>
+            <td>{{ source.notes }}</td>
+          </tr>
+          <tr v-if="sourceRegistry.length === 0">
+            <td colspan="6">No candidate sources seeded yet.</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </section>
 

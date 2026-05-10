@@ -150,6 +150,8 @@ class DatasetManifest(BaseModel):
     source_project_ids: list[str] = Field(default_factory=list)
     skipped_project_ids: list[str] = Field(default_factory=list)
     label_distribution: dict[str, int] = Field(default_factory=dict)
+    source_license_distribution: dict[str, int] = Field(default_factory=dict)
+    usage_scope_distribution: dict[str, int] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utc_now)
     notes: str | None = None
 

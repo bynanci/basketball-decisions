@@ -58,13 +58,14 @@ export type LeagueTag = 'NBA' | 'EUROLEAGUE' | 'NCAA' | 'LOCAL' | 'OTHER' | 'UNK
 
 export interface VideoSourceRecord {
   schema_version?: string
-  project_id: string
+  project_id?: string | null
   created_at?: string
   updated_at?: string
   original_input?: Record<string, unknown>
   pipeline_output?: Record<string, unknown>
   debug_metadata?: Record<string, unknown>
   source_id: string
+  name: string
   source_type: SourceType
   source_url?: string | null
   title?: string | null
@@ -477,6 +478,8 @@ export interface QuizAttemptResponse {
 }
 
 
+export type SourceRegistryResponse = VideoSourceRecord[]
+
 export interface LocalLabProjectArtifact {
   project_id: string
   name: string
@@ -530,6 +533,8 @@ export interface DatasetManifest {
   source_project_ids: string[]
   skipped_project_ids: string[]
   label_distribution: Record<string, number>
+  source_license_distribution: Record<string, number>
+  usage_scope_distribution: Record<string, number>
   created_at: string
 }
 
@@ -577,6 +582,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const apiClient = {
   listProjects: () => request<ListProjectsResponse>('/projects'),
   listLocalLabProjects: () => request<LocalLabProjectsResponse>('/local-lab/projects'),
+  listSources: () => request<SourceRegistryResponse>('/sources'),
+  seedCandidateSources: () => request<SourceRegistryResponse>('/sources/seed-candidates', { method: 'POST' }),
   listDatasets: () => request<DatasetListResponse>('/local-lab/datasets'),
   exportRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/export', { method: 'POST' }),
   exportDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/export', { method: 'POST' }),
