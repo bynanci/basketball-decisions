@@ -267,6 +267,61 @@ export interface TrackReviewResponse {
   storage_paths: Record<string, string>
 }
 
+export interface DetectionRecognitionFeatures {
+  bbox_x: number
+  bbox_y: number
+  bbox_width: number
+  bbox_height: number
+  bbox_area: number
+  bbox_aspect_ratio: number
+  confidence: number
+  frame_index: number
+  has_track_id: boolean
+  track_point_count?: number | null
+  inside_projected_court?: boolean | null
+}
+
+export interface TrackRecognitionFeatures {
+  point_count: number
+  avg_confidence?: number | null
+  min_confidence?: number | null
+  max_confidence?: number | null
+  avg_bbox_area?: number | null
+  bbox_area_variance?: number | null
+  avg_speed_image?: number | null
+  max_jump_distance_image?: number | null
+  frame_span: number
+  gap_count: number
+  projected_inside_court_ratio?: number | null
+}
+
+export interface DetectionRecognitionScore {
+  detection_id: string
+  track_id?: string | null
+  false_positive_risk: number
+  recommended_label: 'LOW' | 'MEDIUM' | 'HIGH' | string
+  reasons: string[]
+  features: DetectionRecognitionFeatures
+}
+
+export interface TrackRecognitionScore {
+  track_id: string
+  false_positive_risk: number
+  recommended_label: 'LOW' | 'MEDIUM' | 'HIGH' | string
+  reasons: string[]
+  features: TrackRecognitionFeatures
+}
+
+export interface RecognitionScoreProjectResponse {
+  project_id: string
+  detection_scores: DetectionRecognitionScore[]
+  track_scores: TrackRecognitionScore[]
+  summary: {
+    high_risk_detection_count: number
+    high_risk_track_count: number
+  }
+}
+
 export type DecisionActionType = 'PASS' | 'DRIVE' | 'SHOT' | 'RESET' | 'HOLD'
 export type CourtRoleTarget =
   | 'BALL_HANDLER'
@@ -475,6 +530,8 @@ export const apiClient = {
   listDatasets: () => request<DatasetListResponse>('/local-lab/datasets'),
   exportRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/export', { method: 'POST' }),
   exportDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/export', { method: 'POST' }),
+  scoreRecognitionQuality: (projectId: string) =>
+    request<RecognitionScoreProjectResponse>(`/local-lab/recognition/score-project/${projectId}`, { method: 'POST' }),
   getProjectBundle: (projectId: string) => request<ProjectBundleResponse>(`/projects/${projectId}/bundle`),
   createProject: (payload: ProjectCreateRequest) =>
     request<ProjectCreateResponse>('/projects', { method: 'POST', body: JSON.stringify(payload) }),

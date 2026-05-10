@@ -41,6 +41,14 @@ from .quiz import (
     SituationType,
 )
 from .projection import ProjectedPlayerTrack, ProjectedTrackPoint
+from .recognition import (
+    DetectionRecognitionFeatures,
+    DetectionRecognitionScore,
+    RecognitionScoreProjectResponse,
+    RecognitionScoreSummary,
+    TrackRecognitionFeatures,
+    TrackRecognitionScore,
+)
 from .tracking import (
     Detection,
     DetectionBox,
@@ -78,6 +86,8 @@ __all__ = [
     "CourtPoint",
     "Detection",
     "DetectionBox",
+    "DetectionRecognitionFeatures",
+    "DetectionRecognitionScore",
     "DecisionAnswer",
     "DecisionOption",
     "DecisionQuizOption",
@@ -110,9 +120,13 @@ __all__ = [
     "SituationType",
     "RunTrackingRequest",
     "RunTrackingResponse",
+    "RecognitionScoreProjectResponse",
+    "RecognitionScoreSummary",
     "SaveCalibrationRequest",
     "SaveCalibrationResponse",
     "TrackPoint",
+    "TrackRecognitionFeatures",
+    "TrackRecognitionScore",
     "VideoAsset",
     "YouTubeVideoRequest",
     "VideoSourceType",
