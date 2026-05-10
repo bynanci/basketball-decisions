@@ -1,12 +1,21 @@
+import math
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.api import common, projects
 from app.api.common import write_json_model
 from app.main import app
-from app.models import ExtractFramesRequest, ExtractFramesResponse, FrameAsset, Project
+from app.models import (
+    CreateQuizPromptRequest,
+    DecisionArrowPoint,
+    ExtractFramesRequest,
+    ExtractFramesResponse,
+    FrameAsset,
+    Project,
+)
 
 
 @pytest.fixture()
@@ -72,6 +81,19 @@ def create_prompt(client: TestClient, tmp_path: Path, payload: dict | None = Non
     return response.json()
 
 
+def test_quiz_models_reject_non_finite_arrow_coordinates() -> None:
+    with pytest.raises(ValidationError):
+        DecisionArrowPoint(x=math.nan, y=0.5)
+
+
+def test_quiz_models_reject_non_finite_expected_values() -> None:
+    payload = valid_prompt_payload()
+    payload["options"][0]["expected_value"] = math.inf
+
+    with pytest.raises(ValidationError):
+        CreateQuizPromptRequest.model_validate(payload)
+
+
 def test_cannot_create_prompt_with_fewer_than_two_options(client: TestClient, tmp_path: Path) -> None:
     write_project(tmp_path)
     payload = valid_prompt_payload()
@@ -98,6 +120,28 @@ def test_cannot_create_prompt_with_two_correct_options(client: TestClient, tmp_p
     write_project(tmp_path)
     payload = valid_prompt_payload()
     payload["options"] = [option("A", is_correct=True), option("B", is_correct=True)]
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "REQUEST_VALIDATION_ERROR"
+
+
+def test_cannot_create_prompt_with_duplicate_option_ids(client: TestClient, tmp_path: Path) -> None:
+    write_project(tmp_path)
+    payload = valid_prompt_payload()
+    payload["options"] = [option("A"), option("A", is_correct=True)]
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "REQUEST_VALIDATION_ERROR"
+
+
+def test_cannot_create_prompt_with_out_of_range_arrow_coordinates(client: TestClient, tmp_path: Path) -> None:
+    write_project(tmp_path)
+    payload = valid_prompt_payload()
+    payload["options"][0]["start"]["x"] = 1.25
 
     response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
 

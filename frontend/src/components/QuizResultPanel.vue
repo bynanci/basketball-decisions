@@ -30,7 +30,8 @@ function formatNumber(value: number | null | undefined) {
 
 function formatOption(option: DecisionQuizOption | null | undefined, fallbackOptionId: string) {
   if (!option) return fallbackOptionId
-  return `${option.option_id} — ${option.label}`
+  const label = option.label.trim() || 'Decision'
+  return `${option.option_id} — ${label}`
 }
 </script>
 

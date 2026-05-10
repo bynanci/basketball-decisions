@@ -32,6 +32,8 @@ const validationErrors = computed(() => {
   if (options.value.length < 2) errors.push('Draw at least 2 arrows.')
   if (options.value.length > 5) errors.push('Use no more than 5 arrows.')
   if (options.value.filter((option) => option.is_correct).length !== 1) errors.push('Mark exactly one option as correct.')
+  if (options.value.some((option) => !isNormalizedPoint(option.start) || !isNormalizedPoint(option.end))) errors.push('Every arrow must stay within normalized image coordinates.')
+  if (options.value.some((option) => option.expected_value !== null && !Number.isFinite(option.expected_value))) errors.push('Expected values must be valid numbers when provided.')
   if (options.value.some((option) => !option.label.trim() || !option.explanation.trim())) errors.push('Every option needs a label and explanation.')
   if (!explanation.value.trim()) errors.push('Summary explanation is required.')
   return errors
@@ -43,6 +45,14 @@ onMounted(async () => {
 
 function optionId(index: number) {
   return String.fromCharCode(65 + index)
+}
+
+function isNormalizedPoint(point: DecisionArrowPoint) {
+  return Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1
+}
+
+function formatExpectedValueInput(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : ''
 }
 
 function createOption(payload: { start: DecisionArrowPoint; end: DecisionArrowPoint }) {
@@ -71,7 +81,12 @@ function setCorrect(optionIdToMark: string) {
 
 function updateExpectedValue(option: DecisionQuizOption, event: Event) {
   const value = (event.target as HTMLInputElement).value
-  option.expected_value = value.trim() === '' ? null : Number(value)
+  if (value.trim() === '') {
+    option.expected_value = null
+    return
+  }
+  const parsed = Number(value)
+  option.expected_value = Number.isFinite(parsed) ? parsed : null
 }
 
 async function savePrompt() {
@@ -145,7 +160,7 @@ async function savePrompt() {
         </header>
         <label>Label <input v-model="option.label" /></label>
         <label>Action type <select v-model="option.action_type"><option v-for="action in actionTypes" :key="action" :value="action">{{ action }}</option></select></label>
-        <label>Expected value (optional) <input type="number" step="0.01" :value="option.expected_value ?? ''" @input="updateExpectedValue(option, $event)" /></label>
+        <label>Expected value (optional) <input type="number" step="0.01" :value="formatExpectedValueInput(option.expected_value)" @input="updateExpectedValue(option, $event)" /></label>
         <label>Option explanation <textarea v-model="option.explanation" placeholder="What does this option create or miss?"></textarea></label>
       </article>
       <p v-if="!options.length" class="muted">No arrows yet.</p>
