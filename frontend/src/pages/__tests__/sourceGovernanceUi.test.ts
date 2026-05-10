@@ -41,4 +41,19 @@ describe('source governance UI wiring', () => {
     expect(localLabPage).toContain('Negative samples are under 20% of curated labels')
     expect(localLabPage).toContain('Positive/negative sample imbalance is greater than 5:1')
   })
+
+  it('renders dataset health readiness when the health API returns data', () => {
+    const localLabPage = readPage('LocalLabPage.vue')
+
+    expect(localLabPage).toContain('apiClient.getDatasetHealth()')
+    expect(localLabPage).toContain('Dataset Health')
+    expect(localLabPage).toContain('Pre-training readiness gate')
+    expect(localLabPage).toContain('Ready for baseline training')
+    expect(localLabPage).toContain('Needs more labels')
+    expect(localLabPage).toContain('Needs more negative samples')
+    expect(localLabPage).toContain('Needs better role coverage')
+    expect(localLabPage).toContain('datasetHealth.recognition.warnings')
+    expect(localLabPage).toContain('datasetHealth.decision.warnings')
+    expect(localLabPage).toContain('severity-badge')
+  })
 })

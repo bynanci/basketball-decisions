@@ -55,3 +55,25 @@ describe('apiClient.getProjectBundle', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/projects/project-1/bundle', { headers: expect.any(Headers) })
   })
 })
+
+
+describe('apiClient.getDatasetHealth', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('requests the backend dataset health endpoint', async () => {
+    const payload = {
+      recognition: { warnings: [] },
+      decision: { warnings: [] },
+      generated_at: '2026-01-01T00:00:00Z'
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiClient.getDatasetHealth()).resolves.toEqual(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/local-lab/datasets/health', { headers: expect.any(Headers) })
+  })
+})

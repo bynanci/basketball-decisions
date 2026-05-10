@@ -538,6 +538,56 @@ export interface DatasetManifest {
   created_at: string
 }
 
+export type DatasetHealthSeverity = 'LOW' | 'MEDIUM' | 'HIGH'
+
+export interface DatasetHealthWarning {
+  code: string
+  severity: DatasetHealthSeverity
+  message: string
+  recommendation: string
+}
+
+export interface RecognitionDatasetHealth {
+  dataset_type: 'recognition'
+  sample_count: number
+  label_count: number
+  positive_sample_count: number
+  negative_sample_count: number
+  positive_negative_ratio?: number | null
+  label_distribution: Record<string, number>
+  source_project_count: number
+  skipped_project_count: number
+  has_minimum_samples: boolean
+  has_balanced_labels: boolean
+  warnings: DatasetHealthWarning[]
+}
+
+export interface DecisionDatasetHealth {
+  dataset_type: 'decision'
+  sample_count: number
+  label_count: number
+  prompt_count: number
+  option_count: number
+  attempt_count: number
+  positive_sample_count: number
+  negative_sample_count: number
+  positive_negative_ratio?: number | null
+  role_distribution: Record<string, number>
+  situation_distribution: Record<string, number>
+  missing_expected_value_rate: number
+  timeout_rate: number
+  has_minimum_prompts: boolean
+  has_role_coverage: boolean
+  has_balanced_labels: boolean
+  warnings: DatasetHealthWarning[]
+}
+
+export interface DatasetHealthResponse {
+  recognition: RecognitionDatasetHealth
+  decision: DecisionDatasetHealth
+  generated_at: string
+}
+
 export interface DatasetListResponse {
   datasets: DatasetSummary[]
 }
@@ -691,6 +741,7 @@ export const apiClient = {
   listSources: () => request<SourceRegistryResponse>('/sources'),
   seedCandidateSources: () => request<SourceRegistryResponse>('/sources/seed-candidates', { method: 'POST' }),
   listDatasets: () => request<DatasetListResponse>('/local-lab/datasets'),
+  getDatasetHealth: () => request<DatasetHealthResponse>('/local-lab/datasets/health'),
   exportRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/export', { method: 'POST' }),
   exportDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/export', { method: 'POST' }),
   curateRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/curate', { method: 'POST' }),

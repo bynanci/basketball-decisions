@@ -1,6 +1,10 @@
 """Pydantic models for basketball decision project artifacts."""
 
 from .dataset import (
+    DatasetHealthResponse,
+    DatasetHealthWarning,
+    DecisionDatasetHealth,
+    RecognitionDatasetHealth,
     DatasetListResponse,
     DatasetManifest,
     DatasetSummary,
@@ -90,6 +94,10 @@ from .video import (
 
 __all__ = [
     "ApiErrorResponse",
+    "DatasetHealthResponse",
+    "DatasetHealthWarning",
+    "DecisionDatasetHealth",
+    "RecognitionDatasetHealth",
     "DatasetListResponse",
     "DatasetManifest",
     "DatasetSummary",

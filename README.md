@@ -318,6 +318,27 @@ Decision export (`POST /api/local-lab/datasets/decision/export`) reads `quiz_pro
 
 Dataset summaries are available from `GET /api/local-lab/datasets` and are displayed as Local Lab cards next to export buttons. This layer is intentionally local-only; no real ML training, YOLO fine-tuning, cloud sync, or learned player value model is implemented yet.
 
+### Dataset Health pre-training gate
+
+Dataset health is available from `GET /api/local-lab/datasets/health` and is shown in the Local Lab **Dataset Health** section. It reads only local curated files (`curated_samples.jsonl`, `curated_labels.jsonl`, and `dataset_manifest.json`) for recognition and decision datasets. The health dashboard is a pre-training readiness gate: it explains whether curated data is large, balanced, and diverse enough for a future baseline training run, but it does **not** train a model, write a model registry entry, or block dataset export yet.
+
+Recognition health reports sample and label counts, positive/negative counts, positive-to-negative ratio, label distribution, source project coverage, skipped project count, readiness flags, and warnings. Recommended minimums are:
+
+- at least 1,000 curated recognition samples;
+- negative recognition labels should be at least 20% of labeled positive/negative samples;
+- positive-to-negative ratio should stay at or below 5:1;
+- at least 3 source projects;
+- both `FALSE_POSITIVE` and `FALSE_POSITIVE_TRACK` labels should be present.
+
+Decision health reports prompt, option, attempt, sample, and label counts; positive/negative counts; role and situation distributions; missing expected-value rate; timeout rate; readiness flags; and warnings. Recommended minimums are:
+
+- at least 50 curated decision prompts;
+- at least 100 decision attempts;
+- negative decision labels should be at least 30% of labeled positive/negative samples;
+- at least 3 court roles and at least 5 situations;
+- no more than 50% of option samples should be missing expected values;
+- timeout rate above 50% is surfaced as a low-severity quality warning.
+
 ## Decision Engine v1
 
 Decision Engine v1 turns saved quiz attempts into explainable, local JSONL decision events for downstream player-value experiments. It is deterministic and intentionally does **not** train or call a learned EPV model yet.

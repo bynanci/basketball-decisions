@@ -156,6 +156,58 @@ class DatasetManifest(BaseModel):
     notes: str | None = None
 
 
+
+DatasetHealthWarningSeverity = Literal["LOW", "MEDIUM", "HIGH"]
+
+
+class DatasetHealthWarning(BaseModel):
+    code: str
+    severity: DatasetHealthWarningSeverity
+    message: str
+    recommendation: str
+
+
+class RecognitionDatasetHealth(BaseModel):
+    dataset_type: Literal["recognition"] = "recognition"
+    sample_count: int = 0
+    label_count: int = 0
+    positive_sample_count: int = 0
+    negative_sample_count: int = 0
+    positive_negative_ratio: float | None = None
+    label_distribution: dict[str, int] = Field(default_factory=dict)
+    source_project_count: int = 0
+    skipped_project_count: int = 0
+    has_minimum_samples: bool = False
+    has_balanced_labels: bool = False
+    warnings: list[DatasetHealthWarning] = Field(default_factory=list)
+
+
+class DecisionDatasetHealth(BaseModel):
+    dataset_type: Literal["decision"] = "decision"
+    sample_count: int = 0
+    label_count: int = 0
+    prompt_count: int = 0
+    option_count: int = 0
+    attempt_count: int = 0
+    positive_sample_count: int = 0
+    negative_sample_count: int = 0
+    positive_negative_ratio: float | None = None
+    role_distribution: dict[str, int] = Field(default_factory=dict)
+    situation_distribution: dict[str, int] = Field(default_factory=dict)
+    missing_expected_value_rate: float = 0.0
+    timeout_rate: float = 0.0
+    has_minimum_prompts: bool = False
+    has_role_coverage: bool = False
+    has_balanced_labels: bool = False
+    warnings: list[DatasetHealthWarning] = Field(default_factory=list)
+
+
+class DatasetHealthResponse(BaseModel):
+    recognition: RecognitionDatasetHealth
+    decision: DecisionDatasetHealth
+    generated_at: datetime = Field(default_factory=utc_now)
+
+
 class DatasetSummary(BaseModel):
     dataset_type: DatasetType
     sample_count: int = 0
