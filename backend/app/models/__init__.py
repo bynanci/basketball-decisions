@@ -21,6 +21,7 @@ from .quiz import (
     QuizAttemptRequest,
     QuizAttemptResponse,
     QuizPrompt,
+    QuizPromptMode,
 )
 from .projection import ProjectedPlayerTrack, ProjectedTrackPoint
 from .tracking import (
@@ -70,6 +71,7 @@ __all__ = [
     "QuizAttemptRequest",
     "QuizAttemptResponse",
     "QuizPrompt",
+    "QuizPromptMode",
     "RunTrackingRequest",
     "RunTrackingResponse",
     "SaveCalibrationRequest",

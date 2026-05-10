@@ -216,3 +216,38 @@ def test_opportunity_cost_null_when_expected_values_missing(client: TestClient, 
 
     assert response.status_code == 200
     assert response.json()["opportunity_cost"] is None
+
+
+def test_create_video_freeze_prompt_persists_playback_fields(client: TestClient, tmp_path: Path) -> None:
+    write_project(tmp_path)
+    payload = valid_prompt_payload()
+    payload.update(
+        {
+            "mode": "VIDEO_FREEZE",
+            "video_asset_id": "video-1",
+            "clip_start_seconds": 1.0,
+            "freeze_frame_seconds": 2.8,
+            "clip_end_seconds": 3.2,
+        }
+    )
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
+
+    assert response.status_code == 200
+    prompt = response.json()
+    assert prompt["mode"] == "VIDEO_FREEZE"
+    assert prompt["video_asset_id"] == "video-1"
+    assert prompt["clip_start_seconds"] == 1.0
+    assert prompt["freeze_frame_seconds"] == 2.8
+    assert prompt["clip_end_seconds"] == 3.2
+
+
+def test_video_freeze_prompt_rejects_clip_start_after_freeze(client: TestClient, tmp_path: Path) -> None:
+    write_project(tmp_path)
+    payload = valid_prompt_payload()
+    payload.update({"mode": "VIDEO_FREEZE", "clip_start_seconds": 4.0, "freeze_frame_seconds": 2.8})
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "REQUEST_VALIDATION_ERROR"

@@ -61,6 +61,45 @@ async def upload_video(project_id: str, file: UploadFile = File(...)) -> VideoAs
     return video
 
 
+@router.get("/source")
+def get_video_source(project_id: str) -> FileResponse:
+    """Serve the current local MP4 without exposing arbitrary filesystem paths."""
+
+    directory = require_project_dir(project_id)
+    video_json_path = directory / "video.json"
+    if not video_json_path.exists():
+        raise api_error(
+            404,
+            "LOCAL_VIDEO_NOT_FOUND",
+            "No local browser-playable video file is available for this project.",
+            {"project_id": project_id},
+            "Upload a local MP4 before using video-freeze quiz playback.",
+        )
+    video_doc = VideoAsset.model_validate(read_json(video_json_path))
+    if not video_doc.uri:
+        raise api_error(
+            404,
+            "LOCAL_VIDEO_NOT_FOUND",
+            "No local browser-playable video file is available for this project.",
+            {"project_id": project_id, "asset_id": video_doc.asset_id},
+            "Upload a local MP4 before using video-freeze quiz playback.",
+        )
+
+    raw_video_path = Path(video_doc.uri)
+    video_path = raw_video_path.resolve()
+    project_root = directory.resolve()
+    if project_root not in video_path.parents or video_path.suffix.lower() != ".mp4" or not video_path.is_file():
+        raise api_error(
+            404,
+            "LOCAL_VIDEO_NOT_FOUND",
+            "No local browser-playable video file is available for this project.",
+            {"project_id": project_id, "asset_id": video_doc.asset_id},
+            "Upload a local MP4 before using video-freeze quiz playback.",
+        )
+
+    return FileResponse(video_path, media_type="video/mp4")
+
+
 @router.post("/youtube", response_model=VideoAsset)
 def create_youtube_video(project_id: str, payload: YouTubeVideoRequest) -> VideoAsset:
     directory = require_project_dir(project_id)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
 import type { QuizAttemptResponse, QuizPrompt } from '../api/client'
@@ -19,13 +19,28 @@ const selectedOptionId = ref<string | null>(null)
 const isLoadingPrompt = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
+const videoElement = ref<HTMLVideoElement | null>(null)
+const isVideoAtFreeze = ref(false)
+const videoPlaybackMessage = ref('')
+const videoSourceFailed = ref(false)
 const imageSrc = computed(() => prompt.value?.image_url || (prompt.value ? apiClient.frameImageUrl(props.projectId, prompt.value.frame_index) : ''))
+const videoSrc = computed(() => apiClient.videoSourceUrl(props.projectId))
+const freezeTime = computed(() => prompt.value?.freeze_frame_seconds ?? prompt.value?.timestamp_seconds ?? 0)
+const clipStart = computed(() => Math.max(0, prompt.value?.clip_start_seconds ?? Math.max(0, freezeTime.value - 3)))
+const isVideoPrompt = computed(() => prompt.value?.mode === 'VIDEO_FREEZE')
+const isAnswered = computed(() => result.value !== null)
+const canUseVideo = computed(() => isVideoPrompt.value && !videoSourceFailed.value)
+const shouldShowArrows = computed(() => !canUseVideo.value || isVideoAtFreeze.value || isAnswered.value)
+const fallbackMessage = computed(() =>
+  isVideoPrompt.value && videoSourceFailed.value
+    ? 'Video playback is unavailable for this prompt, so the still frame is shown instead.'
+    : ''
+)
 const selectedOption = computed(() => prompt.value?.options.find((option) => option.option_id === result.value?.selected_option_id) ?? null)
 const correctOption = computed(() => prompt.value?.options.find((option) => option.option_id === result.value?.correct_option_id) ?? null)
 const correctOptionId = computed(() => result.value?.correct_option_id ?? null)
 const incorrectOptionId = computed(() => (result.value && !result.value.is_correct ? result.value.selected_option_id : null))
-const isAnswered = computed(() => result.value !== null)
-const canSelectArrow = computed(() => !!prompt.value && !isSubmitting.value && !isAnswered.value)
+const canSelectArrow = computed(() => !!prompt.value && shouldShowArrows.value && !isSubmitting.value && !isAnswered.value)
 
 onMounted(async () => {
   await ensureProjectHydrated(props.projectId).catch(() => undefined)
@@ -37,6 +52,10 @@ async function loadPrompt() {
   errorMessage.value = ''
   try {
     prompt.value = await apiClient.getQuizPrompt(props.projectId, props.promptId)
+    if (prompt.value.mode === 'VIDEO_FREEZE') {
+      await nextTick()
+      startVideoClip()
+    }
   } catch (error) {
     errorMessage.value = isApiClientError(error) ? error.message : 'Could not load quiz prompt.'
   } finally {
@@ -44,8 +63,48 @@ async function loadPrompt() {
   }
 }
 
+function startVideoClip() {
+  const video = videoElement.value
+  if (!video || !prompt.value) return
+  isVideoAtFreeze.value = false
+  videoPlaybackMessage.value = 'Playing clip… arrows appear at the freeze.'
+  video.currentTime = clipStart.value
+  const playPromise = video.play()
+  if (playPromise) {
+    playPromise.catch(() => {
+      videoPlaybackMessage.value = 'Press play to start the clip. It will pause at the freeze.'
+    })
+  }
+}
+
+function handleVideoLoadedMetadata() {
+  startVideoClip()
+}
+
+function handleVideoTimeUpdate() {
+  const video = videoElement.value
+  if (!video || !prompt.value || isVideoAtFreeze.value) return
+  if (video.currentTime >= freezeTime.value) {
+    video.pause()
+    video.currentTime = freezeTime.value
+    isVideoAtFreeze.value = true
+    videoPlaybackMessage.value = 'Paused at the freeze. Select the best decision arrow.'
+  }
+}
+
+function handleVideoError() {
+  videoSourceFailed.value = true
+  isVideoAtFreeze.value = true
+  videoPlaybackMessage.value = ''
+}
+
+function replayClip() {
+  if (!canUseVideo.value) return
+  startVideoClip()
+}
+
 async function submitAttempt(optionId: string) {
-  if (!prompt.value || isSubmitting.value || result.value) return
+  if (!prompt.value || isSubmitting.value || result.value || !shouldShowArrows.value) return
   selectedOptionId.value = optionId
   isSubmitting.value = true
   errorMessage.value = ''
@@ -83,13 +142,27 @@ function retry() {
       <div class="question-block">
         <span class="question-kicker">Question</span>
         <h2>{{ prompt.question }}</h2>
-        <p v-if="!isAnswered" class="instruction">Click the arrow that represents the best decision.</p>
+        <p v-if="!isAnswered" class="instruction">{{ canUseVideo && !isVideoAtFreeze ? 'Watch the clip until it freezes, then click the best decision arrow.' : 'Click the arrow that represents the best decision.' }}</p>
         <p v-else class="instruction">The correct arrow is highlighted in green. A wrong selected arrow is highlighted in red.</p>
       </div>
 
+      <p v-if="fallbackMessage" class="fallback-banner" role="status">{{ fallbackMessage }}</p>
       <div class="image-stage">
-        <img :src="imageSrc" :alt="`Frame ${prompt.frame_index}`" />
+        <video
+          v-if="canUseVideo"
+          ref="videoElement"
+          :src="videoSrc"
+          playsinline
+          muted
+          controls
+          preload="metadata"
+          @loadedmetadata="handleVideoLoadedMetadata"
+          @timeupdate="handleVideoTimeUpdate"
+          @error="handleVideoError"
+        ></video>
+        <img v-else :src="imageSrc" :alt="`Frame ${prompt.frame_index}`" />
         <ArrowDrawingOverlay
+          v-if="shouldShowArrows"
           :options="prompt.options"
           :readonly="true"
           :disabled="!canSelectArrow"
@@ -98,6 +171,10 @@ function retry() {
           :incorrect-option-id="incorrectOptionId"
           @select-option="submitAttempt"
         />
+      </div>
+      <div v-if="canUseVideo" class="video-controls">
+        <button type="button" @click="replayClip">Replay clip</button>
+        <span class="muted" aria-live="polite">{{ videoPlaybackMessage }}</span>
       </div>
       <p v-if="isSubmitting" class="muted" aria-live="polite">Submitting your answer…</p>
     </div>
@@ -174,6 +251,16 @@ function retry() {
   margin: 0;
 }
 
+.fallback-banner {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 12px;
+  color: #9a3412;
+  font-weight: 700;
+  margin: 0;
+  padding: 0.75rem;
+}
+
 .image-stage {
   background: #111827;
   border-radius: 12px;
@@ -181,9 +268,16 @@ function retry() {
   position: relative;
 }
 
-.image-stage img {
+.image-stage img,
+.image-stage video {
   display: block;
   width: 100%;
+}
+
+.video-controls {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
 }
 
 .pending-result {
