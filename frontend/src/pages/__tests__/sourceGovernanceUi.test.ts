@@ -30,4 +30,15 @@ describe('source governance UI wiring', () => {
     expect(localLabPage).toContain('allowed_for_training')
     expect(localLabPage).toContain('Reference only')
   })
+
+  it('surfaces dataset curation controls and imbalance warnings', () => {
+    const localLabPage = readPage('LocalLabPage.vue')
+
+    expect(localLabPage).toContain('Curate Recognition Dataset')
+    expect(localLabPage).toContain('Curate Decision Dataset')
+    expect(localLabPage).toContain('positive_sample_count')
+    expect(localLabPage).toContain('negative_sample_count')
+    expect(localLabPage).toContain('Negative samples are under 20% of curated labels')
+    expect(localLabPage).toContain('Positive/negative sample imbalance is greater than 5:1')
+  })
 })

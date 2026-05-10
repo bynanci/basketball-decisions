@@ -47,7 +47,8 @@ function formatRatio(value?: number | null) {
 }
 
 function hasFewNegatives(dataset: DatasetSummary | DatasetManifest) {
-  return dataset.positive_sample_count > 0 && dataset.negative_sample_count < Math.max(1, Math.ceil(dataset.positive_sample_count / 10))
+  const totalSamples = dataset.positive_sample_count + dataset.negative_sample_count
+  return totalSamples > 0 && dataset.negative_sample_count / totalSamples < 0.2
 }
 
 function hasImbalance(dataset: DatasetSummary | DatasetManifest) {
@@ -229,7 +230,7 @@ onMounted(refreshLocalLab)
         <div><dt>Ratio</dt><dd>{{ formatRatio(lastExportManifest.positive_negative_ratio) }}</dd></div>
       </dl>
       <p><strong>Label distribution:</strong> {{ formatLabelDistribution(lastExportManifest.label_distribution) }}</p>
-      <p v-if="hasFewNegatives(lastExportManifest)" class="warning-message">Negative samples are underrepresented. Add more tracking review exclusions or bad-decision prompts.</p>
+      <p v-if="hasFewNegatives(lastExportManifest)" class="warning-message">Negative samples are under 20% of curated labels. Add more tracking review exclusions or bad-decision prompts.</p>
       <p v-if="hasImbalance(lastExportManifest)" class="warning-message">Positive/negative sample imbalance is greater than 5:1.</p>
       <ul v-if="lastExportManifest.skipped_projects.length">
         <li v-for="project in lastExportManifest.skipped_projects" :key="project.project_id">
@@ -339,7 +340,7 @@ onMounted(refreshLocalLab)
         </div>
       </dl>
       <p class="label-distribution"><strong>Labels:</strong> {{ formatLabelDistribution(dataset.label_distribution) }}</p>
-      <p v-if="hasFewNegatives(dataset)" class="warning-message">Negative samples are underrepresented. Add more tracking review exclusions or bad-decision prompts.</p>
+      <p v-if="hasFewNegatives(dataset)" class="warning-message">Negative samples are under 20% of curated labels. Add more tracking review exclusions or bad-decision prompts.</p>
       <p v-if="hasImbalance(dataset)" class="warning-message">Positive/negative sample imbalance is greater than 5:1.</p>
     </article>
   </section>
