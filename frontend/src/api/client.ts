@@ -506,6 +506,10 @@ export interface DatasetSummary {
   project_count: number
   last_exported_at?: string | null
   storage_paths: Record<string, string>
+  positive_sample_count: number
+  negative_sample_count: number
+  positive_negative_ratio?: number | null
+  label_distribution: Record<string, number>
 }
 
 export interface DatasetManifest {
@@ -520,6 +524,13 @@ export interface DatasetManifest {
   included_project_count: number
   skipped_project_count: number
   skipped_projects: Array<{ project_id: string; name?: string | null; reason: string }>
+  positive_sample_count: number
+  negative_sample_count: number
+  positive_negative_ratio?: number | null
+  source_project_ids: string[]
+  skipped_project_ids: string[]
+  label_distribution: Record<string, number>
+  created_at: string
 }
 
 export interface DatasetListResponse {
@@ -569,6 +580,8 @@ export const apiClient = {
   listDatasets: () => request<DatasetListResponse>('/local-lab/datasets'),
   exportRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/export', { method: 'POST' }),
   exportDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/export', { method: 'POST' }),
+  curateRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/curate', { method: 'POST' }),
+  curateDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/curate', { method: 'POST' }),
   buildDecisionEvents: () => request<DecisionEventsBuildSummary>('/local-lab/decision-events/build', { method: 'POST' }),
   scoreRecognitionQuality: (projectId: string) =>
     request<RecognitionScoreProjectResponse>(`/local-lab/recognition/score-project/${projectId}`, { method: 'POST' }),

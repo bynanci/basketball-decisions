@@ -15,6 +15,8 @@ const isLoading = ref(false)
 const isExportingRecognition = ref(false)
 const isExportingDecision = ref(false)
 const isBuildingDecisionEvents = ref(false)
+const isCuratingRecognition = ref(false)
+const isCuratingDecision = ref(false)
 const decisionEventsSummary = ref<DecisionEventsBuildSummary | null>(null)
 const lastExportManifest = ref<DatasetManifest | null>(null)
 const statusMessage = ref('')
@@ -34,6 +36,25 @@ function formatDate(value?: string | null) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
+}
+
+function formatRatio(value?: number | null) {
+  if (value === null || value === undefined) return '—'
+  return `${formatNumber(value)}:1`
+}
+
+function hasFewNegatives(dataset: DatasetSummary | DatasetManifest) {
+  return dataset.positive_sample_count > 0 && dataset.negative_sample_count < Math.max(1, Math.ceil(dataset.positive_sample_count / 10))
+}
+
+function hasImbalance(dataset: DatasetSummary | DatasetManifest) {
+  return dataset.negative_sample_count === 0 ? dataset.positive_sample_count > 0 : dataset.positive_sample_count / dataset.negative_sample_count > 5
+}
+
+function formatLabelDistribution(distribution: Record<string, number>) {
+  const entries = Object.entries(distribution)
+  if (!entries.length) return 'No labels yet'
+  return entries.map(([label, count]) => `${label}: ${count}`).join(', ')
 }
 
 function datasetTitle(value: string) {
@@ -99,6 +120,39 @@ async function exportDecisionDataset() {
   }
 }
 
+
+async function curateRecognitionDataset() {
+  isCuratingRecognition.value = true
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    const manifest = await apiClient.curateRecognitionDataset()
+    lastExportManifest.value = manifest
+    statusMessage.value = `Recognition dataset curated with ${manifest.positive_sample_count} positive samples and ${manifest.negative_sample_count} negative samples.`
+    await refreshLocalLab()
+  } catch (error) {
+    showError(error, 'Could not curate the recognition dataset.')
+  } finally {
+    isCuratingRecognition.value = false
+  }
+}
+
+async function curateDecisionDataset() {
+  isCuratingDecision.value = true
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    const manifest = await apiClient.curateDecisionDataset()
+    lastExportManifest.value = manifest
+    statusMessage.value = `Decision dataset curated with ${manifest.positive_sample_count} positive samples and ${manifest.negative_sample_count} negative samples.`
+    await refreshLocalLab()
+  } catch (error) {
+    showError(error, 'Could not curate the decision dataset.')
+  } finally {
+    isCuratingDecision.value = false
+  }
+}
+
 async function buildDecisionEvents() {
   isBuildingDecisionEvents.value = true
   statusMessage.value = ''
@@ -132,6 +186,12 @@ onMounted(refreshLocalLab)
       <button type="button" :disabled="isExportingDecision" @click="exportDecisionDataset">
         {{ isExportingDecision ? 'Exporting…' : 'Export Decision Dataset' }}
       </button>
+      <button type="button" :disabled="isCuratingRecognition" @click="curateRecognitionDataset">
+        {{ isCuratingRecognition ? 'Curating…' : 'Curate Recognition Dataset' }}
+      </button>
+      <button type="button" :disabled="isCuratingDecision" @click="curateDecisionDataset">
+        {{ isCuratingDecision ? 'Curating…' : 'Curate Decision Dataset' }}
+      </button>
       <button type="button" :disabled="isBuildingDecisionEvents" @click="buildDecisionEvents">
         {{ isBuildingDecisionEvents ? 'Building…' : 'Build Decision Events' }}
       </button>
@@ -142,6 +202,14 @@ onMounted(refreshLocalLab)
     <div v-if="lastExportManifest" class="export-summary">
       <strong>Last export summary</strong>
       <p>{{ datasetTitle(lastExportManifest.dataset_type) }} included {{ lastExportManifest.included_project_count }} projects and skipped {{ lastExportManifest.skipped_project_count }}.</p>
+      <dl class="curation-metrics">
+        <div><dt>Positive</dt><dd>{{ lastExportManifest.positive_sample_count }}</dd></div>
+        <div><dt>Negative</dt><dd>{{ lastExportManifest.negative_sample_count }}</dd></div>
+        <div><dt>Ratio</dt><dd>{{ formatRatio(lastExportManifest.positive_negative_ratio) }}</dd></div>
+      </dl>
+      <p><strong>Label distribution:</strong> {{ formatLabelDistribution(lastExportManifest.label_distribution) }}</p>
+      <p v-if="hasFewNegatives(lastExportManifest)" class="warning-message">Negative samples are underrepresented. Add more tracking review exclusions or bad-decision prompts.</p>
+      <p v-if="hasImbalance(lastExportManifest)" class="warning-message">Positive/negative sample imbalance is greater than 5:1.</p>
       <ul v-if="lastExportManifest.skipped_projects.length">
         <li v-for="project in lastExportManifest.skipped_projects" :key="project.project_id">
           <strong>{{ project.name ?? project.project_id }}</strong>: {{ project.reason }}
@@ -197,7 +265,22 @@ onMounted(refreshLocalLab)
           <dt>Last exported</dt>
           <dd>{{ formatDate(dataset.last_exported_at) }}</dd>
         </div>
+        <div>
+          <dt>Positive</dt>
+          <dd>{{ dataset.positive_sample_count }}</dd>
+        </div>
+        <div>
+          <dt>Negative</dt>
+          <dd>{{ dataset.negative_sample_count }}</dd>
+        </div>
+        <div>
+          <dt>Pos/neg ratio</dt>
+          <dd>{{ formatRatio(dataset.positive_negative_ratio) }}</dd>
+        </div>
       </dl>
+      <p class="label-distribution"><strong>Labels:</strong> {{ formatLabelDistribution(dataset.label_distribution) }}</p>
+      <p v-if="hasFewNegatives(dataset)" class="warning-message">Negative samples are underrepresented. Add more tracking review exclusions or bad-decision prompts.</p>
+      <p v-if="hasImbalance(dataset)" class="warning-message">Positive/negative sample imbalance is greater than 5:1.</p>
     </article>
   </section>
 
@@ -295,6 +378,29 @@ onMounted(refreshLocalLab)
 .success-message {
   color: #166534;
   font-weight: 700;
+}
+
+.warning-message {
+  color: #92400e;
+  font-weight: 800;
+}
+
+.curation-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.curation-metrics dd {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0.25rem 0 0;
+}
+
+.label-distribution {
+  color: #475569;
+  font-size: 0.9rem;
 }
 
 .decision-events-card {
