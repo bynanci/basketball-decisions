@@ -1,0 +1,14 @@
+{
+  "dataset_type": "decision",
+  "schema_version": "1.0",
+  "sample_count": 0,
+  "label_count": 0,
+  "project_count": 0,
+  "exported_at": "1970-01-01T00:00:00Z",
+  "storage_paths": {
+    "manifest": "backend/app/data/datasets/decision/dataset_manifest.json",
+    "samples": "backend/app/data/datasets/decision/samples.jsonl",
+    "labels": "backend/app/data/datasets/decision/labels.jsonl"
+  },
+  "notes": "Initialized local dataset registry; no export has been run yet."
+}

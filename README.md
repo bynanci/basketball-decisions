@@ -293,3 +293,27 @@ The profile has three parts:
 - `SituationType` controls the training or analysis context the user wants to focus on, such as pick-and-roll, short-roll, spot-up, closeout attack, transition advantage, late-clock, post-double, drive-and-kick, help-rotation, low-man decisions, and off-ball relocation.
 
 For now, Home shows the selected mode, links back to the role entry page, links down to the existing project creation flow, and displays a static recommended situations list. EPV and deeper role-based filtering are intentionally not implemented yet.
+
+## Local Data Memory Layer
+
+The Local Lab data memory layer prepares project artifacts for future local ML training without adding a database, cloud service, YOLO training job, or Player Value scoring. The frontend page is available at `/local-lab`, and the backend API is mounted under `/api/local-lab`.
+
+Local dataset files are JSON/JSONL only and are written under `backend/app/data/datasets/` with one folder per future training domain:
+
+- `recognition/` for tracking QC-derived detection and track labels.
+- `decision/` for quiz prompt samples and quiz attempt labels.
+- `player_value/` as a reserved local dataset registry folder for future Player Value work.
+
+Each dataset folder owns the same three local files:
+
+- `dataset_manifest.json` summarizes sample count, label count, project count, last export time, and storage paths.
+- `samples.jsonl` stores exported training examples.
+- `labels.jsonl` stores exported labels or attempt outcomes.
+
+Repeated inputs become local artifacts first: uploaded video metadata, extracted frame indexes, calibration, tracking output, tracking review patches, cleaned tracking/projection files, quiz prompts, and quiz attempts remain in `backend/data/projects/{project_id}/`. The Local Lab project index (`GET /api/local-lab/projects`) scans those artifacts and reports availability flags plus frame, prompt, and attempt counts for every project.
+
+Recognition export (`POST /api/local-lab/datasets/recognition/export`) reads each project's `tracking.json` and `tracking_review_patch.json`. Review `excluded_detection_ids` become `DetectionTrainingLabel` rows with `FALSE_POSITIVE`; review `excluded_track_ids` become `TrackTrainingLabel` rows with `FALSE_POSITIVE_TRACK`; non-excluded tracks become heuristic `VALID_PLAYER_TRACK` labels. The exporter writes `recognition/samples.jsonl`, `recognition/labels.jsonl`, and `recognition/dataset_manifest.json`.
+
+Decision export (`POST /api/local-lab/datasets/decision/export`) reads `quiz_prompts.json` as `DecisionTrainingSample` rows and reads `quiz_attempts.json` as `DecisionAttemptTrainingLabel` rows. The exporter writes `decision/samples.jsonl`, `decision/labels.jsonl`, and `decision/dataset_manifest.json`.
+
+Dataset summaries are available from `GET /api/local-lab/datasets` and are displayed as Local Lab cards next to export buttons. This layer is intentionally a registry/export step only; no real ML training, YOLO fine-tuning, cloud sync, or player value scoring is implemented yet.

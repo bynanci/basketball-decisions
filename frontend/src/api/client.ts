@@ -393,6 +393,52 @@ export interface QuizAttemptResponse {
   timed_out: boolean
 }
 
+
+export interface LocalLabProjectArtifact {
+  project_id: string
+  name: string
+  has_video: boolean
+  frame_count: number
+  has_calibration: boolean
+  has_tracking: boolean
+  has_tracking_review: boolean
+  has_cleaned_tracking: boolean
+  has_projected_tracks: boolean
+  quiz_prompt_count: number
+  quiz_attempt_count: number
+  updated_at?: string | null
+}
+
+export interface LocalLabProjectsResponse {
+  projects: LocalLabProjectArtifact[]
+}
+
+export type DatasetType = 'recognition' | 'decision' | 'player_value'
+
+export interface DatasetSummary {
+  dataset_type: DatasetType
+  sample_count: number
+  label_count: number
+  project_count: number
+  last_exported_at?: string | null
+  storage_paths: Record<string, string>
+}
+
+export interface DatasetManifest {
+  dataset_type: DatasetType
+  schema_version: string
+  sample_count: number
+  label_count: number
+  project_count: number
+  exported_at: string
+  storage_paths: Record<string, string>
+  notes?: string | null
+}
+
+export interface DatasetListResponse {
+  datasets: DatasetSummary[]
+}
+
 export function normalizeApiErrorPayload(status: number, payload?: Partial<ApiErrorResponse> | null): ApiErrorResponse {
   return {
     code: payload?.code ?? 'HTTP_ERROR',
@@ -425,6 +471,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const apiClient = {
   listProjects: () => request<ListProjectsResponse>('/projects'),
+  listLocalLabProjects: () => request<LocalLabProjectsResponse>('/local-lab/projects'),
+  listDatasets: () => request<DatasetListResponse>('/local-lab/datasets'),
+  exportRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/export', { method: 'POST' }),
+  exportDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/export', { method: 'POST' }),
   getProjectBundle: (projectId: string) => request<ProjectBundleResponse>(`/projects/${projectId}/bundle`),
   createProject: (payload: ProjectCreateRequest) =>
     request<ProjectCreateResponse>('/projects', { method: 'POST', body: JSON.stringify(payload) }),

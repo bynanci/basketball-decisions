@@ -1,5 +1,17 @@
 """Pydantic models for basketball decision project artifacts."""
 
+from .dataset import (
+    DatasetListResponse,
+    DatasetManifest,
+    DatasetSummary,
+    DecisionAttemptTrainingLabel,
+    DecisionTrainingSample,
+    DetectionTrainingLabel,
+    LocalLabProjectArtifact,
+    LocalLabProjectsResponse,
+    RecognitionTrainingSample,
+    TrackTrainingLabel,
+)
 from .calibration import (
     Calibration,
     CourtKeypointPair,
@@ -51,6 +63,16 @@ from .video import (
 
 __all__ = [
     "ApiErrorResponse",
+    "DatasetListResponse",
+    "DatasetManifest",
+    "DatasetSummary",
+    "DecisionAttemptTrainingLabel",
+    "DecisionTrainingSample",
+    "DetectionTrainingLabel",
+    "LocalLabProjectArtifact",
+    "LocalLabProjectsResponse",
+    "RecognitionTrainingSample",
+    "TrackTrainingLabel",
     "Calibration",
     "CourtKeypointPair",
     "CourtPoint",
