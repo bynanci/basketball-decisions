@@ -148,6 +148,13 @@ def get_quiz_prompt(project_id: str, prompt_id: str) -> QuizPrompt:
     return _find_prompt(project_id, prompt_id)
 
 
+def _role_feedback_for_option(option, user_role):
+    if user_role is None or option.role_feedback is None:
+        return option.explanation
+    feedback = getattr(option.role_feedback, user_role.lower(), None)
+    return feedback or option.explanation
+
+
 @router.post("/{prompt_id}/attempts", response_model=QuizAttemptResponse)
 def submit_quiz_attempt(project_id: str, prompt_id: str, payload: QuizAttemptRequest) -> QuizAttemptResponse:
     prompt = _find_prompt(project_id, prompt_id)
@@ -185,6 +192,8 @@ def submit_quiz_attempt(project_id: str, prompt_id: str, payload: QuizAttemptReq
         scoring_mode=scoring_mode,
         selected_explanation=selected.explanation,
         correct_explanation=correct.explanation,
+        selected_role_feedback=_role_feedback_for_option(selected, payload.user_role),
+        correct_role_feedback=_role_feedback_for_option(correct, payload.user_role),
         summary_explanation=prompt.explanation,
     )
     attempts = _read_attempts(project_id)

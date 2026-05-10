@@ -30,13 +30,14 @@ const matchLabel = computed(() => {
   return `${roleProfile.value.courtRole} / ${situationLabel}`
 })
 const recommendedPrompts = computed(() => {
-  if (!roleProfile.value) return []
-  const selectedSituations = roleProfile.value.situationTypes
+  const profile = roleProfile.value
+  if (!profile) return []
+  const selectedSituations = profile.situationTypes
 
   return prompts.value.filter((prompt) => {
-    const matchesCourtRole = prompt.court_role_target === roleProfile.value?.courtRole
+    const matchesCourtRole = prompt.court_role_target === profile.courtRole
     const matchesSituation = selectedSituations.length === 0 || selectedSituations.includes(prompt.situation_type)
-    const matchesUserRole = matchesPromptUserRole(prompt, roleProfile.value.userRole)
+    const matchesUserRole = matchesPromptUserRole(prompt, profile.userRole)
     return matchesCourtRole && matchesSituation && matchesUserRole
   })
 })

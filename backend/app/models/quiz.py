@@ -41,6 +41,7 @@ SituationType = Literal[
 ]
 QuizPromptMode = Literal["STILL_FRAME", "VIDEO_FREEZE"]
 QuizScoringMode = Literal["EXPECTED_VALUE", "CORRECTNESS_ONLY"]
+UserRole = Literal["COACH", "PLAYER", "ANALYST", "FAN"]
 
 
 class DecisionArrowPoint(BaseModel):
@@ -48,6 +49,23 @@ class DecisionArrowPoint(BaseModel):
 
     x: FiniteFloat = Field(ge=0, le=1)
     y: FiniteFloat = Field(ge=0, le=1)
+
+
+class DecisionRoleFeedback(BaseModel):
+    """Optional role-specific feedback for one quiz decision option."""
+
+    coach: str | None = None
+    player: str | None = None
+    analyst: str | None = None
+    fan: str | None = None
+
+    @field_validator("coach", "player", "analyst", "fan")
+    @classmethod
+    def normalize_optional_feedback(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
 
 
 class DecisionQuizOption(BaseModel):
@@ -61,6 +79,7 @@ class DecisionQuizOption(BaseModel):
     expected_value: FiniteFloat | None = None
     is_correct: bool = False
     explanation: str
+    role_feedback: DecisionRoleFeedback | None = None
 
     @field_validator("option_id", "label", "explanation")
     @classmethod
@@ -195,6 +214,7 @@ class CreateQuizPromptRequest(BaseModel):
 
 class QuizAttemptRequest(BaseModel):
     selected_option_id: str
+    user_role: UserRole | None = None
 
     @field_validator("selected_option_id")
     @classmethod
@@ -213,6 +233,10 @@ class QuizAttemptResponse(BaseModel):
                 data = {**data, "score": 100 if data["is_correct"] else 0}
             if "scoring_mode" not in data:
                 data = {**data, "scoring_mode": "CORRECTNESS_ONLY"}
+            if "selected_role_feedback" not in data and "selected_explanation" in data:
+                data = {**data, "selected_role_feedback": data["selected_explanation"]}
+            if "correct_role_feedback" not in data and "correct_explanation" in data:
+                data = {**data, "correct_role_feedback": data["correct_explanation"]}
         return data
 
     prompt_id: str
@@ -226,6 +250,8 @@ class QuizAttemptResponse(BaseModel):
     scoring_mode: QuizScoringMode
     selected_explanation: str
     correct_explanation: str
+    selected_role_feedback: str
+    correct_role_feedback: str
     summary_explanation: str
 
 

@@ -265,9 +265,50 @@ def test_attempt_returns_correctness_and_explanations(client: TestClient, tmp_pa
         "scoring_mode": "EXPECTED_VALUE",
         "selected_explanation": "Explanation for A",
         "correct_explanation": "Explanation for C",
+        "selected_role_feedback": "Explanation for A",
+        "correct_role_feedback": "Explanation for C",
         "summary_explanation": "Hit the cutter for the highest-value look.",
     }
     assert (tmp_path / "project-1" / "quiz_attempts.json").exists()
+
+
+def test_attempt_returns_role_specific_feedback_for_user_role(client: TestClient, tmp_path: Path) -> None:
+    payload = valid_prompt_payload()
+    payload["options"][0]["role_feedback"] = {
+        "player": "Next time, check the low man before committing to the drive.",
+        "coach": "Use this as a skip-pass recognition drill.",
+    }
+    payload["options"][1]["role_feedback"] = {
+        "player": "The cutter is available once the low man steps up.",
+        "fan": "This is why the box score misses decision quality.",
+    }
+    prompt = create_prompt(client, tmp_path, payload)
+
+    response = client.post(
+        f"/api/projects/project-1/quiz-prompts/{prompt['prompt_id']}/attempts",
+        json={"selected_option_id": "A", "user_role": "PLAYER"},
+    )
+
+    assert response.status_code == 200
+    attempt = response.json()
+    assert attempt["selected_role_feedback"] == "Next time, check the low man before committing to the drive."
+    assert attempt["correct_role_feedback"] == "The cutter is available once the low man steps up."
+
+
+def test_attempt_role_feedback_falls_back_to_explanation_when_missing(client: TestClient, tmp_path: Path) -> None:
+    payload = valid_prompt_payload()
+    payload["options"][0]["role_feedback"] = {"coach": "Use this as a skip-pass recognition drill."}
+    prompt = create_prompt(client, tmp_path, payload)
+
+    response = client.post(
+        f"/api/projects/project-1/quiz-prompts/{prompt['prompt_id']}/attempts",
+        json={"selected_option_id": "A", "user_role": "PLAYER"},
+    )
+
+    assert response.status_code == 200
+    attempt = response.json()
+    assert attempt["selected_role_feedback"] == "Explanation for A"
+    assert attempt["correct_role_feedback"] == "Explanation for C"
 
 
 def test_attempt_scores_with_expected_values(client: TestClient, tmp_path: Path) -> None:
