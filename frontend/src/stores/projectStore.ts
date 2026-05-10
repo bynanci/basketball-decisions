@@ -8,6 +8,7 @@ import type {
   ProjectBundleResponse,
   ProjectedPlayerTrack,
   RunTrackingResponse,
+  TrackReviewResponse,
   VideoAsset
 } from '../api/client'
 
@@ -30,6 +31,7 @@ export interface ProjectRecord {
   projectedTracks: ProjectedPlayerTrack[]
   trackingPipelineOutput?: RunTrackingResponse['pipeline_output'] | null
   trackingDebugMetadata?: RunTrackingResponse['debug_metadata'] | null
+  trackingReview?: TrackReviewResponse | null
 }
 
 interface ProjectState {
@@ -54,7 +56,8 @@ function createEmptyProject(input: Omit<Partial<ProjectRecord>, 'frames' | 'cali
     tracks: [],
     projectedTracks: [],
     trackingPipelineOutput: null,
-    trackingDebugMetadata: null
+    trackingDebugMetadata: null,
+    trackingReview: null
   }
 }
 
@@ -139,6 +142,7 @@ export const useProjectStore = defineStore('projectStore', {
       project.projectedTracks = bundle.projected_tracks?.projected_tracks ?? []
       project.trackingPipelineOutput = bundle.tracking?.pipeline_output ?? null
       project.trackingDebugMetadata = bundle.tracking?.debug_metadata ?? null
+      project.trackingReview = bundle.tracking_review ?? null
 
       if (!existing) {
         this.projects.push(project)

@@ -160,3 +160,46 @@ def test_save_tracking_review_uses_calibration_for_cleaned_projection(client: Te
     point = response.json()["cleaned_projected_tracks"][0]["points"][0]
     assert point["court_x"] == 35
     assert point["court_y"] == 80
+
+
+def test_get_tracks_returns_empty_projection_without_calibration(client: TestClient, tmp_path: Path) -> None:
+    directory = write_tracking_project(tmp_path)
+
+    response = client.get("/api/projects/project-1/tracks")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["tracking"]["tracks"][0]["track_id"] == "track-1"
+    assert payload["projected_tracks"] == []
+    assert (directory / "projected_tracks.json").exists()
+
+
+def test_get_tracks_uses_calibration_for_projection(client: TestClient, tmp_path: Path) -> None:
+    directory = write_tracking_project(tmp_path)
+    write_json_model(
+        directory / "calibration.json",
+        Calibration(
+            project_id="project-1",
+            keypoint_pairs=[],
+            homography=[[1, 0, 10], [0, 1, 20], [0, 0, 1]],
+        ),
+    )
+
+    response = client.get("/api/projects/project-1/tracks")
+
+    assert response.status_code == 200
+    point = response.json()["projected_tracks"][0]["points"][0]
+    assert point["court_x"] == 35
+    assert point["court_y"] == 80
+
+
+def test_tracking_review_projection_remains_empty_without_calibration(client: TestClient, tmp_path: Path) -> None:
+    write_tracking_project(tmp_path)
+
+    response = client.post(
+        "/api/projects/project-1/tracking/review",
+        json={"excluded_detection_ids": [], "excluded_track_ids": ["track-2"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["cleaned_projected_tracks"] == []

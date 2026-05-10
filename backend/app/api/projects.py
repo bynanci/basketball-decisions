@@ -16,6 +16,8 @@ from app.models import (
     ProjectCreateResponse,
     ProjectTracksResponse,
     RunTrackingResponse,
+    TrackReviewPatch,
+    TrackReviewResponse,
     VideoAsset,
 )
 
@@ -66,6 +68,32 @@ def _read_optional_artifact(
         ) from exc
 
 
+def _read_tracking_review_artifact(directory: Path, project_id: str) -> TrackReviewResponse | None:
+    """Return raw tracking plus optional reviewer/cleaned artifacts for bundle hydration."""
+
+    tracking = _read_optional_artifact(directory, "tracking.json", RunTrackingResponse)
+    if tracking is None:
+        return None
+
+    review_patch = _read_optional_artifact(directory, "tracking_review_patch.json", TrackReviewPatch) or TrackReviewPatch()
+    cleaned_tracking = _read_optional_artifact(directory, "tracking_cleaned.json", RunTrackingResponse)
+    cleaned_projection = _read_optional_artifact(directory, "projected_tracks_cleaned.json", ProjectTracksResponse)
+
+    return TrackReviewResponse(
+        project_id=project_id,
+        tracking=tracking,
+        review_patch=review_patch,
+        cleaned_tracking=cleaned_tracking,
+        cleaned_projected_tracks=cleaned_projection.projected_tracks if cleaned_projection is not None else [],
+        storage_paths={
+            "tracking": str(directory / "tracking.json"),
+            "review_patch": str(directory / "tracking_review_patch.json"),
+            "tracking_cleaned": str(directory / "tracking_cleaned.json"),
+            "projected_tracks_cleaned": str(directory / "projected_tracks_cleaned.json"),
+        },
+    )
+
+
 @router.get("/{project_id}/bundle", response_model=ProjectBundleResponse)
 def get_project_bundle(project_id: str) -> ProjectBundleResponse:
     """Return a project plus any persisted local MVP pipeline artifacts."""
@@ -79,6 +107,7 @@ def get_project_bundle(project_id: str) -> ProjectBundleResponse:
         calibration=_read_optional_artifact(directory, "calibration.json", Calibration),
         tracking=_read_optional_artifact(directory, "tracking.json", RunTrackingResponse),
         projected_tracks=_read_optional_artifact(directory, "projected_tracks.json", ProjectTracksResponse),
+        tracking_review=_read_tracking_review_artifact(directory, project_id),
     )
 
 

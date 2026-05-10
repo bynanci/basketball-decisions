@@ -75,7 +75,13 @@ def _validate_frame_reference(project_id: str, payload: CreateQuizPromptRequest)
     directory = require_project_dir(project_id)
     index_path = directory / "frames" / "index.json"
     if not index_path.exists():
-        return
+        raise api_error(
+            409,
+            "FRAME_INDEX_NOT_FOUND",
+            "Quiz prompts require an extracted frame index.",
+            {"project_id": project_id},
+            "Run POST /api/projects/{project_id}/frames/extract before creating quiz prompts, or add an explicit import/admin mode.",
+        )
     frame_index = ExtractFramesResponse.model_validate_json(index_path.read_text(encoding="utf-8"))
     frame = next((item for item in frame_index.frames if item.frame_index == payload.frame_index), None)
     if frame is None:

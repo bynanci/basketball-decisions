@@ -34,6 +34,9 @@ const isExtracting = ref(false)
 const actionErrorMessage = ref('')
 const actionErrorCode = ref('')
 const actionErrorHint = ref('')
+const quizPromptCount = ref<number | null>(null)
+const isLoadingQuizPrompts = ref(false)
+const quizPromptError = ref('')
 
 const hasProject = computed(() => !!project.value)
 const hasVideoAsset = computed(() => !!project.value?.videoAsset)
@@ -42,6 +45,10 @@ const firstFrame = computed(() => project.value?.frames[0] ?? null)
 const hasCalibration = computed(() => !!project.value?.calibration)
 const hasTracking = computed(() => !!project.value && (project.value.detections.length > 0 || project.value.tracks.length > 0 || project.value.projectedTracks.length > 0))
 const hasProjectedTracks = computed(() => (project.value?.projectedTracks.length ?? 0) > 0)
+const hasCleanedTrackingArtifacts = computed(() =>
+  !!project.value?.trackingReview?.cleaned_tracking || (project.value?.trackingReview?.cleaned_projected_tracks.length ?? 0) > 0
+)
+const hasQuizPrompts = computed(() => (quizPromptCount.value ?? 0) > 0)
 const calibrationFrameSelected = computed(() => !!project.value?.calibration?.frame_id)
 const calibrationLink = computed(() => {
   const frameIndex = firstFrame.value?.frame_index
@@ -123,10 +130,12 @@ const steps = computed<PipelineStep[]>(() => [
   {
     number: 7,
     title: 'Tracking Quality Review',
-    status: statusFor(false, hasTracking.value),
-    explanation: hasTracking.value
-      ? 'Inspect raw detections and save cleaned tracking artifacts before trusting projected paths.'
-      : 'Run tracking before excluding false-positive detections or full tracks.',
+    status: statusFor(hasCleanedTrackingArtifacts.value, hasTracking.value),
+    explanation: hasCleanedTrackingArtifacts.value
+      ? 'Cleaned tracking review artifacts are saved and available from the backend bundle.'
+      : hasTracking.value
+        ? 'Inspect raw detections and save cleaned tracking artifacts before trusting projected paths.'
+        : 'Run tracking before excluding false-positive detections or full tracks.',
     action: hasTracking.value
       ? { kind: 'link', label: 'Open QC review', to: `/projects/${props.projectId}/tracking-review` }
       : blockedAction('Run tracking before quality review.'),
@@ -151,12 +160,20 @@ const steps = computed<PipelineStep[]>(() => [
   {
     number: 9,
     title: 'Decision Quiz Ready',
-    status: 'NOT_STARTED',
-    explanation: 'Future MVP step: build and play decision prompts from extracted frames and normalized arrows.',
-    action: hasFrames.value
-      ? { kind: 'link', label: 'Build quiz prompt', to: quizBuilderLink.value }
-      : blockedAction('Extract frames before building quiz prompts.'),
-    disabledReason: hasFrames.value ? 'Future step; quiz tooling is available for early prompt drafting.' : 'No extracted frames are available.'
+    status: statusFor(hasQuizPrompts.value, hasFrames.value),
+    explanation: hasQuizPrompts.value
+      ? `${quizPromptCount.value} quiz prompt(s) are available for this project.`
+      : isLoadingQuizPrompts.value
+        ? 'Loading saved quiz prompt count from the backend.'
+        : quizPromptError.value
+          ? `Could not load quiz prompt count: ${quizPromptError.value}`
+          : 'Build at least one prompt from an extracted frame using normalized decision arrows.',
+    action: hasQuizPrompts.value
+      ? { kind: 'link', label: 'Review prompts', to: `/projects/${props.projectId}` }
+      : hasFrames.value
+        ? { kind: 'link', label: 'Build quiz prompt', to: quizBuilderLink.value }
+        : blockedAction('Extract frames before building quiz prompts.'),
+    disabledReason: hasFrames.value ? undefined : 'No extracted frames are available.'
   }
 ])
 
@@ -167,8 +184,9 @@ const describeVideo = computed(() => {
   return `Video asset ${video.asset_id}${filename} is hydrated from backend metadata.`
 })
 
-onMounted(() => {
-  void ensureProjectHydrated(props.projectId, { force: true }).catch(() => undefined)
+onMounted(async () => {
+  await ensureProjectHydrated(props.projectId, { force: true }).catch(() => undefined)
+  await loadQuizPromptCount()
 })
 
 function statusFor(done: boolean, ready = true): PipelineStatus {
@@ -189,6 +207,20 @@ function showActionError(error: unknown) {
     actionErrorCode.value = 'PIPELINE_ACTION_ERROR'
     actionErrorMessage.value = 'Could not complete the pipeline action.'
     actionErrorHint.value = error instanceof Error ? error.message : ''
+  }
+}
+
+async function loadQuizPromptCount() {
+  isLoadingQuizPrompts.value = true
+  quizPromptError.value = ''
+  try {
+    const prompts = await apiClient.listQuizPrompts(props.projectId)
+    quizPromptCount.value = prompts.length
+  } catch (error) {
+    quizPromptCount.value = 0
+    quizPromptError.value = isApiClientError(error) ? error.message : 'Could not load quiz prompts.'
+  } finally {
+    isLoadingQuizPrompts.value = false
   }
 }
 
