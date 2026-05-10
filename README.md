@@ -70,7 +70,7 @@ Project pages are designed to recover from backend storage instead of depending 
 GET /api/projects/{project_id}/bundle
 ```
 
-The bundle returns `project.json` plus any optional artifacts that exist locally: `video.json`, `frames/index.json`, `calibration.json`, `tracking.json`, and `projected_tracks.json`. Missing optional artifacts are returned as `null`, so a partially completed MVP pipeline can still load without crashing. A missing `project.json` returns the typed `PROJECT_NOT_FOUND` API error.
+The bundle returns `project.json` plus any optional artifacts that exist locally: `video.json`, `frames/index.json`, `calibration.json`, `tracking.json`, and `projected_tracks.json`. Missing optional artifacts are returned as `null`, so a partially completed MVP pipeline can still load without crashing. A missing `project.json` returns the typed `PROJECT_NOT_FOUND` API error. If an optional artifact exists but is malformed or does not match its expected schema, hydration stops with a typed 422 response that includes a `debug_hint` naming the artifact to fix or regenerate.
 
 Supported refresh/deep-link recovery paths include:
 
