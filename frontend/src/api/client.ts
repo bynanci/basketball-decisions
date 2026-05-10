@@ -51,6 +51,15 @@ export interface ProjectCreateResponse {
   storage_path: string
 }
 
+export interface ProjectBundleResponse {
+  project: Project
+  video: VideoAsset | null
+  frames: ExtractFramesResponse | null
+  calibration: Calibration | null
+  tracking: RunTrackingResponse | null
+  projected_tracks: ProjectTracksResponse | null
+}
+
 export interface ListProjectsResponse {
   projects: Array<{ id: string; name: string; description?: string | null }>
 }
@@ -241,6 +250,15 @@ export interface ProjectTracksResponse {
   storage_paths: Record<string, string>
 }
 
+export function normalizeApiErrorPayload(status: number, payload?: Partial<ApiErrorResponse> | null): ApiErrorResponse {
+  return {
+    code: payload?.code ?? 'HTTP_ERROR',
+    message: payload?.message ?? `API request failed with status ${status}`,
+    details: payload?.details ?? {},
+    debug_hint: payload?.debug_hint ?? null
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   const isFormData = init.body instanceof FormData
@@ -256,12 +274,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       payload = undefined
     }
-    const normalizedPayload: ApiErrorResponse = {
-      code: payload?.code ?? 'HTTP_ERROR',
-      message: payload?.message ?? `API request failed with status ${response.status}`,
-      details: payload?.details ?? {},
-      debug_hint: payload?.debug_hint ?? null
-    }
+    const normalizedPayload = normalizeApiErrorPayload(response.status, payload)
     throw new ApiClientError(response.status, normalizedPayload)
   }
   return (await response.json()) as T
@@ -269,6 +282,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const apiClient = {
   listProjects: () => request<ListProjectsResponse>('/projects'),
+  getProjectBundle: (projectId: string) => request<ProjectBundleResponse>(`/projects/${projectId}/bundle`),
   createProject: (payload: ProjectCreateRequest) =>
     request<ProjectCreateResponse>('/projects', { method: 'POST', body: JSON.stringify(payload) }),
   uploadVideo: (projectId: string, file: File) => {

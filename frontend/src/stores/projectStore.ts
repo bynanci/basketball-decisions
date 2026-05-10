@@ -5,6 +5,7 @@ import type {
   Detection,
   FrameAsset,
   PlayerTrack,
+  ProjectBundleResponse,
   ProjectedPlayerTrack,
   VideoAsset
 } from '../api/client'
@@ -101,6 +102,30 @@ export const useProjectStore = defineStore('projectStore', {
       project.detections = payload.detections ?? project.detections
       project.tracks = payload.tracks ?? project.tracks
       project.projectedTracks = payload.projectedTracks ?? project.projectedTracks
+    },
+    hydrateProjectFromBundle(bundle: ProjectBundleResponse) {
+      const projectId = bundle.project.project_id
+      const existing = this.getProject(projectId)
+      const source = bundle.video?.source_type ?? existing?.source ?? 'upload'
+      const project = existing ?? createEmptyProject({ id: projectId, name: bundle.project.name, source })
+
+      project.id = projectId
+      project.name = bundle.project.name
+      project.source = source
+      project.description = bundle.project.description
+      project.videoAsset = bundle.video
+      project.videoFileName = bundle.video?.filename ?? project.videoFileName
+      project.frames = bundle.frames?.frames ?? []
+      project.calibration = bundle.calibration
+      project.calibrationPairs = bundle.calibration?.keypoint_pairs ?? []
+      project.detections = bundle.tracking?.detections ?? []
+      project.tracks = bundle.tracking?.tracks ?? []
+      project.projectedTracks = bundle.projected_tracks?.projected_tracks ?? []
+
+      if (!existing) {
+        this.projects.push(project)
+      }
+      this.activeProjectId = projectId
     }
   }
 })

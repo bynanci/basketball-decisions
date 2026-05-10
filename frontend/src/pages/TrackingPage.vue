@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { apiClient, isApiClientError, type RunTrackingResponse } from '../api/client'
 import Court2DView from '../components/Court2DView.vue'
 import TrackOverlay from '../components/TrackOverlay.vue'
 import VideoPlayer from '../components/VideoPlayer.vue'
+import { useProjectHydration } from '../composables/useProjectHydration'
 import { useProjectStore } from '../stores/projectStore'
 
 const props = defineProps<{
@@ -11,6 +12,7 @@ const props = defineProps<{
 }>()
 
 const projectStore = useProjectStore()
+const { ensureProjectHydrated, loading: isHydrating, error: hydrationError, errorCode: hydrationErrorCode, errorHint: hydrationErrorHint } = useProjectHydration()
 projectStore.setActiveProject(props.projectId)
 const project = computed(() => projectStore.getProject(props.projectId))
 const isRunning = ref(false)
@@ -24,6 +26,7 @@ const hasBackendResult = computed(() => !!project.value && (project.value.detect
 const detections = computed(() => project.value?.detections ?? [])
 const tracks = computed(() => project.value?.tracks ?? [])
 const projectedTracks = computed(() => project.value?.projectedTracks ?? [])
+const isCalibrationMissing = computed(() => !project.value?.calibration)
 const currentFrameIndex = computed(() => detections.value[0]?.frame_index ?? project.value?.frames[0]?.frame_index ?? 0)
 const currentFrame = computed(() => project.value?.frames.find((frame) => frame.frame_index === currentFrameIndex.value) ?? project.value?.frames[0] ?? null)
 const frameSrc = computed(() => (currentFrame.value ? apiClient.frameImageUrl(props.projectId, currentFrame.value.frame_index) : undefined))
@@ -36,6 +39,10 @@ const detectorMode = computed(() => {
   if (detector && typeof detector === 'object' && 'detector_mode' in detector && typeof detector.detector_mode === 'string') return detector.detector_mode
   if (detector && typeof detector === 'object' && 'mode' in detector && typeof detector.mode === 'string') return detector.mode
   return 'unknown'
+})
+
+onMounted(() => {
+  void ensureProjectHydrated(props.projectId).catch(() => undefined)
 })
 
 function showError(error: unknown) {
@@ -51,7 +58,7 @@ function showError(error: unknown) {
 }
 
 async function runTracking() {
-  if (isRunning.value) return
+  if (isRunning.value || isHydrating.value) return
   isRunning.value = true
   errorMessage.value = ''
   errorCode.value = ''
@@ -86,7 +93,8 @@ async function runTracking() {
   <section class="card">
     <h1>Tracking</h1>
     <p>Project {{ props.projectId }}: run backend detection/tracking, then visualize image-space tracks and projected 2D court paths.</p>
-    <button type="button" :disabled="isRunning" @click="runTracking">{{ isRunning ? 'Running…' : 'Run Tracking' }}</button>
+    <button type="button" :disabled="isRunning || isHydrating" @click="runTracking">{{ isRunning ? 'Running…' : 'Run Tracking' }}</button>
+    <p v-if="isCalibrationMissing" class="warning">Tracking can run, but 2D projection needs calibration for meaningful court coordinates.</p>
     <p v-if="!hasBackendResult" class="empty-label">No backend tracking results yet. Click Run Tracking to request detections, tracks, and projected court paths.</p>
     <div class="stats-grid">
       <span><strong>{{ detections.length }}</strong> detections</span>
@@ -94,6 +102,17 @@ async function runTracking() {
       <span><strong>{{ projectedTracks.length }}</strong> projected tracks</span>
       <span><strong>{{ detectorMode }}</strong> detector mode</span>
     </div>
+  </section>
+
+  <section v-if="isHydrating" class="card" aria-live="polite">
+    <strong>Loading project…</strong>
+    <p>Recovering frames, tracking output, and projected tracks from backend storage.</p>
+  </section>
+
+  <section v-if="hydrationError" class="error-card" role="alert">
+    <strong>{{ hydrationErrorCode }}</strong>
+    <p>{{ hydrationError }}</p>
+    <small v-if="hydrationErrorHint">{{ hydrationErrorHint }}</small>
   </section>
 
   <section v-if="errorMessage" class="error-card" role="alert">
@@ -137,7 +156,8 @@ async function runTracking() {
   width: 100%;
 }
 
-.empty-label {
+.empty-label,
+.warning {
   color: #b45309;
   font-weight: 700;
 }

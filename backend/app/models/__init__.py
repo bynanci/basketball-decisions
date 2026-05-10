@@ -9,7 +9,7 @@ from .calibration import (
     SaveCalibrationResponse,
 )
 from .errors import ApiErrorResponse
-from .project import Project, ProjectCreateRequest, ProjectCreateResponse
+from .project import Project, ProjectBundleResponse, ProjectCreateRequest, ProjectCreateResponse
 from .quiz import DecisionAnswer, DecisionOption, FreezeFrame, QuizPrompt
 from .projection import ProjectedPlayerTrack, ProjectedTrackPoint
 from .tracking import (
@@ -46,6 +46,7 @@ __all__ = [
     "ImagePoint",
     "PlayerTrack",
     "Project",
+    "ProjectBundleResponse",
     "ProjectCreateRequest",
     "ProjectCreateResponse",
     "ProjectedPlayerTrack",

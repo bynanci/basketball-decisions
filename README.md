@@ -48,7 +48,7 @@ Open <http://localhost:5173>. The Vite dev server proxies `/api` requests to `ht
 
 ## Current MVP flow
 
-The frontend now supports the real local MP4 path through the backend APIs:
+The frontend now supports the real local MP4 path through the backend APIs and can hydrate project pages from backend local JSON storage after a browser refresh or direct link:
 
 1. Create a backend project.
 2. Upload an MP4.
@@ -58,8 +58,39 @@ The frontend now supports the real local MP4 path through the backend APIs:
 6. Save calibration so the backend computes a `cv2.findHomography` homography.
 7. Run backend tracking.
 8. View detection / track / projected-track counts and projected 2D court paths returned by the backend. The UI does not substitute demo tracks when backend results are absent.
+9. Refresh or open deep links for the project, calibration frame, or tracking page; the frontend reloads available artifacts from `GET /api/projects/{project_id}/bundle`.
 
 Decision Quiz scoring and quiz-builder workflows are intentionally not part of this MVP milestone.
+
+## Refresh-safe hydration and deep links
+
+Project pages are designed to recover from backend storage instead of depending only on in-memory Pinia state. On mount, the project, calibration, and tracking routes call:
+
+```http
+GET /api/projects/{project_id}/bundle
+```
+
+The bundle returns `project.json` plus any optional artifacts that exist locally: `video.json`, `frames/index.json`, `calibration.json`, `tracking.json`, and `projected_tracks.json`. Missing optional artifacts are returned as `null`, so a partially completed MVP pipeline can still load without crashing. A missing `project.json` returns the typed `PROJECT_NOT_FOUND` API error.
+
+Supported refresh/deep-link recovery paths include:
+
+- `/projects/:projectId` for project metadata, video metadata, frame counts, calibration status, tracking status, and projected-track status.
+- `/projects/:projectId/calibration?frameIndex=<frame_index>` for opening a saved extracted frame directly and recovering saved calibration keypoints/homography.
+- `/projects/:projectId/tracking` for recovering saved detections, tracks, and projected tracks when tracking has already run.
+
+The backend video `uri` is metadata only for hydration. The browser preview still uses a session-local object URL after upload; the frontend intentionally does **not** treat backend file paths as browser-playable video URLs until a proper streaming endpoint is added.
+
+Recommended refresh-safe demo path:
+
+1. Create a project.
+2. Upload an MP4.
+3. Extract frames.
+4. Refresh the project page to verify project/video/frame hydration.
+5. Select a calibration frame.
+6. Save calibration.
+7. Refresh the calibration page to verify keypoint/homography recovery.
+8. Run tracking.
+9. Refresh the tracking page to verify detection, track, and projected-track recovery.
 
 ## 3. Upload a local MP4
 
@@ -160,8 +191,8 @@ The following Decision Quiz work is intentionally deferred beyond the MVP:
 
 The following pieces are intentionally minimal:
 
-- **Frontend API integration**: project creation, MP4 upload, YouTube metadata creation, frame extraction, calibration saving, tracking, and projected tracks are wired for the MVP flow; broader persistence/reload behavior is still limited by in-memory Pinia state.
-- **Video playback source handling**: uploaded videos are previewed with a browser object URL for the current session; production video streaming is not implemented.
+- **Frontend API integration**: project creation, MP4 upload, YouTube metadata creation, frame extraction, calibration saving, tracking, projected tracks, and route-level hydration are wired for the MVP flow.
+- **Video playback source handling**: uploaded videos are previewed with a browser object URL for the current session; backend video file URIs are metadata only unless a streaming endpoint is added.
 - **YouTube downloader**: optional `yt-dlp` support may be unavailable in local environments.
 - **Detection/tracking models**: `detector.py` and `tracker.py` remain deterministic MVP implementations, not production player models.
 - **Persistence model**: project JSON files are local dev storage, not a production database.

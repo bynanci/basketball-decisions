@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { apiClient, isApiClientError, type CourtKeypointPair } from '../api/client'
 import CalibrationOverlay from '../components/CalibrationOverlay.vue'
 import VideoPlayer from '../components/VideoPlayer.vue'
+import { useProjectHydration } from '../composables/useProjectHydration'
 import { useProjectStore } from '../stores/projectStore'
 
 const props = defineProps<{
@@ -13,6 +14,7 @@ const props = defineProps<{
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
+const { ensureProjectHydrated, loading: isHydrating, error: hydrationError, errorCode: hydrationErrorCode, errorHint: hydrationErrorHint } = useProjectHydration()
 projectStore.setActiveProject(props.projectId)
 
 const project = computed(() => projectStore.getProject(props.projectId))
@@ -23,7 +25,9 @@ const frameIndex = computed(() => {
   return Number.isFinite(parsed) ? parsed : null
 })
 const selectedFrame = computed(() => project.value?.frames.find((frame) => frame.frame_index === frameIndex.value) ?? null)
-const frameSrc = computed(() => (frameIndex.value !== null ? apiClient.frameImageUrl(props.projectId, frameIndex.value) : undefined))
+const selectedFrameMissing = computed(() => frameIndex.value !== null && !selectedFrame.value && !isHydrating.value)
+const shouldSelectFrame = computed(() => frameIndex.value === null && (project.value?.frames.length ?? 0) > 0)
+const frameSrc = computed(() => (selectedFrame.value ? apiClient.frameImageUrl(props.projectId, selectedFrame.value.frame_index) : undefined))
 const imageNaturalWidth = ref(selectedFrame.value?.width ?? 100)
 const imageNaturalHeight = ref(selectedFrame.value?.height ?? 100)
 const displayWidth = ref(0)
@@ -58,7 +62,11 @@ const pairs = computed(() => project.value?.calibrationPairs ?? [])
 const nextUnmarked = computed(() => keypoints.find((keypoint) => !pairs.value.some((pair) => pair.keypoint_id === keypoint.id)))
 const reprojectionError = computed(() => project.value?.calibration?.reprojection_error)
 const canSave = computed(() => pairs.value.length >= 4 && !!selectedFrame.value && !isSaving.value)
-const canContinue = computed(() => !!project.value?.calibration?.homography && savedCalibrationId.value === props.projectId)
+const canContinue = computed(() => !!project.value?.calibration?.homography)
+
+onMounted(() => {
+  void ensureProjectHydrated(props.projectId).catch(() => undefined)
+})
 
 function selectKeypoint(keypointId: string) {
   activeKeypointId.value = keypointId
@@ -137,13 +145,25 @@ function continueToTracking() {
     <h1>Calibration</h1>
     <p>Project {{ props.projectId }}: manually mark image points for known court keypoints. MVP does not run automatic court detection.</p>
     <p v-if="selectedFrame">Selected frame {{ selectedFrame.frame_index }} at {{ selectedFrame.timestamp_seconds.toFixed(2) }}s.</p>
-    <p v-else-if="frameIndex !== null" class="warning">Frame {{ frameIndex }} is not in the local project store. Return to the project page after extracting frames, then choose a calibration frame.</p>
-    <p v-else class="warning">Choose an extracted frame from the project page for pixel-accurate calibration.</p>
+    <p v-else-if="selectedFrameMissing" class="warning">Selected frame is not available. Extract frames again or return to Project page.</p>
+    <p v-else-if="shouldSelectFrame" class="warning">Select an extracted frame below to start pixel-accurate calibration.</p>
+    <p v-else class="warning">Extract frames on the project page, then choose a calibration frame.</p>
     <p class="status">{{ status }}</p>
     <p v-if="reprojectionError !== null && reprojectionError !== undefined" class="status">Reprojection error: {{ reprojectionError.toFixed(3) }}</p>
     <button type="button" :disabled="!canSave" @click="saveBackendCalibration">{{ isSaving ? 'Saving…' : 'Save backend calibration' }}</button>
     <button type="button" class="secondary" :disabled="!canContinue" @click="continueToTracking">Continue to tracking</button>
     <RouterLink class="button secondary" :to="`/projects/${projectId}`">Back to project</RouterLink>
+  </section>
+
+  <section v-if="isHydrating" class="card" aria-live="polite">
+    <strong>Loading project…</strong>
+    <p>Recovering frames and saved calibration from backend storage.</p>
+  </section>
+
+  <section v-if="hydrationError" class="error-card" role="alert">
+    <strong>{{ hydrationErrorCode }}</strong>
+    <p>{{ hydrationError }}</p>
+    <small v-if="hydrationErrorHint">{{ hydrationErrorHint }}</small>
   </section>
 
   <section v-if="errorMessage" class="error-card" role="alert">
@@ -152,8 +172,20 @@ function continueToTracking() {
     <small v-if="errorHint">{{ errorHint }}</small>
   </section>
 
-  <section class="card calibration-stage">
-    <div v-if="frameSrc" class="calibration-frame-shell">
+  <section v-if="shouldSelectFrame" class="card">
+    <h2>Available frames</h2>
+    <p class="status">Choose one frame to calibrate; the image overlay appears after selection.</p>
+    <div class="frame-strip">
+      <RouterLink v-for="frame in project?.frames" :key="frame.frame_id" class="frame-card" :to="`/projects/${projectId}/calibration?frameIndex=${frame.frame_index}`">
+        <img :src="apiClient.frameImageUrl(projectId, frame.frame_index)" :alt="`Frame ${frame.frame_index}`" />
+        <strong>Frame {{ frame.frame_index }}</strong>
+        <span>{{ frame.timestamp_seconds.toFixed(2) }}s</span>
+      </RouterLink>
+    </div>
+  </section>
+
+  <section v-if="frameSrc" class="card calibration-stage">
+    <div class="calibration-frame-shell">
       <img :src="frameSrc" alt="Calibration frame" @load="onImageLoad" />
       <CalibrationOverlay
         :keypoints="keypoints"
@@ -168,7 +200,10 @@ function continueToTracking() {
         @remove-point="removePoint"
       />
     </div>
-    <VideoPlayer v-else :video-src="project?.videoPreviewUrl" title="Calibration frame" />
+  </section>
+
+  <section v-else-if="!shouldSelectFrame" class="card">
+    <VideoPlayer :video-src="project?.videoPreviewUrl" title="Calibration frame" />
   </section>
 </template>
 
@@ -200,6 +235,32 @@ function continueToTracking() {
 .warning {
   color: #b45309;
   font-weight: 700;
+}
+
+.frame-strip {
+  display: flex;
+  gap: 0.85rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.frame-card {
+  border: 1px solid #dde3ee;
+  border-radius: 12px;
+  color: inherit;
+  display: grid;
+  flex: 0 0 180px;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  text-decoration: none;
+}
+
+.frame-card img {
+  aspect-ratio: 16 / 9;
+  background: #111827;
+  border-radius: 8px;
+  object-fit: cover;
+  width: 100%;
 }
 
 .secondary {
