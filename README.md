@@ -57,8 +57,9 @@ The frontend now supports the real local MP4 path through the backend APIs and c
 5. Mark 4+ manual court keypoints in real image pixel coordinates.
 6. Save calibration so the backend computes a `cv2.findHomography` homography.
 7. Run backend tracking.
-8. View detection / track / projected-track counts and projected 2D court paths returned by the backend. The UI does not substitute demo tracks when backend results are absent.
-9. Refresh or open deep links for the project, calibration frame, or tracking page; the frontend reloads available artifacts from `GET /api/projects/{project_id}/bundle`.
+8. Open Tracking Quality Review to exclude false-positive detections or full tracks before using projected paths.
+9. View detection / track / projected-track counts and projected 2D court paths returned by the backend. The UI does not substitute demo tracks when backend results are absent.
+10. Refresh or open deep links for the project, calibration frame, tracking page, or tracking review page; the frontend reloads available artifacts from backend storage.
 
 Decision Arrow Quiz is available as a small still-frame MVP: build one prompt from an extracted frame, draw decision arrows, save the prompt, and play it back with explanations.
 
@@ -77,6 +78,7 @@ Supported refresh/deep-link recovery paths include:
 - `/projects/:projectId` for project metadata, video metadata, frame counts, calibration status, tracking status, and projected-track status.
 - `/projects/:projectId/calibration?frameIndex=<frame_index>` for opening a saved extracted frame directly and recovering saved calibration keypoints/homography. If the query parameter is omitted after a calibration has been saved, the page restores the calibration frame from the persisted `frame_id`.
 - `/projects/:projectId/tracking` for recovering saved detections, tracks, and projected tracks when tracking has already run.
+- `/projects/:projectId/tracking-review` for loading raw tracking plus any saved manual review patch and cleaned tracking artifacts.
 
 The backend video `uri` is metadata only for hydration. The browser preview still uses a session-local object URL after upload; the frontend intentionally does **not** treat backend file paths as browser-playable video URLs until a proper streaming endpoint is added.
 
@@ -91,7 +93,8 @@ Recommended MVP Demo Path:
 7. Mark 4+ keypoints.
 8. Save calibration.
 9. Run tracking.
-10. View 2D court projection.
+10. Open Tracking Review and save any false-positive exclusions.
+11. View 2D court projection.
 
 For coordinate conventions used by calibration, quiz arrows, homography projection, and court rendering, see [Coordinate System Guide](docs/coordinate-system.md).
 
@@ -180,6 +183,41 @@ curl -X POST "http://localhost:8000/api/projects/${PROJECT_ID}/tracking/run" \
 curl "http://localhost:8000/api/projects/${PROJECT_ID}/tracks"
 ```
 
+
+## 8. Review tracking quality and save cleaned tracks
+
+Tracking Quality Review is a manual QC MVP for removing obvious false positives before relying on 2D court paths. Open `/projects/:projectId/tracking-review` after tracking has run. The review page shows raw detections over the selected frame, labels each bbox with its `track_id`, lists all tracks with point counts, and lets you:
+
+- exclude a single bad detection by `detection_id`;
+- exclude an entire false-positive track by `track_id`;
+- add optional reviewer notes;
+- save the review patch without overwriting `tracking.json`.
+
+Backend artifacts written by `POST /api/projects/{project_id}/tracking/review`:
+
+- `backend/data/projects/{project_id}/tracking_review_patch.json` for the manual patch;
+- `backend/data/projects/{project_id}/tracking_cleaned.json` for cleaned image-space detections/tracks;
+- `backend/data/projects/{project_id}/projected_tracks_cleaned.json` for cleaned projected court paths.
+
+Raw and cleaned outputs are intentionally separate. Use raw tracking for audit/debug comparisons, and use cleaned tracking/projection when downstream analysis should ignore referees, coaches, bench players, or spectators.
+
+Backend API example:
+
+```bash
+curl "http://localhost:8000/api/projects/${PROJECT_ID}/tracking/review"
+
+curl -X POST "http://localhost:8000/api/projects/${PROJECT_ID}/tracking/review" \
+  -H "Content-Type: application/json" \
+  -d '{"excluded_detection_ids":[],"excluded_track_ids":["track-2"],"notes":"false-positive coach near sideline"}'
+```
+
+Tracking QC limitations:
+
+- Manual QC only; there is no automatic team classification, jersey recognition, referee detection, or advanced re-identification.
+- The UI does not decide whether a detection is a player; reviewers must inspect bboxes and tracks.
+- Track aliases are supported by the backend patch schema, but this MVP does not provide an advanced merge/re-id workflow in the UI.
+- Cleaned projected tracks are only as accurate as the original detections/tracks and saved calibration homography.
+
 ## Decision Arrow Quiz MVP
 
 Decision Arrow Quiz is a small still-image MVP for authoring and playing one decision prompt at a time. It uses extracted frame images rather than video playback.
@@ -217,5 +255,6 @@ The following pieces are intentionally minimal:
 - **Video playback source handling**: uploaded videos are previewed with a browser object URL for the current session; backend video file URIs are metadata only unless a streaming endpoint is added.
 - **YouTube downloader**: optional `yt-dlp` support may be unavailable in local environments.
 - **Detection/tracking models**: `detector.py` and `tracker.py` remain deterministic MVP implementations, not production player models.
+- **Tracking QC**: cleanup is reviewer-driven only and does not classify teams, read jerseys, detect referees automatically, or perform advanced re-identification.
 - **Persistence model**: project JSON files are local dev storage, not a production database.
 - **Decision Quiz**: the MVP is limited to one still-frame arrow prompt at a time; no accounts, sessions, video playback freeze, or learned EPV model are included.

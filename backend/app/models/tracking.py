@@ -71,6 +71,15 @@ class RunTrackingResponse(ProjectArtifact):
     tracks: list[PlayerTrack] = Field(default_factory=list)
 
 
+class TrackReviewPatch(BaseModel):
+    """Manual tracking quality-control edits supplied by a reviewer."""
+
+    excluded_detection_ids: list[str] = Field(default_factory=list)
+    excluded_track_ids: list[str] = Field(default_factory=list)
+    track_id_aliases: dict[str, str] = Field(default_factory=dict)
+    notes: str | None = None
+
+
 class ProjectTracksResponse(BaseModel):
     """Combined tracking and projected court-coordinate response."""
 
@@ -80,5 +89,17 @@ class ProjectTracksResponse(BaseModel):
     storage_paths: dict[str, str] = Field(default_factory=dict)
 
 
+class TrackReviewResponse(BaseModel):
+    """Raw tracking, reviewer patch, and cleaned tracking artifacts."""
+
+    project_id: str
+    tracking: RunTrackingResponse
+    review_patch: TrackReviewPatch = Field(default_factory=TrackReviewPatch)
+    cleaned_tracking: RunTrackingResponse | None = None
+    cleaned_projected_tracks: list["ProjectedPlayerTrack"] = Field(default_factory=list)
+    storage_paths: dict[str, str] = Field(default_factory=dict)
+
+
 from .projection import ProjectedPlayerTrack
 ProjectTracksResponse.model_rebuild()
+TrackReviewResponse.model_rebuild()

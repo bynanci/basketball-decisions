@@ -31,6 +31,8 @@ from .tracking import (
     RunTrackingRequest,
     RunTrackingResponse,
     ProjectTracksResponse,
+    TrackReviewPatch,
+    TrackReviewResponse,
     TrackPoint,
 )
 from .video import (
@@ -65,6 +67,8 @@ __all__ = [
     "ProjectedPlayerTrack",
     "ProjectedTrackPoint",
     "ProjectTracksResponse",
+    "TrackReviewPatch",
+    "TrackReviewResponse",
     "CreateQuizPromptRequest",
     "DecisionArrowPoint",
     "QuizAttemptRecord",

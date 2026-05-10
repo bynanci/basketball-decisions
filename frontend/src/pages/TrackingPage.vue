@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
 import Court2DView from '../components/Court2DView.vue'
 import TrackOverlay from '../components/TrackOverlay.vue'
@@ -92,6 +93,7 @@ async function runTracking() {
     <h1>Tracking</h1>
     <p>Project {{ props.projectId }}: run backend detection/tracking, then visualize image-space tracks and projected 2D court paths.</p>
     <button type="button" :disabled="isRunning || isHydrating" @click="runTracking">{{ isRunning ? 'Running…' : 'Run Tracking' }}</button>
+    <RouterLink v-if="hasBackendResult" class="button secondary review-link" :to="`/projects/${projectId}/tracking-review`">Open Tracking Review</RouterLink>
     <p v-if="isCalibrationMissing" class="warning">Tracking can run, but 2D projection needs calibration for meaningful court coordinates.</p>
     <p v-if="!hasBackendResult" class="empty-label">No backend tracking results yet. Click Run Tracking to request detections, tracks, and projected court paths.</p>
     <div class="stats-grid">
@@ -165,6 +167,14 @@ async function runTracking() {
   gap: 0.75rem;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   margin-top: 1rem;
+}
+
+.review-link {
+  margin-left: 0.75rem;
+}
+
+.secondary {
+  background: #475569;
 }
 
 .stats-grid span {

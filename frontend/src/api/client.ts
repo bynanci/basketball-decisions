@@ -250,6 +250,22 @@ export interface ProjectTracksResponse {
   storage_paths: Record<string, string>
 }
 
+export interface TrackReviewPatch {
+  excluded_detection_ids: string[]
+  excluded_track_ids: string[]
+  track_id_aliases?: Record<string, string>
+  notes?: string | null
+}
+
+export interface TrackReviewResponse {
+  project_id: string
+  tracking: RunTrackingResponse
+  review_patch: TrackReviewPatch
+  cleaned_tracking?: RunTrackingResponse | null
+  cleaned_projected_tracks: ProjectedPlayerTrack[]
+  storage_paths: Record<string, string>
+}
+
 export type DecisionActionType = 'PASS' | 'DRIVE' | 'SHOT' | 'RESET' | 'HOLD'
 export type QuizPromptMode = 'STILL_FRAME' | 'VIDEO_FREEZE'
 
@@ -382,6 +398,12 @@ export const apiClient = {
       body: JSON.stringify(payload)
     }),
   getTracks: (projectId: string) => request<ProjectTracksResponse>(`/projects/${projectId}/tracks`),
+  getTrackingReview: (projectId: string) => request<TrackReviewResponse>(`/projects/${projectId}/tracking/review`),
+  saveTrackingReview: (projectId: string, payload: TrackReviewPatch) =>
+    request<TrackReviewResponse>(`/projects/${projectId}/tracking/review`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
   listQuizPrompts: (projectId: string) => request<QuizPrompt[]>(`/projects/${projectId}/quiz-prompts`),
   createQuizPrompt: (projectId: string, payload: CreateQuizPromptRequest) =>
     request<QuizPrompt>(`/projects/${projectId}/quiz-prompts`, {
