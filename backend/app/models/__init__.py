@@ -10,7 +10,17 @@ from .calibration import (
 )
 from .errors import ApiErrorResponse
 from .project import Project, ProjectBundleResponse, ProjectCreateRequest, ProjectCreateResponse
-from .quiz import DecisionAnswer, DecisionOption, FreezeFrame, QuizPrompt
+from .quiz import (
+    CreateQuizPromptRequest,
+    DecisionAnswer,
+    DecisionArrowPoint,
+    DecisionOption,
+    FreezeFrame,
+    QuizAttemptRecord,
+    QuizAttemptRequest,
+    QuizAttemptResponse,
+    QuizPrompt,
+)
 from .projection import ProjectedPlayerTrack, ProjectedTrackPoint
 from .tracking import (
     Detection,
@@ -52,6 +62,11 @@ __all__ = [
     "ProjectedPlayerTrack",
     "ProjectedTrackPoint",
     "ProjectTracksResponse",
+    "CreateQuizPromptRequest",
+    "DecisionArrowPoint",
+    "QuizAttemptRecord",
+    "QuizAttemptRequest",
+    "QuizAttemptResponse",
     "QuizPrompt",
     "RunTrackingRequest",
     "RunTrackingResponse",

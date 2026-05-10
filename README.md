@@ -60,7 +60,7 @@ The frontend now supports the real local MP4 path through the backend APIs and c
 8. View detection / track / projected-track counts and projected 2D court paths returned by the backend. The UI does not substitute demo tracks when backend results are absent.
 9. Refresh or open deep links for the project, calibration frame, or tracking page; the frontend reloads available artifacts from `GET /api/projects/{project_id}/bundle`.
 
-Decision Quiz scoring and quiz-builder workflows are intentionally not part of this MVP milestone.
+Decision Arrow Quiz is available as a small still-frame MVP: build one prompt from an extracted frame, draw decision arrows, save the prompt, and play it back with explanations.
 
 ## Refresh-safe hydration and deep links
 
@@ -177,15 +177,34 @@ curl -X POST "http://localhost:8000/api/projects/${PROJECT_ID}/tracking/run" \
 curl "http://localhost:8000/api/projects/${PROJECT_ID}/tracks"
 ```
 
-## Future: Decision Quiz
+## Decision Arrow Quiz MVP
 
-Decision Quiz is a traceable extension point for future basketball decision prompts, not an MVP-complete feature. The backend model surface is reserved in `backend/app/models/quiz.py`, with future local JSON storage expected at `backend/data/projects/{project_id}/quiz_prompts.json`. The frontend includes a placeholder `DecisionQuizOverlay.vue` that only renders a freeze frame and direction-arrow placeholder.
+Decision Arrow Quiz is a small still-image MVP for authoring and playing one decision prompt at a time. It uses extracted frame images rather than video playback.
 
-The following Decision Quiz work is intentionally deferred beyond the MVP:
+Builder flow:
 
-- Scoring answers or selecting correct decisions.
-- Wiring quiz prompts to coach annotations.
-- Handling multi-player decision contexts.
+1. Open a project that has extracted frames.
+2. Click **Build Quiz** on a frame card.
+3. Draw 2–5 arrows on the frame; arrow start/end coordinates are stored as normalized `0..1` image coordinates.
+4. Label each arrow, choose an action type (`PASS`, `DRIVE`, `SHOT`, `RESET`, or `HOLD`), optionally enter a manual `expected_value`, and write an option explanation.
+5. Mark exactly one option as correct.
+6. Add the question and summary explanation, then save the prompt.
+
+Player flow:
+
+1. Open a saved prompt from **Existing Quiz Prompts** on the project page.
+2. Click one arrow on the freeze frame.
+3. Review the selected option, correct option, correctness, optional expected-value opportunity cost, option explanations, and summary explanation.
+
+Quiz prompts are stored locally under `backend/data/projects/{project_id}/quiz_prompts.json`; attempts are appended to `backend/data/projects/{project_id}/quiz_attempts.json`. This is local development JSON storage, not a production quiz database.
+
+Limitations intentionally kept out of scope for this MVP:
+
+- Still image only; no video freeze playback yet.
+- No EPV model; `expected_value` is manually entered and optional.
+- No multi-question sessions.
+- No user accounts or respondent identity.
+- No coach annotation workflow.
 
 ## Current limitations / TODO functionality
 
@@ -196,4 +215,4 @@ The following pieces are intentionally minimal:
 - **YouTube downloader**: optional `yt-dlp` support may be unavailable in local environments.
 - **Detection/tracking models**: `detector.py` and `tracker.py` remain deterministic MVP implementations, not production player models.
 - **Persistence model**: project JSON files are local dev storage, not a production database.
-- **Decision Quiz**: scoring, prompt authoring, and quiz-builder flows are intentionally deferred.
+- **Decision Quiz**: the MVP is limited to one still-frame arrow prompt at a time; no accounts, sessions, video playback freeze, or learned EPV model are included.

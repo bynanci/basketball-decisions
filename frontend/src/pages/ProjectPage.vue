@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
+import type { QuizPrompt } from '../api/client'
 import Court2DView from '../components/Court2DView.vue'
 import VideoPlayer from '../components/VideoPlayer.vue'
 import { useProjectHydration } from '../composables/useProjectHydration'
@@ -22,9 +23,12 @@ const errorHint = ref('')
 const hasCalibration = computed(() => !!project.value?.calibration)
 const hasTracking = computed(() => !!project.value && (project.value.detections.length > 0 || project.value.tracks.length > 0))
 const hasProjectedTracks = computed(() => (project.value?.projectedTracks.length ?? 0) > 0)
+const quizPrompts = ref<QuizPrompt[]>([])
+const isLoadingQuizPrompts = ref(false)
 
 onMounted(() => {
   void ensureProjectHydrated(props.projectId).catch(() => undefined)
+  void loadQuizPrompts()
 })
 
 function showError(error: unknown) {
@@ -36,6 +40,17 @@ function showError(error: unknown) {
     errorCode.value = 'FRAME_EXTRACTION_ERROR'
     errorMessage.value = 'Could not extract frames.'
     errorHint.value = error instanceof Error ? error.message : ''
+  }
+}
+
+async function loadQuizPrompts() {
+  isLoadingQuizPrompts.value = true
+  try {
+    quizPrompts.value = await apiClient.listQuizPrompts(props.projectId)
+  } catch {
+    quizPrompts.value = []
+  } finally {
+    isLoadingQuizPrompts.value = false
   }
 }
 
@@ -129,9 +144,25 @@ async function extractFrames() {
         <strong>Frame {{ frame.frame_index }}</strong>
         <span>{{ frame.timestamp_seconds.toFixed(2) }}s</span>
         <RouterLink class="button small" :to="`/projects/${projectId}/calibration?frameIndex=${frame.frame_index}`">Use for calibration</RouterLink>
+        <RouterLink class="button small secondary-link" :to="`/projects/${projectId}/quiz-builder?frameIndex=${frame.frame_index}`">Build Quiz</RouterLink>
       </article>
     </div>
   </section>
+
+
+  <section class="card">
+    <h2>Existing Quiz Prompts</h2>
+    <p v-if="isLoadingQuizPrompts" class="muted">Loading quiz prompts…</p>
+    <p v-else-if="!quizPrompts.length" class="muted">No quiz prompts yet. Use Build Quiz on an extracted frame.</p>
+    <div v-else class="quiz-list">
+      <article v-for="prompt in quizPrompts" :key="prompt.prompt_id" class="quiz-card">
+        <strong>{{ prompt.question }}</strong>
+        <span>Frame {{ prompt.frame_index }} · {{ prompt.options.length }} options</span>
+        <RouterLink class="button small" :to="`/projects/${projectId}/quiz/${prompt.prompt_id}`">Play</RouterLink>
+      </article>
+    </div>
+  </section>
+
 </template>
 
 <style scoped>
@@ -172,6 +203,25 @@ async function extractFrames() {
   font-size: 0.85rem;
   padding: 0.5rem 0.65rem;
   text-align: center;
+}
+
+.secondary-link {
+  background: #475569;
+}
+
+.quiz-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.quiz-card {
+  align-items: center;
+  border: 1px solid #dde3ee;
+  border-radius: 12px;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr auto auto;
+  padding: 0.75rem;
 }
 
 .metadata-list {

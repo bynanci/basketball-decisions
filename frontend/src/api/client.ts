@@ -250,6 +250,67 @@ export interface ProjectTracksResponse {
   storage_paths: Record<string, string>
 }
 
+export type DecisionActionType = 'PASS' | 'DRIVE' | 'SHOT' | 'RESET' | 'HOLD'
+
+export interface DecisionArrowPoint {
+  x: number
+  y: number
+}
+
+export interface DecisionQuizOption {
+  option_id: string
+  label: string
+  action_type: DecisionActionType
+  start: DecisionArrowPoint
+  end: DecisionArrowPoint
+  expected_value?: number | null
+  is_correct: boolean
+  explanation: string
+}
+
+export interface QuizPrompt {
+  project_id: string
+  prompt_id: string
+  question: string
+  frame_id: string
+  frame_index: number
+  timestamp_seconds: number
+  image_url?: string | null
+  image_path?: string | null
+  options: DecisionQuizOption[]
+  explanation: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateQuizPromptRequest {
+  question: string
+  frame_id: string
+  frame_index: number
+  timestamp_seconds: number
+  image_url?: string | null
+  image_path?: string | null
+  options: DecisionQuizOption[]
+  explanation: string
+}
+
+export interface QuizAttemptRequest {
+  selected_option_id: string
+}
+
+export interface QuizAttemptResponse {
+  prompt_id: string
+  selected_option_id: string
+  correct_option_id: string
+  is_correct: boolean
+  selected_expected_value?: number | null
+  correct_expected_value?: number | null
+  opportunity_cost?: number | null
+  selected_explanation: string
+  correct_explanation: string
+  summary_explanation: string
+}
+
 export function normalizeApiErrorPayload(status: number, payload?: Partial<ApiErrorResponse> | null): ApiErrorResponse {
   return {
     code: payload?.code ?? 'HTTP_ERROR',
@@ -308,5 +369,17 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
-  getTracks: (projectId: string) => request<ProjectTracksResponse>(`/projects/${projectId}/tracks`)
+  getTracks: (projectId: string) => request<ProjectTracksResponse>(`/projects/${projectId}/tracks`),
+  listQuizPrompts: (projectId: string) => request<QuizPrompt[]>(`/projects/${projectId}/quiz-prompts`),
+  createQuizPrompt: (projectId: string, payload: CreateQuizPromptRequest) =>
+    request<QuizPrompt>(`/projects/${projectId}/quiz-prompts`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+  getQuizPrompt: (projectId: string, promptId: string) => request<QuizPrompt>(`/projects/${projectId}/quiz-prompts/${promptId}`),
+  submitQuizAttempt: (projectId: string, promptId: string, payload: QuizAttemptRequest) =>
+    request<QuizAttemptResponse>(`/projects/${projectId}/quiz-prompts/${promptId}/attempts`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
 }
