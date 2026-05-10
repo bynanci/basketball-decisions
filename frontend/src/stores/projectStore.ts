@@ -7,6 +7,7 @@ import type {
   PlayerTrack,
   ProjectBundleResponse,
   ProjectedPlayerTrack,
+  RunTrackingResponse,
   VideoAsset
 } from '../api/client'
 
@@ -27,6 +28,8 @@ export interface ProjectRecord {
   detections: Detection[]
   tracks: PlayerTrack[]
   projectedTracks: ProjectedPlayerTrack[]
+  trackingPipelineOutput?: RunTrackingResponse['pipeline_output'] | null
+  trackingDebugMetadata?: RunTrackingResponse['debug_metadata'] | null
 }
 
 interface ProjectState {
@@ -49,7 +52,9 @@ function createEmptyProject(input: Omit<Partial<ProjectRecord>, 'frames' | 'cali
     calibrationPairs: [],
     detections: [],
     tracks: [],
-    projectedTracks: []
+    projectedTracks: [],
+    trackingPipelineOutput: null,
+    trackingDebugMetadata: null
   }
 }
 
@@ -96,12 +101,23 @@ export const useProjectStore = defineStore('projectStore', {
       project.calibration = calibration
       project.calibrationPairs = calibration.keypoint_pairs
     },
-    setTracks(projectId: string, payload: { detections?: Detection[]; tracks?: PlayerTrack[]; projectedTracks?: ProjectedPlayerTrack[] }) {
+    setTracks(
+      projectId: string,
+      payload: {
+        detections?: Detection[]
+        tracks?: PlayerTrack[]
+        projectedTracks?: ProjectedPlayerTrack[]
+        pipelineOutput?: RunTrackingResponse['pipeline_output'] | null
+        debugMetadata?: RunTrackingResponse['debug_metadata'] | null
+      }
+    ) {
       const project = this.getProject(projectId)
       if (!project) return
       project.detections = payload.detections ?? project.detections
       project.tracks = payload.tracks ?? project.tracks
       project.projectedTracks = payload.projectedTracks ?? project.projectedTracks
+      project.trackingPipelineOutput = payload.pipelineOutput ?? project.trackingPipelineOutput
+      project.trackingDebugMetadata = payload.debugMetadata ?? project.trackingDebugMetadata
     },
     hydrateProjectFromBundle(bundle: ProjectBundleResponse) {
       const projectId = bundle.project.project_id
@@ -121,6 +137,8 @@ export const useProjectStore = defineStore('projectStore', {
       project.detections = bundle.tracking?.detections ?? project.detections ?? []
       project.tracks = bundle.tracking?.tracks ?? project.tracks ?? []
       project.projectedTracks = bundle.projected_tracks?.projected_tracks ?? project.projectedTracks ?? []
+      project.trackingPipelineOutput = bundle.tracking?.pipeline_output ?? project.trackingPipelineOutput ?? null
+      project.trackingDebugMetadata = bundle.tracking?.debug_metadata ?? project.trackingDebugMetadata ?? null
 
       if (!existing) {
         this.projects.push(project)

@@ -45,6 +45,8 @@ function bundle(overrides: Partial<ProjectBundleResponse> = {}): ProjectBundleRe
     },
     tracking: {
       project_id: 'project-1',
+      pipeline_output: { detector_mode: 'hydrated-detector' },
+      debug_metadata: { detector: { mode: 'hydrated-debug-detector' } },
       detections: [
         {
           detection_id: 'detection-1',
@@ -88,6 +90,8 @@ describe('projectStore.hydrateProjectFromBundle', () => {
     expect(project?.detections).toHaveLength(1)
     expect(project?.tracks).toHaveLength(1)
     expect(project?.projectedTracks).toHaveLength(1)
+    expect(project?.trackingPipelineOutput?.detector_mode).toBe('hydrated-detector')
+    expect(project?.trackingDebugMetadata?.detector).toEqual({ mode: 'hydrated-debug-detector' })
   })
 
   it('preserves an existing browser-only video preview URL', () => {
@@ -99,7 +103,20 @@ describe('projectStore.hydrateProjectFromBundle', () => {
     expect(store.getProject('project-1')?.videoPreviewUrl).toBe('blob:local-preview')
   })
 
-  it('preserves existing tracking arrays when optional tracking artifacts are missing', () => {
+  it('updates tracking metadata with run results', () => {
+    const store = useProjectStore()
+    store.addProject({ id: 'project-1', name: 'Local Project', source: 'upload' })
+
+    store.setTracks('project-1', {
+      pipelineOutput: { detector_mode: 'run-detector' },
+      debugMetadata: { detector: { mode: 'run-debug-detector' } }
+    })
+
+    expect(store.getProject('project-1')?.trackingPipelineOutput?.detector_mode).toBe('run-detector')
+    expect(store.getProject('project-1')?.trackingDebugMetadata?.detector).toEqual({ mode: 'run-debug-detector' })
+  })
+
+  it('preserves existing tracking arrays and metadata when optional tracking artifacts are missing', () => {
     const store = useProjectStore()
     store.addProject({ id: 'project-1', name: 'Local Project', source: 'upload' })
     store.setTracks('project-1', {
@@ -115,7 +132,9 @@ describe('projectStore.hydrateProjectFromBundle', () => {
         }
       ],
       tracks: [{ track_id: 'existing-track', points: [], metadata: {} }],
-      projectedTracks: [{ track_id: 'existing-projected-track', points: [], metadata: {} }]
+      projectedTracks: [{ track_id: 'existing-projected-track', points: [], metadata: {} }],
+      pipelineOutput: { detector_mode: 'existing-detector' },
+      debugMetadata: { detector: { mode: 'existing-debug-detector' } }
     })
 
     store.hydrateProjectFromBundle(bundle({ tracking: null, projected_tracks: null }))
@@ -123,6 +142,8 @@ describe('projectStore.hydrateProjectFromBundle', () => {
     expect(store.getProject('project-1')?.detections).toHaveLength(1)
     expect(store.getProject('project-1')?.tracks).toHaveLength(1)
     expect(store.getProject('project-1')?.projectedTracks).toHaveLength(1)
+    expect(store.getProject('project-1')?.trackingPipelineOutput?.detector_mode).toBe('existing-detector')
+    expect(store.getProject('project-1')?.trackingDebugMetadata?.detector).toEqual({ mode: 'existing-debug-detector' })
   })
 
 })

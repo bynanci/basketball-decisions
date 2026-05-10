@@ -63,6 +63,32 @@ describe('useProjectHydration', () => {
     expect(hydrationErrorHint.value).toBe('Create the project first.')
   })
 
+
+  it('forced hydration refreshes cached project artifacts for route mounts', async () => {
+    vi.spyOn(apiClient, 'getProjectBundle').mockResolvedValue({
+      ...bundle(),
+      frames: {
+        schema_version: '1.0',
+        project_id: 'project-1',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        original_input: {},
+        pipeline_output: {},
+        debug_metadata: {},
+        request: { project_id: 'project-1', video_asset_id: 'video-1' },
+        frames: [{ frame_id: 'frame-1', frame_index: 9, timestamp_seconds: 3, image_path: '/tmp/frame.jpg', metadata: {} }]
+      }
+    })
+    const store = useProjectStore()
+    store.addProject({ id: 'project-1', name: 'Cached Project', source: 'upload' })
+    const { ensureProjectHydrated } = useProjectHydration()
+
+    await ensureProjectHydrated('project-1', { force: true })
+
+    expect(apiClient.getProjectBundle).toHaveBeenCalledWith('project-1')
+    expect(store.getProject('project-1')?.frames[0]?.frame_index).toBe(9)
+  })
+
   it('skips backend fetch for cached basic metadata unless forced', async () => {
     const getBundle = vi.spyOn(apiClient, 'getProjectBundle').mockResolvedValue(bundle())
     const store = useProjectStore()
