@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
 import type { QuizAttemptResponse, QuizPrompt } from '../api/client'
@@ -21,6 +21,9 @@ const selectedOptionId = ref<string | null>(null)
 const isLoadingPrompt = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
+const promptStartedAt = ref<number | null>(null)
+const timerIntervalId = ref<number | null>(null)
+const remainingMs = ref<number | null>(null)
 const videoElement = ref<HTMLVideoElement | null>(null)
 const isVideoAtFreeze = ref(false)
 const videoPlaybackMessage = ref('')
@@ -31,6 +34,8 @@ const freezeTime = computed(() => prompt.value?.freeze_frame_seconds ?? prompt.v
 const clipStart = computed(() => Math.max(0, prompt.value?.clip_start_seconds ?? Math.max(0, freezeTime.value - 3)))
 const isVideoPrompt = computed(() => prompt.value?.mode === 'VIDEO_FREEZE')
 const isAnswered = computed(() => result.value !== null)
+const isQuickDecision = computed(() => prompt.value?.question_mode === 'QUICK_DECISION')
+const isRoleRead = computed(() => prompt.value?.question_mode === 'ROLE_READ')
 const canUseVideo = computed(() => isVideoPrompt.value && !videoSourceFailed.value)
 const shouldShowArrows = computed(() => !canUseVideo.value || isVideoAtFreeze.value || isAnswered.value)
 const fallbackMessage = computed(() =>
@@ -44,10 +49,25 @@ const correctOptionId = computed(() => result.value?.correct_option_id ?? null)
 const incorrectOptionId = computed(() => (result.value && !result.value.is_correct ? result.value.selected_option_id : null))
 const canSelectArrow = computed(() => !!prompt.value && shouldShowArrows.value && !isSubmitting.value && !isAnswered.value)
 const roleInstruction = computed(() => prompt.value?.role_instruction?.trim() ?? '')
+const courtRoleLabel = computed(() => (prompt.value ? formatLabel(prompt.value.court_role_target) : ''))
+const situationLabel = computed(() => (prompt.value ? formatLabel(prompt.value.situation_type) : ''))
+const roleReadAttentionPoints = computed(() => {
+  if (!prompt.value) return []
+  return [
+    `Read the floor as the ${courtRoleLabel.value}.`,
+    `Prioritize cues tied to ${situationLabel.value}.`,
+    'Choose the arrow that best matches your role responsibility.'
+  ]
+})
+const timerSecondsLabel = computed(() => (remainingMs.value === null ? '' : (Math.max(0, remainingMs.value) / 1000).toFixed(1)))
 
 onMounted(async () => {
   await ensureProjectHydrated(props.projectId).catch(() => undefined)
   await loadPrompt()
+})
+
+onBeforeUnmount(() => {
+  stopTimer()
 })
 
 async function loadPrompt() {
@@ -55,6 +75,7 @@ async function loadPrompt() {
   errorMessage.value = ''
   try {
     prompt.value = await apiClient.getQuizPrompt(props.projectId, props.promptId)
+    resetAttemptClock()
     if (prompt.value.mode === 'VIDEO_FREEZE') {
       await nextTick()
       startVideoClip()
@@ -106,17 +127,78 @@ function replayClip() {
   startVideoClip()
 }
 
+function formatLabel(value: string) {
+  return value
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
+function stopTimer() {
+  if (timerIntervalId.value !== null) {
+    window.clearInterval(timerIntervalId.value)
+    timerIntervalId.value = null
+  }
+}
+
+function responseTimeMs() {
+  return promptStartedAt.value === null ? null : Math.max(0, Date.now() - promptStartedAt.value)
+}
+
+function resetAttemptClock() {
+  stopTimer()
+  promptStartedAt.value = Date.now()
+  remainingMs.value = prompt.value?.question_mode === 'QUICK_DECISION' ? prompt.value.time_limit_ms ?? null : null
+  if (prompt.value?.question_mode === 'QUICK_DECISION' && prompt.value.time_limit_ms) {
+    timerIntervalId.value = window.setInterval(() => {
+      if (!prompt.value || result.value || isSubmitting.value) {
+        stopTimer()
+        return
+      }
+      const elapsed = responseTimeMs() ?? 0
+      remainingMs.value = Math.max(0, (prompt.value.time_limit_ms ?? 0) - elapsed)
+      if (remainingMs.value <= 0) {
+        void submitTimeout()
+      }
+    }, 100)
+  }
+}
+
+async function submitTimeout() {
+  if (!prompt.value || isSubmitting.value || result.value) return
+  stopTimer()
+  isSubmitting.value = true
+  errorMessage.value = ''
+  selectedOptionId.value = null
+  try {
+    result.value = await apiClient.submitQuizAttempt(props.projectId, prompt.value.prompt_id, {
+      selected_option_id: null,
+      user_role: roleStore.roleProfile?.userRole ?? null,
+      response_time_ms: prompt.value.time_limit_ms ?? responseTimeMs(),
+      timed_out: true
+    })
+  } catch (error) {
+    errorMessage.value = isApiClientError(error) ? error.message : 'Could not submit timeout attempt.'
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
 async function submitAttempt(optionId: string) {
   if (!prompt.value || isSubmitting.value || result.value || !shouldShowArrows.value) return
+  stopTimer()
   selectedOptionId.value = optionId
+  const elapsedMs = responseTimeMs()
   isSubmitting.value = true
   errorMessage.value = ''
   try {
     result.value = await apiClient.submitQuizAttempt(props.projectId, prompt.value.prompt_id, {
       selected_option_id: optionId,
-      user_role: roleStore.roleProfile?.userRole ?? null
+      user_role: roleStore.roleProfile?.userRole ?? null,
+      response_time_ms: elapsedMs,
+      timed_out: false
     })
-    selectedOptionId.value = result.value.selected_option_id
+    selectedOptionId.value = result.value.selected_option_id ?? null
   } catch (error) {
     errorMessage.value = isApiClientError(error) ? error.message : 'Could not submit quiz attempt.'
   } finally {
@@ -128,6 +210,7 @@ function retry() {
   result.value = null
   selectedOptionId.value = null
   errorMessage.value = ''
+  resetAttemptClock()
 }
 </script>
 
@@ -147,7 +230,21 @@ function retry() {
     <div class="card prompt-card">
       <div class="question-block">
         <span class="question-kicker">Question</span>
-        <p v-if="roleInstruction" class="role-instruction">{{ roleInstruction }}</p>
+        <div v-if="isRoleRead" class="role-read-panel">
+          <div class="role-read-header">
+            <span class="role-badge">{{ courtRoleLabel }}</span>
+            <strong>Role read</strong>
+          </div>
+          <p v-if="roleInstruction" class="role-instruction prominent">{{ roleInstruction }}</p>
+          <ul>
+            <li v-for="point in roleReadAttentionPoints" :key="point">{{ point }}</li>
+          </ul>
+        </div>
+        <p v-else-if="roleInstruction" class="role-instruction">{{ roleInstruction }}</p>
+        <div v-if="isQuickDecision" class="timer-banner" role="timer" aria-live="polite">
+          <span>Quick decision</span>
+          <strong>{{ timerSecondsLabel }}s</strong>
+        </div>
         <h2>{{ prompt.question }}</h2>
         <p v-if="!isAnswered" class="instruction">{{ canUseVideo && !isVideoAtFreeze ? 'Watch the clip until it freezes, then click the best decision arrow.' : 'Click the arrow that represents the best decision.' }}</p>
         <p v-else class="instruction">The correct arrow is highlighted in green. A wrong selected arrow is highlighted in red.</p>
@@ -198,7 +295,7 @@ function retry() {
       />
       <div v-else class="pending-result" aria-live="polite">
         <h2>Ready to answer</h2>
-        <p class="muted">Select one arrow to create an attempt and reveal correctness, expected value details, and coaching explanations.</p>
+        <p class="muted">Select one arrow to create an attempt and reveal correctness, timing details, expected value details, and coaching explanations.</p>
         <ul class="option-list">
           <li v-for="option in prompt.options" :key="option.option_id" :class="{ selected: option.option_id === selectedOptionId }">
             <strong>{{ option.option_id }}</strong>
@@ -248,6 +345,66 @@ function retry() {
   font-weight: 700;
   margin: 0.75rem 0;
   padding: 0.75rem 1rem;
+}
+
+.role-read-panel {
+  background: #eef2ff;
+  border: 1px solid #a5b4fc;
+  border-radius: 14px;
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  padding: 1rem;
+}
+
+.role-read-header {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.role-badge {
+  background: #312e81;
+  border-radius: 999px;
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.35rem 0.7rem;
+}
+
+.role-read-panel ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.role-instruction.prominent {
+  border-left-width: 6px;
+  font-size: 1.02rem;
+  margin: 0;
+}
+
+.timer-banner {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 12px;
+  color: #9a3412;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+}
+
+.timer-banner span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.timer-banner strong {
+  font-size: 1.35rem;
 }
 
 .question-kicker {

@@ -202,6 +202,8 @@ def test_can_create_valid_prompt(client: TestClient, tmp_path: Path) -> None:
     assert prompt["project_id"] == "project-1"
     assert prompt["prompt_id"]
     assert prompt["options"][1]["is_correct"] is True
+    assert prompt["question_mode"] == "FREEZE_FRAME"
+    assert prompt["time_limit_ms"] is None
     assert (tmp_path / "project-1" / "quiz_prompts.json").exists()
 
 
@@ -268,6 +270,8 @@ def test_attempt_returns_correctness_and_explanations(client: TestClient, tmp_pa
         "selected_role_feedback": "Explanation for A",
         "correct_role_feedback": "Explanation for C",
         "summary_explanation": "Hit the cutter for the highest-value look.",
+        "response_time_ms": None,
+        "timed_out": False,
     }
     assert (tmp_path / "project-1" / "quiz_attempts.json").exists()
 
@@ -368,6 +372,52 @@ def test_attempt_opportunity_cost_cannot_be_negative(client: TestClient, tmp_pat
     assert attempt["opportunity_cost"] == 0
     assert attempt["score"] == 100
     assert attempt["scoring_mode"] == "EXPECTED_VALUE"
+
+
+def test_quick_decision_prompt_requires_positive_time_limit(client: TestClient, tmp_path: Path) -> None:
+    write_project(tmp_path)
+    payload = valid_prompt_payload()
+    payload["question_mode"] = "QUICK_DECISION"
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "REQUEST_VALIDATION_ERROR"
+
+
+def test_quick_decision_prompt_persists_time_limit(client: TestClient, tmp_path: Path) -> None:
+    write_project(tmp_path)
+    payload = valid_prompt_payload()
+    payload.update({"question_mode": "QUICK_DECISION", "time_limit_ms": 4500})
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
+
+    assert response.status_code == 200
+    prompt = response.json()
+    assert prompt["question_mode"] == "QUICK_DECISION"
+    assert prompt["time_limit_ms"] == 4500
+
+
+def test_timeout_attempt_captures_timing_without_selected_option(client: TestClient, tmp_path: Path) -> None:
+    payload = valid_prompt_payload()
+    payload.update({"question_mode": "QUICK_DECISION", "time_limit_ms": 3000})
+    prompt = create_prompt(client, tmp_path, payload)
+
+    response = client.post(
+        f"/api/projects/project-1/quiz-prompts/{prompt['prompt_id']}/attempts",
+        json={"selected_option_id": None, "response_time_ms": 3000, "timed_out": True},
+    )
+
+    assert response.status_code == 200
+    attempt = response.json()
+    assert attempt["selected_option_id"] is None
+    assert attempt["correct_option_id"] == "C"
+    assert attempt["is_correct"] is False
+    assert attempt["score"] == 0
+    assert attempt["selected_explanation"] == "Time expired"
+    assert attempt["selected_role_feedback"] == "Time expired"
+    assert attempt["response_time_ms"] == 3000
+    assert attempt["timed_out"] is True
 
 
 def test_create_video_freeze_prompt_persists_playback_fields(client: TestClient, tmp_path: Path) -> None:

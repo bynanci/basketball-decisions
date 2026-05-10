@@ -30,9 +30,13 @@ const hasEpvComparison = computed(() => epvOptions.value.length > 0 && epvOption
 const userRoleLabel = computed(() => formatUserRole(roleStore.roleProfile?.userRole ?? 'selected role'))
 const selectedRoleFeedback = computed(() => props.result.selected_role_feedback?.trim() || props.result.selected_explanation || 'No feedback available.')
 const correctRoleFeedback = computed(() => props.result.correct_role_feedback?.trim() || props.result.correct_explanation || 'No feedback available.')
+const responseTimeLabel = computed(() => {
+  if (!isFiniteNumber(props.result.response_time_ms)) return 'Not captured'
+  return `${(Number(props.result.response_time_ms) / 1000).toFixed(2)}s`
+})
 
-function formatOption(option: DecisionQuizOption | null | undefined, fallbackOptionId: string) {
-  if (!option) return fallbackOptionId
+function formatOption(option: DecisionQuizOption | null | undefined, fallbackOptionId: string | null | undefined) {
+  if (!option) return fallbackOptionId || 'No answer selected'
   const label = option.label.trim() || 'Decision'
   return `${option.option_id} — ${label}`
 }
@@ -49,8 +53,8 @@ function formatUserRole(value: string) {
   <section class="quiz-result-panel" aria-live="polite">
     <header :class="['result-banner', result.is_correct ? 'correct' : 'incorrect']">
       <span class="result-kicker">Result</span>
-      <strong>{{ result.is_correct ? 'Correct' : 'Not quite' }}</strong>
-      <span>{{ result.is_correct ? 'You selected the best decision.' : 'Review the best available decision below.' }}</span>
+      <strong>{{ result.timed_out ? 'Time expired' : result.is_correct ? 'Correct' : 'Not quite' }}</strong>
+      <span>{{ result.timed_out ? 'The countdown ended before an answer was selected.' : result.is_correct ? 'You selected the best decision.' : 'Review the best available decision below.' }}</span>
     </header>
 
     <dl class="result-metrics">
@@ -65,6 +69,14 @@ function formatUserRole(value: string) {
       <div>
         <dt>Selected option</dt>
         <dd>{{ selectedOptionLabel }}</dd>
+      </div>
+      <div>
+        <dt>Timed out</dt>
+        <dd>{{ result.timed_out ? 'true' : 'false' }}</dd>
+      </div>
+      <div>
+        <dt>Response time</dt>
+        <dd>{{ responseTimeLabel }}</dd>
       </div>
       <div>
         <dt>Correct option</dt>

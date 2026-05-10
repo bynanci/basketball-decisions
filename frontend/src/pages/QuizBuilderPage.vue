@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
-import type { CourtRoleTarget, DecisionActionType, DecisionArrowPoint, DecisionQuizOption, QuizPromptMode, SituationType } from '../api/client'
+import type { CourtRoleTarget, DecisionActionType, DecisionArrowPoint, DecisionQuizOption, QuizPromptMode, QuizQuestionMode, SituationType } from '../api/client'
 import ArrowDrawingOverlay from '../components/ArrowDrawingOverlay.vue'
 import { useProjectHydration } from '../composables/useProjectHydration'
 import { useProjectStore } from '../stores/projectStore'
@@ -23,6 +23,8 @@ const courtRoleTarget = ref<CourtRoleTarget | ''>(roleStore.roleProfile?.courtRo
 const situationType = ref<SituationType | ''>(roleStore.roleProfile?.situationTypes[0] ?? '')
 const roleInstruction = ref('')
 const mode = ref<QuizPromptMode>('STILL_FRAME')
+const questionMode = ref<QuizQuestionMode>('FREEZE_FRAME')
+const timeLimitMs = ref<number | null>(5000)
 const clipStartSec = ref<number | null>(null)
 const freezeFrameSec = ref<number | null>(null)
 const clipEndSec = ref<number | null>(null)
@@ -31,6 +33,11 @@ const selectedOptionId = ref<string | null>(null)
 const isSaving = ref(false)
 const errorMessage = ref('')
 const actionTypes: DecisionActionType[] = ['PASS', 'DRIVE', 'SHOT', 'RESET', 'HOLD']
+const questionModes: Array<{ value: QuizQuestionMode; label: string; description: string }> = [
+  { value: 'FREEZE_FRAME', label: 'Freeze frame', description: 'No time limit; learners can study the frame and arrows.' },
+  { value: 'QUICK_DECISION', label: 'Quick decision', description: 'Learners must answer before the countdown expires.' },
+  { value: 'ROLE_READ', label: 'Role read', description: 'Emphasizes role instruction and role-specific attention points.' }
+]
 const roleFeedbackFields = [
   { key: 'coach', label: 'Coach feedback', placeholder: 'Use this as a skip-pass recognition drill.' },
   { key: 'player', label: 'Player feedback', placeholder: 'Next time, check the low man before committing to the drive.' },
@@ -57,6 +64,7 @@ const validationErrors = computed(() => {
   if (options.value.some((option) => !isNormalizedPoint(option.start) || !isNormalizedPoint(option.end))) errors.push('Every arrow must stay within normalized image coordinates.')
   if (options.value.some((option) => option.expected_value !== null && !Number.isFinite(option.expected_value))) errors.push('Expected values must be valid numbers when provided.')
   if (options.value.some((option) => !option.label.trim() || !option.explanation.trim())) errors.push('Every option needs a label and explanation.')
+  if (questionMode.value === 'QUICK_DECISION' && (timeLimitMs.value === null || !Number.isFinite(timeLimitMs.value) || timeLimitMs.value <= 0)) errors.push('Quick decision prompts require a positive time limit.')
   if (effectiveMode.value === 'VIDEO_FREEZE') {
     const freezeAt = freezeFrameSec.value ?? selectedFrame.value?.timestamp_seconds ?? null
     if (freezeAt === null || !Number.isFinite(freezeAt)) errors.push('Freeze frame time is required for video mode.')
@@ -183,6 +191,8 @@ async function savePrompt() {
       freeze_frame_seconds: effectiveMode.value === 'VIDEO_FREEZE' ? freezeFrameSec.value : null,
       clip_end_seconds: effectiveMode.value === 'VIDEO_FREEZE' ? clipEndSec.value : null,
       mode: effectiveMode.value,
+      question_mode: questionMode.value,
+      time_limit_ms: questionMode.value === 'QUICK_DECISION' ? timeLimitMs.value : null,
       options: sanitizedOptions,
       explanation: explanation.value.trim()
     })
@@ -254,9 +264,22 @@ async function savePrompt() {
         <textarea v-model="roleInstruction" placeholder="You are the ball handler. Read the help defender and choose the best next action."></textarea>
       </label>
 
+      <h2>Question mode</h2>
+      <label>
+        Interaction style
+        <select v-model="questionMode">
+          <option v-for="item in questionModes" :key="item.value" :value="item.value">{{ item.label }}</option>
+        </select>
+      </label>
+      <p class="muted">{{ questionModes.find((item) => item.value === questionMode)?.description }}</p>
+      <label v-if="questionMode === 'QUICK_DECISION'">
+        Time limit (milliseconds)
+        <input v-model.number="timeLimitMs" type="number" min="1" step="100" />
+      </label>
+
       <h2>Playback mode</h2>
       <label>
-        Mode
+        Media playback
         <select v-model="mode">
           <option value="STILL_FRAME">Still frame</option>
           <option value="VIDEO_FREEZE" :disabled="!hasVideoSource">Video freeze</option>
