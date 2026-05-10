@@ -156,6 +156,24 @@ def _training_eligible_project_dirs() -> tuple[list[Path], list[SkippedProject]]
     return eligible, skipped
 
 
+
+
+def _increment_distribution(distribution: dict[str, int], key: object) -> None:
+    distribution[str(key)] = distribution.get(str(key), 0) + 1
+
+
+def _source_distributions(project_dirs: Iterable[Path]) -> tuple[dict[str, int], dict[str, int]]:
+    license_distribution: dict[str, int] = {}
+    usage_distribution: dict[str, int] = {}
+    for directory in project_dirs:
+        source_path = directory / "source.json"
+        if not source_path.exists():
+            continue
+        source = VideoSourceRecord.model_validate(read_json(source_path))
+        _increment_distribution(license_distribution, source.license_type)
+        _increment_distribution(usage_distribution, source.usage_scope)
+    return dict(sorted(license_distribution.items())), dict(sorted(usage_distribution.items()))
+
 def _tracking_path(directory: Path) -> Path:
     return directory / "tracking.json"
 
@@ -531,6 +549,8 @@ def curate_decision_dataset() -> DatasetManifest:
     created_at = utc_now()
 
     eligible_dirs, skipped_projects = _training_eligible_project_dirs()
+    source_license_distribution, usage_scope_distribution = _source_distributions(eligible_dirs)
+
     for directory in eligible_dirs:
         prompts = _read_json_list(directory / "quiz_prompts.json", _PROMPTS_ADAPTER)
         attempts = _read_json_list(directory / "quiz_attempts.json", _ATTEMPTS_ADAPTER)
@@ -620,6 +640,8 @@ def export_recognition_dataset() -> DatasetManifest:
 
     eligible_dirs, skipped_projects = _training_eligible_project_dirs()
 
+    source_license_distribution, usage_scope_distribution = _source_distributions(eligible_dirs)
+
     for directory in eligible_dirs:
         tracking_path = directory / "tracking.json"
         review_path = directory / "tracking_review_patch.json"
@@ -691,6 +713,10 @@ def export_recognition_dataset() -> DatasetManifest:
         skipped_projects=skipped_projects,
         exported_at=created_at,
         storage_paths=_dataset_storage_paths("recognition"),
+        source_project_ids=sorted(project_ids),
+        skipped_project_ids=[project.project_id for project in skipped_projects],
+        source_license_distribution=source_license_distribution,
+        usage_scope_distribution=usage_scope_distribution,
         notes="Recognition labels are derived from tracking review exclusions plus heuristic valid-track labels.",
     )
     write_json_model(directory / "dataset_manifest.json", manifest)
@@ -707,6 +733,7 @@ def export_decision_dataset() -> DatasetManifest:
     created_at = utc_now()
 
     eligible_dirs, skipped_projects = _training_eligible_project_dirs()
+    source_license_distribution, usage_scope_distribution = _source_distributions(eligible_dirs)
 
     for directory in eligible_dirs:
         prompts = _read_json_list(directory / "quiz_prompts.json", _PROMPTS_ADAPTER)
@@ -760,6 +787,10 @@ def export_decision_dataset() -> DatasetManifest:
         skipped_projects=skipped_projects,
         exported_at=created_at,
         storage_paths=_dataset_storage_paths("decision"),
+        source_project_ids=sorted(prompt_project_ids | label_project_ids),
+        skipped_project_ids=[project.project_id for project in skipped_projects],
+        source_license_distribution=source_license_distribution,
+        usage_scope_distribution=usage_scope_distribution,
         notes="Decision samples come from quiz prompts; labels come from quiz attempts.",
     )
     write_json_model(directory / "dataset_manifest.json", manifest)

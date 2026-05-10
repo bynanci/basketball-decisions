@@ -157,3 +157,21 @@ def test_recognition_export_includes_owned_training_source(client: TestClient, t
     assert manifest["included_project_count"] == 1
     assert manifest["skipped_project_count"] == 0
     assert manifest["sample_count"] == 1
+
+
+def test_seed_candidate_sources_creates_global_registry(client: TestClient) -> None:
+    response = client.post("/api/sources/seed-candidates")
+
+    assert response.status_code == 200
+    sources = response.json()
+    names = {source["name"] for source in sources}
+    assert "BARD: Basketball Action Recognition Dataset" in names
+    assert "E-BARD: Extended Basketball Action Recognition Dataset" in names
+    assert "SpaceJam / Basketball Action Recognition" in names
+    assert "YouTube / NBA / EuroLeague / NCAA Highlights" in names
+    assert any(source["allowed_for_training"] is True for source in sources if source["source_id"] == "candidate-bard")
+    assert any(source["usage_scope"] == "REFERENCE_ONLY" for source in sources if source["source_type"] == "YOUTUBE")
+
+    list_response = client.get("/api/sources")
+    assert list_response.status_code == 200
+    assert len(list_response.json()) == 4

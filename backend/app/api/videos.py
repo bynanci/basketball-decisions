@@ -32,6 +32,7 @@ def _write_upload_source(directory: Path, project_id: str, asset_id: str, filena
     source = VideoSourceRecord(
         project_id=project_id,
         source_id=asset_id,
+        name=filename or "User upload",
         source_type=SourceType.UPLOAD,
         title=filename,
         license_type=SourceLicenseType.OWNED,
@@ -57,6 +58,7 @@ def _write_youtube_source(
     source = VideoSourceRecord(
         project_id=project_id,
         source_id=asset_id,
+        name=title or "YouTube reference",
         source_type=SourceType.YOUTUBE,
         source_url=payload.url,
         title=title,

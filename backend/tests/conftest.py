@@ -8,7 +8,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api import common, local_lab, projects  # noqa: E402
+from app.api import common, local_lab, projects, sources  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -18,4 +18,5 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(projects, "DATA_DIR", tmp_path)
     monkeypatch.setattr(local_lab, "DATA_DIR", tmp_path)
     monkeypatch.setattr(local_lab, "DATASETS_DIR", tmp_path / "datasets")
+    monkeypatch.setattr(sources, "SOURCE_REGISTRY_PATH", tmp_path / "source_registry.json")
     return TestClient(app)
