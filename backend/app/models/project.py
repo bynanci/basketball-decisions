@@ -7,6 +7,9 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from .base import ProjectArtifact
+from .calibration import Calibration
+from .tracking import ProjectTracksResponse, RunTrackingResponse
+from .video import ExtractFramesResponse, VideoAsset
 
 
 class Project(ProjectArtifact):
@@ -30,3 +33,14 @@ class ProjectCreateResponse(BaseModel):
 
     project: Project
     storage_path: str
+
+
+class ProjectBundleResponse(BaseModel):
+    """Refresh-safe bundle of a project and any persisted local artifacts."""
+
+    project: Project
+    video: VideoAsset | None = None
+    frames: ExtractFramesResponse | None = None
+    calibration: Calibration | None = None
+    tracking: RunTrackingResponse | None = None
+    projected_tracks: ProjectTracksResponse | None = None
