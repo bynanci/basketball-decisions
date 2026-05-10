@@ -254,6 +254,20 @@ Limitations intentionally kept out of scope for this MVP:
 - No user accounts or respondent identity.
 - No coach annotation workflow.
 
+## Training Lobby
+
+The dynamic training lobby is available at `/training` after a user chooses a role profile from `/start`. If no role profile exists, the page shows **Choose your role first** and links back to `/start`.
+
+When a profile is present, the lobby shows the current `UserRole / CourtRole`, lists selected situations, and lets the user choose a project as the prompt source. After a project is selected, the frontend loads that project's quiz prompts with `apiClient.listQuizPrompts(projectId)` and filters recommendations client-side:
+
+- `prompt.court_role_target` must match the selected `courtRole`;
+- if selected situations exist, `prompt.situation_type` must be included in the selected `situationTypes`;
+- if a prompt declares `user_role_targets`, the selected `userRole` must be included.
+
+The lobby displays two prompt sections: **Recommended for your role** and **All prompts in this project**. Prompt cards show the question, court role, situation type, frame index, option count, and a **Play** button that opens the existing quiz player route at `/projects/:projectId/quiz/:promptId`. If a project has prompts but none match the selected role and situations, the lobby shows a clear empty state such as `No prompts match BALL_HANDLER / PICK_AND_ROLL yet. Build one from an extracted frame.`
+
+Home links to `/training` whenever a role profile exists, and the `/start` continue button now sends users directly into training mode after saving their profile.
+
 ## Current limitations / TODO functionality
 
 The following pieces are intentionally minimal:

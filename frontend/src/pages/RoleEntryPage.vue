@@ -72,7 +72,7 @@ function saveAndContinue() {
   }
 
   roleStore.setRoleProfile(profile)
-  router.push('/')
+  router.push('/training')
 }
 
 function clearProfile() {
@@ -166,6 +166,6 @@ function clearProfile() {
       <strong>Ready to continue?</strong>
       <p>Saving stores your profile in this browser for your next visit.</p>
     </div>
-    <button type="button" :disabled="!canContinue" @click="saveAndContinue">Continue to Dashboard</button>
+    <button type="button" :disabled="!canContinue" @click="saveAndContinue">Continue to Training</button>
   </section>
 </template>

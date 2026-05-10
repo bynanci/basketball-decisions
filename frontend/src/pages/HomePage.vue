@@ -132,9 +132,10 @@ async function createYoutubeProject() {
     <div>
       <p class="eyebrow">Current mode</p>
       <h2>Current mode: {{ roleStore.roleProfile.userRole }} / {{ roleStore.roleProfile.courtRole }}</h2>
-      <p>Role-aware recommendations are static for now, but your profile persists for future filtering.</p>
+      <p>Open the training lobby to see quiz prompts filtered for your selected role and situations.</p>
     </div>
     <div class="quick-links">
+      <RouterLink to="/training">Training lobby</RouterLink>
       <a href="#project-creation">Continue projects</a>
       <RouterLink to="/start">Change role</RouterLink>
     </div>
