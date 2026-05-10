@@ -132,6 +132,8 @@ def create_quiz_prompt(project_id: str, payload: CreateQuizPromptRequest) -> Qui
         freeze_frame_seconds=payload.freeze_frame_seconds,
         clip_end_seconds=payload.clip_end_seconds,
         mode=payload.mode,
+        question_mode=payload.question_mode,
+        time_limit_ms=payload.time_limit_ms,
         options=payload.options,
         explanation=payload.explanation,
         created_at=now,
@@ -158,43 +160,51 @@ def _role_feedback_for_option(option, user_role):
 @router.post("/{prompt_id}/attempts", response_model=QuizAttemptResponse)
 def submit_quiz_attempt(project_id: str, prompt_id: str, payload: QuizAttemptRequest) -> QuizAttemptResponse:
     prompt = _find_prompt(project_id, prompt_id)
-    selected = next((option for option in prompt.options if option.option_id == payload.selected_option_id), None)
-    if selected is None:
-        raise api_error(
-            400,
-            "QUIZ_OPTION_NOT_FOUND",
-            "Selected option was not found on this quiz prompt.",
-            {"selected_option_id": payload.selected_option_id, "prompt_id": prompt_id},
-            "Submit one of the option_id values returned with the prompt.",
-        )
     correct = next(option for option in prompt.options if option.is_correct)
+    selected = None
+    if payload.selected_option_id is not None:
+        selected = next((option for option in prompt.options if option.option_id == payload.selected_option_id), None)
+        if selected is None:
+            raise api_error(
+                400,
+                "QUIZ_OPTION_NOT_FOUND",
+                "Selected option was not found on this quiz prompt.",
+                {"selected_option_id": payload.selected_option_id, "prompt_id": prompt_id},
+                "Submit one of the option_id values returned with the prompt.",
+            )
+
     expected_values = [option.expected_value for option in prompt.options]
     has_expected_values = all(value is not None for value in expected_values)
     opportunity_cost = None
-    if has_expected_values and selected.expected_value is not None:
+    if payload.timed_out:
+        score = 0
+        scoring_mode = "EXPECTED_VALUE" if has_expected_values else "CORRECTNESS_ONLY"
+    elif selected is not None and has_expected_values and selected.expected_value is not None:
         best_expected_value = max(value for value in expected_values if value is not None)
         opportunity_cost = round(max(0.0, best_expected_value - selected.expected_value), 4)
         score = max(0, round(100 - opportunity_cost * 200))
         scoring_mode = "EXPECTED_VALUE"
     else:
-        score = 100 if selected.option_id == correct.option_id else 0
+        score = 100 if selected is not None and selected.option_id == correct.option_id else 0
         scoring_mode = "CORRECTNESS_ONLY"
 
     response = QuizAttemptResponse(
         prompt_id=prompt.prompt_id,
-        selected_option_id=selected.option_id,
+        selected_option_id=selected.option_id if selected is not None else None,
         correct_option_id=correct.option_id,
-        is_correct=selected.option_id == correct.option_id,
-        selected_expected_value=selected.expected_value,
+        is_correct=selected is not None and selected.option_id == correct.option_id and not payload.timed_out,
+        selected_expected_value=selected.expected_value if selected is not None else None,
         correct_expected_value=correct.expected_value,
         opportunity_cost=opportunity_cost,
         score=score,
         scoring_mode=scoring_mode,
-        selected_explanation=selected.explanation,
+        selected_explanation=selected.explanation if selected is not None else "Time expired",
         correct_explanation=correct.explanation,
-        selected_role_feedback=_role_feedback_for_option(selected, payload.user_role),
+        selected_role_feedback=_role_feedback_for_option(selected, payload.user_role) if selected is not None else "Time expired",
         correct_role_feedback=_role_feedback_for_option(correct, payload.user_role),
         summary_explanation=prompt.explanation,
+        response_time_ms=payload.response_time_ms,
+        timed_out=payload.timed_out,
     )
     attempts = _read_attempts(project_id)
     attempts.append(QuizAttemptRecord(project_id=project_id, attempt_id=str(uuid4()), **response.model_dump()))

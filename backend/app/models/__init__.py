@@ -24,6 +24,7 @@ from .quiz import (
     QuizAttemptResponse,
     QuizPrompt,
     QuizPromptMode,
+    QuizQuestionMode,
     QuizScoringMode,
     SituationType,
 )
@@ -82,6 +83,7 @@ __all__ = [
     "QuizAttemptResponse",
     "QuizPrompt",
     "QuizPromptMode",
+    "QuizQuestionMode",
     "QuizScoringMode",
     "SituationType",
     "RunTrackingRequest",

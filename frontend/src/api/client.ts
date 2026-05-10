@@ -290,6 +290,7 @@ export type SituationType =
   | 'LOW_MAN_DECISION'
   | 'OFF_BALL_RELOCATION'
 export type QuizPromptMode = 'STILL_FRAME' | 'VIDEO_FREEZE'
+export type QuizQuestionMode = 'FREEZE_FRAME' | 'QUICK_DECISION' | 'ROLE_READ'
 export type QuizScoringMode = 'EXPECTED_VALUE' | 'CORRECTNESS_ONLY'
 export type QuizUserRole = 'COACH' | 'PLAYER' | 'ANALYST' | 'FAN'
 
@@ -335,6 +336,8 @@ export interface QuizPrompt {
   freeze_frame_seconds?: number | null
   clip_end_seconds?: number | null
   mode: QuizPromptMode
+  question_mode: QuizQuestionMode
+  time_limit_ms?: number | null
   options: DecisionQuizOption[]
   explanation: string
   created_at: string
@@ -357,18 +360,22 @@ export interface CreateQuizPromptRequest {
   freeze_frame_seconds?: number | null
   clip_end_seconds?: number | null
   mode: QuizPromptMode
+  question_mode: QuizQuestionMode
+  time_limit_ms?: number | null
   options: DecisionQuizOption[]
   explanation: string
 }
 
 export interface QuizAttemptRequest {
-  selected_option_id: string
+  selected_option_id?: string | null
   user_role?: QuizUserRole | null
+  response_time_ms?: number | null
+  timed_out?: boolean
 }
 
 export interface QuizAttemptResponse {
   prompt_id: string
-  selected_option_id: string
+  selected_option_id?: string | null
   correct_option_id: string
   is_correct: boolean
   selected_expected_value?: number | null
@@ -381,6 +388,8 @@ export interface QuizAttemptResponse {
   selected_role_feedback: string
   correct_role_feedback: string
   summary_explanation: string
+  response_time_ms?: number | null
+  timed_out: boolean
 }
 
 export function normalizeApiErrorPayload(status: number, payload?: Partial<ApiErrorResponse> | null): ApiErrorResponse {

@@ -40,6 +40,7 @@ SituationType = Literal[
     "OFF_BALL_RELOCATION",
 ]
 QuizPromptMode = Literal["STILL_FRAME", "VIDEO_FREEZE"]
+QuizQuestionMode = Literal["FREEZE_FRAME", "QUICK_DECISION", "ROLE_READ"]
 QuizScoringMode = Literal["EXPECTED_VALUE", "CORRECTNESS_ONLY"]
 UserRole = Literal["COACH", "PLAYER", "ANALYST", "FAN"]
 
@@ -109,6 +110,8 @@ class QuizPrompt(BaseModel):
     freeze_frame_seconds: FiniteFloat | None = Field(default=None, ge=0)
     clip_end_seconds: FiniteFloat | None = Field(default=None, ge=0)
     mode: QuizPromptMode = "STILL_FRAME"
+    question_mode: QuizQuestionMode = "FREEZE_FRAME"
+    time_limit_ms: int | None = Field(default=None, ge=1)
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
     created_at: datetime = Field(default_factory=utc_now)
@@ -123,6 +126,8 @@ class QuizPrompt(BaseModel):
                 "situation_type": "PICK_AND_ROLL",
                 "user_role_targets": [],
                 "role_instruction": None,
+                "question_mode": "FREEZE_FRAME",
+                "time_limit_ms": None,
                 **data,
             }
         return data
@@ -156,6 +161,8 @@ class QuizPrompt(BaseModel):
                 raise ValueError("clip_start_seconds must be less than or equal to freeze_frame_seconds")
             if self.clip_end_seconds is not None and self.clip_end_seconds < freeze_at:
                 raise ValueError("clip_end_seconds must be greater than or equal to freeze_frame_seconds")
+        if self.question_mode == "QUICK_DECISION" and self.time_limit_ms is None:
+            raise ValueError("time_limit_ms must be greater than 0 for QUICK_DECISION prompts")
         return self
 
 
@@ -177,6 +184,8 @@ class CreateQuizPromptRequest(BaseModel):
     freeze_frame_seconds: FiniteFloat | None = Field(default=None, ge=0)
     clip_end_seconds: FiniteFloat | None = Field(default=None, ge=0)
     mode: QuizPromptMode = "STILL_FRAME"
+    question_mode: QuizQuestionMode = "FREEZE_FRAME"
+    time_limit_ms: int | None = Field(default=None, ge=1)
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
 
@@ -209,19 +218,29 @@ class CreateQuizPromptRequest(BaseModel):
                 raise ValueError("clip_start_seconds must be less than or equal to freeze_frame_seconds")
             if self.clip_end_seconds is not None and self.clip_end_seconds < freeze_at:
                 raise ValueError("clip_end_seconds must be greater than or equal to freeze_frame_seconds")
+        if self.question_mode == "QUICK_DECISION" and self.time_limit_ms is None:
+            raise ValueError("time_limit_ms must be greater than 0 for QUICK_DECISION prompts")
         return self
 
 
 class QuizAttemptRequest(BaseModel):
-    selected_option_id: str
+    selected_option_id: str | None = None
     user_role: UserRole | None = None
+    response_time_ms: int | None = Field(default=None, ge=0)
+    timed_out: bool = False
 
     @field_validator("selected_option_id")
     @classmethod
-    def require_non_empty_text(cls, value: str) -> str:
-        if not value.strip():
+    def require_non_empty_text(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
             raise ValueError("must not be blank")
         return value
+
+    @model_validator(mode="after")
+    def validate_timeout_selection(self) -> "QuizAttemptRequest":
+        if not self.timed_out and self.selected_option_id is None:
+            raise ValueError("selected_option_id is required unless timed_out is true")
+        return self
 
 
 class QuizAttemptResponse(BaseModel):
@@ -240,7 +259,7 @@ class QuizAttemptResponse(BaseModel):
         return data
 
     prompt_id: str
-    selected_option_id: str
+    selected_option_id: str | None = None
     correct_option_id: str
     is_correct: bool
     selected_expected_value: FiniteFloat | None = None
@@ -253,6 +272,8 @@ class QuizAttemptResponse(BaseModel):
     selected_role_feedback: str
     correct_role_feedback: str
     summary_explanation: str
+    response_time_ms: int | None = Field(default=None, ge=0)
+    timed_out: bool = False
 
 
 class QuizAttemptRecord(QuizAttemptResponse):
