@@ -15,11 +15,8 @@ projectStore.setActiveProject(props.projectId)
 const prompt = ref<QuizPrompt | null>(null)
 const result = ref<QuizAttemptResponse | null>(null)
 const selectedOptionId = ref<string | null>(null)
-const imageNaturalWidth = ref(1280)
-const imageNaturalHeight = ref(720)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
-const project = computed(() => projectStore.getProject(props.projectId))
 const imageSrc = computed(() => prompt.value?.image_url || (prompt.value ? apiClient.frameImageUrl(props.projectId, prompt.value.frame_index) : ''))
 const selectedOption = computed(() => prompt.value?.options.find((option) => option.option_id === result.value?.selected_option_id) ?? null)
 const correctOption = computed(() => prompt.value?.options.find((option) => option.option_id === result.value?.correct_option_id) ?? null)
@@ -29,18 +26,9 @@ onMounted(async () => {
   await loadPrompt()
 })
 
-function updateImageNaturalSize(event: Event) {
-  const image = event.target as HTMLImageElement
-  imageNaturalWidth.value = image.naturalWidth || imageNaturalWidth.value
-  imageNaturalHeight.value = image.naturalHeight || imageNaturalHeight.value
-}
-
 async function loadPrompt() {
   try {
     prompt.value = await apiClient.getQuizPrompt(props.projectId, props.promptId)
-    const frame = project.value?.frames.find((item) => item.frame_index === prompt.value?.frame_index)
-    if (frame?.width) imageNaturalWidth.value = frame.width
-    if (frame?.height) imageNaturalHeight.value = frame.height
   } catch (error) {
     errorMessage.value = isApiClientError(error) ? error.message : 'Could not load quiz prompt.'
   }
@@ -80,10 +68,8 @@ function retry() {
     <div class="card">
       <h2>{{ prompt.question }}</h2>
       <div class="image-stage">
-        <img :src="imageSrc" :alt="`Frame ${prompt.frame_index}`" @load="updateImageNaturalSize" />
+        <img :src="imageSrc" :alt="`Frame ${prompt.frame_index}`" />
         <ArrowDrawingOverlay
-          :image-natural-width="imageNaturalWidth"
-          :image-natural-height="imageNaturalHeight"
           :options="prompt.options"
           :readonly="true"
           :selected-option-id="selectedOptionId"
