@@ -13,6 +13,7 @@ from pydantic import TypeAdapter, ValidationError
 from app.api.common import DATA_DIR, api_error, read_json, write_json_model
 from app.api.reference_videos import reference_video_summary
 from app.models import (
+    DatasetHealthResponse,
     DatasetListResponse,
     DatasetManifest,
     CuratedTrainingLabel,
@@ -43,6 +44,7 @@ from app.models.base import utc_now
 from app.models.tracking import Detection, PlayerTrack
 from app.pipeline.recognition_quality import score_project_recognition
 from app.services.decision_engine import evaluate_attempt
+from app.services.dataset_health import dataset_health_response
 
 router = APIRouter(prefix="/local-lab", tags=["local-lab"])
 
@@ -874,6 +876,12 @@ def _summary_for_dataset(dataset_type: str) -> DatasetSummary:
 @router.get("/datasets", response_model=DatasetListResponse)
 def list_datasets() -> DatasetListResponse:
     return DatasetListResponse(datasets=[_summary_for_dataset(dataset_type) for dataset_type in DATASET_TYPES])
+
+
+@router.get("/datasets/health", response_model=DatasetHealthResponse)
+def get_dataset_health() -> DatasetHealthResponse:
+    _ensure_dataset_dirs()
+    return dataset_health_response(DATASETS_DIR)
 
 
 @router.get("/reference-video-summary", response_model=ReferenceVideoDraftSummary)

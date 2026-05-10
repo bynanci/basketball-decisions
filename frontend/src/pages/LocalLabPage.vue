@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import {
   apiClient,
+  type DatasetHealthResponse,
+  type DatasetHealthWarning,
   type DatasetManifest,
   type DatasetSummary,
   type DecisionEventsBuildSummary,
@@ -13,6 +15,7 @@ import {
 
 const projects = ref<LocalLabProjectArtifact[]>([])
 const datasets = ref<DatasetSummary[]>([])
+const datasetHealth = ref<DatasetHealthResponse | null>(null)
 const sourceRegistry = ref<VideoSourceRecord[]>([])
 const referenceVideoSummary = ref<ReferenceVideoDraftSummary>({ reference_only_source_count: 0, quiz_prompt_draft_count: 0, decision_rule_draft_count: 0 })
 const isLoading = ref(false)
@@ -30,6 +33,23 @@ const errorCode = ref('')
 
 const sortedDatasets = computed(() => [...datasets.value].sort((a, b) => a.dataset_type.localeCompare(b.dataset_type)))
 
+const recognitionReadiness = computed(() => {
+  if (!datasetHealth.value) return 'Needs more labels'
+  const health = datasetHealth.value.recognition
+  if (!health.has_minimum_samples) return 'Needs more labels'
+  if (!health.has_balanced_labels) return 'Needs more negative samples'
+  return 'Ready for baseline training'
+})
+
+const decisionReadiness = computed(() => {
+  if (!datasetHealth.value) return 'Needs more labels'
+  const health = datasetHealth.value.decision
+  if (!health.has_minimum_prompts) return 'Needs more labels'
+  if (!health.has_role_coverage) return 'Needs better role coverage'
+  if (!health.has_balanced_labels) return 'Needs more negative samples'
+  return 'Ready for baseline training'
+})
+
 function boolLabel(value: boolean) {
   return value ? 'Yes' : 'No'
 }
@@ -46,6 +66,14 @@ function formatNumber(value: number) {
 function formatRatio(value?: number | null) {
   if (value === null || value === undefined) return '—'
   return `${formatNumber(value)}:1`
+}
+
+function formatPercent(value: number) {
+  return `${formatNumber(value * 100)}%`
+}
+
+function severityClass(warning: DatasetHealthWarning) {
+  return `severity-${warning.severity.toLowerCase()}`
 }
 
 function hasFewNegatives(dataset: DatasetSummary | DatasetManifest) {
@@ -84,14 +112,16 @@ async function refreshLocalLab() {
   isLoading.value = true
   errorMessage.value = ''
   try {
-    const [projectResponse, datasetResponse, sourceResponse, referenceSummaryResponse] = await Promise.all([
+    const [projectResponse, datasetResponse, healthResponse, sourceResponse, referenceSummaryResponse] = await Promise.all([
       apiClient.listLocalLabProjects(),
       apiClient.listDatasets(),
+      apiClient.getDatasetHealth(),
       apiClient.listSources(),
       apiClient.getReferenceVideoSummary()
     ])
     projects.value = projectResponse.projects
     datasets.value = datasetResponse.datasets
+    datasetHealth.value = healthResponse
     sourceRegistry.value = sourceResponse
     referenceVideoSummary.value = referenceSummaryResponse
   } catch (error) {
@@ -252,6 +282,79 @@ onMounted(refreshLocalLab)
     </div>
   </section>
 
+
+  <section class="card dataset-health-section">
+    <div class="table-header">
+      <div>
+        <p class="eyebrow">Dataset Health</p>
+        <h2>Pre-training readiness gate</h2>
+        <p class="muted">Health warnings are explainable guidance for curated local JSON/JSONL datasets. They do not run or register ML training.</p>
+      </div>
+      <span v-if="datasetHealth">Generated {{ formatDate(datasetHealth.generated_at) }}</span>
+    </div>
+
+    <div v-if="datasetHealth" class="health-grid">
+      <article class="health-card">
+        <div class="health-card-header">
+          <div>
+            <p class="eyebrow">Recognition</p>
+            <h3>{{ recognitionReadiness }}</h3>
+          </div>
+          <span class="readiness-badge">{{ datasetHealth.recognition.has_minimum_samples && datasetHealth.recognition.has_balanced_labels ? 'Ready for baseline training' : recognitionReadiness }}</span>
+        </div>
+        <dl class="health-metrics">
+          <div><dt>Samples</dt><dd>{{ datasetHealth.recognition.sample_count }}</dd></div>
+          <div><dt>Labels</dt><dd>{{ datasetHealth.recognition.label_count }}</dd></div>
+          <div><dt>Positive</dt><dd>{{ datasetHealth.recognition.positive_sample_count }}</dd></div>
+          <div><dt>Negative</dt><dd>{{ datasetHealth.recognition.negative_sample_count }}</dd></div>
+          <div><dt>Pos/neg ratio</dt><dd>{{ formatRatio(datasetHealth.recognition.positive_negative_ratio) }}</dd></div>
+          <div><dt>Source projects</dt><dd>{{ datasetHealth.recognition.source_project_count }}</dd></div>
+        </dl>
+        <p class="label-distribution"><strong>Labels:</strong> {{ formatLabelDistribution(datasetHealth.recognition.label_distribution) }}</p>
+        <ul class="warning-list">
+          <li v-for="warning in datasetHealth.recognition.warnings" :key="warning.code">
+            <span class="severity-badge" :class="severityClass(warning)">{{ warning.severity }}</span>
+            <div>
+              <strong>{{ warning.message }}</strong>
+              <p>{{ warning.recommendation }}</p>
+            </div>
+          </li>
+          <li v-if="datasetHealth.recognition.warnings.length === 0" class="success-message">Ready for baseline training.</li>
+        </ul>
+      </article>
+
+      <article class="health-card">
+        <div class="health-card-header">
+          <div>
+            <p class="eyebrow">Decision</p>
+            <h3>{{ decisionReadiness }}</h3>
+          </div>
+          <span class="readiness-badge">{{ datasetHealth.decision.has_minimum_prompts && datasetHealth.decision.has_role_coverage && datasetHealth.decision.has_balanced_labels ? 'Ready for baseline training' : decisionReadiness }}</span>
+        </div>
+        <dl class="health-metrics">
+          <div><dt>Prompts</dt><dd>{{ datasetHealth.decision.prompt_count }}</dd></div>
+          <div><dt>Options</dt><dd>{{ datasetHealth.decision.option_count }}</dd></div>
+          <div><dt>Attempts</dt><dd>{{ datasetHealth.decision.attempt_count }}</dd></div>
+          <div><dt>Negative</dt><dd>{{ datasetHealth.decision.negative_sample_count }}</dd></div>
+          <div><dt>Missing EV</dt><dd>{{ formatPercent(datasetHealth.decision.missing_expected_value_rate) }}</dd></div>
+          <div><dt>Timeouts</dt><dd>{{ formatPercent(datasetHealth.decision.timeout_rate) }}</dd></div>
+        </dl>
+        <p class="label-distribution"><strong>Roles:</strong> {{ formatLabelDistribution(datasetHealth.decision.role_distribution) }}</p>
+        <p class="label-distribution"><strong>Situations:</strong> {{ formatLabelDistribution(datasetHealth.decision.situation_distribution) }}</p>
+        <ul class="warning-list">
+          <li v-for="warning in datasetHealth.decision.warnings" :key="warning.code">
+            <span class="severity-badge" :class="severityClass(warning)">{{ warning.severity }}</span>
+            <div>
+              <strong>{{ warning.message }}</strong>
+              <p>{{ warning.recommendation }}</p>
+            </div>
+          </li>
+          <li v-if="datasetHealth.decision.warnings.length === 0" class="success-message">Ready for baseline training.</li>
+        </ul>
+      </article>
+    </div>
+    <p v-else class="muted">Dataset health has not loaded yet.</p>
+  </section>
 
   <section class="card">
     <div class="table-header">
@@ -568,6 +671,107 @@ onMounted(refreshLocalLab)
 .dataset-card dd {
   margin: 0;
   font-weight: 700;
+}
+
+.dataset-health-section {
+  display: grid;
+  gap: 1rem;
+}
+
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.health-card {
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.health-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.readiness-badge,
+.severity-badge {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
+.readiness-badge {
+  background: #eff6ff;
+  border: 1px solid #60a5fa;
+  color: #1d4ed8;
+}
+
+.health-metrics {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin: 1rem 0;
+}
+
+.health-metrics div {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0.65rem;
+}
+
+.health-metrics dt {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.health-metrics dd {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin: 0.25rem 0 0;
+}
+
+.warning-list {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.warning-list li {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.warning-list p {
+  color: #475569;
+  margin: 0.25rem 0 0;
+}
+
+.severity-high {
+  background: #fee2e2;
+  border: 1px solid #ef4444;
+  color: #991b1b;
+}
+
+.severity-medium {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+}
+
+.severity-low {
+  background: #ecfeff;
+  border: 1px solid #06b6d4;
+  color: #155e75;
 }
 
 .table-scroll {
