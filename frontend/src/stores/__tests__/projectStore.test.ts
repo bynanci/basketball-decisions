@@ -116,7 +116,7 @@ describe('projectStore.hydrateProjectFromBundle', () => {
     expect(store.getProject('project-1')?.trackingDebugMetadata?.detector).toEqual({ mode: 'run-debug-detector' })
   })
 
-  it('preserves existing tracking arrays and metadata when optional tracking artifacts are missing', () => {
+  it('clears existing tracking arrays and metadata when backend tracking artifacts are missing', () => {
     const store = useProjectStore()
     store.addProject({ id: 'project-1', name: 'Local Project', source: 'upload' })
     store.setTracks('project-1', {
@@ -139,11 +139,11 @@ describe('projectStore.hydrateProjectFromBundle', () => {
 
     store.hydrateProjectFromBundle(bundle({ tracking: null, projected_tracks: null }))
 
-    expect(store.getProject('project-1')?.detections).toHaveLength(1)
-    expect(store.getProject('project-1')?.tracks).toHaveLength(1)
-    expect(store.getProject('project-1')?.projectedTracks).toHaveLength(1)
-    expect(store.getProject('project-1')?.trackingPipelineOutput?.detector_mode).toBe('existing-detector')
-    expect(store.getProject('project-1')?.trackingDebugMetadata?.detector).toEqual({ mode: 'existing-debug-detector' })
+    expect(store.getProject('project-1')?.detections).toHaveLength(0)
+    expect(store.getProject('project-1')?.tracks).toHaveLength(0)
+    expect(store.getProject('project-1')?.projectedTracks).toHaveLength(0)
+    expect(store.getProject('project-1')?.trackingPipelineOutput).toBeNull()
+    expect(store.getProject('project-1')?.trackingDebugMetadata).toBeNull()
   })
 
 })

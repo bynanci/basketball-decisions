@@ -115,7 +115,7 @@ def test_save_tracking_review_writes_cleaned_artifacts_without_mutating_raw_trac
     payload = response.json()
     assert [track["track_id"] for track in payload["cleaned_tracking"]["tracks"]] == ["track-1"]
     assert [detection["detection_id"] for detection in payload["cleaned_tracking"]["detections"]] == ["det-1"]
-    assert len(payload["cleaned_projected_tracks"]) == 1
+    assert payload["cleaned_projected_tracks"] == []
     assert (directory / "tracking_cleaned.json").exists()
     assert (directory / "projected_tracks_cleaned.json").exists()
     raw_tracking = RunTrackingResponse.model_validate_json((directory / "tracking.json").read_text(encoding="utf-8"))

@@ -270,6 +270,9 @@ def _project_tracks(project_id: str, tracking: RunTrackingResponse) -> list[Proj
         calibration = Calibration.model_validate(read_json(calibration_path))
         homography = calibration.homography
 
+    if homography is None:
+        return []
+
     raw_projected_tracks = project_tracks_to_court([track.model_dump() for track in tracking.tracks], homography)
     projected_tracks: list[ProjectedPlayerTrack] = []
     for raw_track in raw_projected_tracks:
