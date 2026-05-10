@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, FiniteFloat, field_validator, model_validator
 
 from .base import utc_now
 
@@ -20,8 +20,8 @@ ActionType = Literal["PASS", "DRIVE", "SHOT", "RESET", "HOLD"]
 class DecisionArrowPoint(BaseModel):
     """Normalized image point for an arrow endpoint."""
 
-    x: float = Field(ge=0, le=1)
-    y: float = Field(ge=0, le=1)
+    x: FiniteFloat = Field(ge=0, le=1)
+    y: FiniteFloat = Field(ge=0, le=1)
 
 
 class DecisionQuizOption(BaseModel):
@@ -32,7 +32,7 @@ class DecisionQuizOption(BaseModel):
     action_type: ActionType
     start: DecisionArrowPoint
     end: DecisionArrowPoint
-    expected_value: float | None = None
+    expected_value: FiniteFloat | None = None
     is_correct: bool = False
     explanation: str
 
@@ -52,7 +52,7 @@ class QuizPrompt(BaseModel):
     question: str
     frame_id: str
     frame_index: int
-    timestamp_seconds: float
+    timestamp_seconds: FiniteFloat
     image_url: str | None = None
     image_path: str | None = None
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
@@ -84,7 +84,7 @@ class CreateQuizPromptRequest(BaseModel):
     question: str
     frame_id: str
     frame_index: int
-    timestamp_seconds: float
+    timestamp_seconds: FiniteFloat
     image_url: str | None = None
     image_path: str | None = None
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
@@ -124,9 +124,9 @@ class QuizAttemptResponse(BaseModel):
     selected_option_id: str
     correct_option_id: str
     is_correct: bool
-    selected_expected_value: float | None = None
-    correct_expected_value: float | None = None
-    opportunity_cost: float | None = None
+    selected_expected_value: FiniteFloat | None = None
+    correct_expected_value: FiniteFloat | None = None
+    opportunity_cost: FiniteFloat | None = None
     selected_explanation: str
     correct_explanation: str
     summary_explanation: str
@@ -148,7 +148,7 @@ DecisionDirection = Literal["left", "right", "up", "down", "hold", "pass", "shoo
 class FreezeFrame(BaseModel):
     frame_id: str
     frame_index: int
-    timestamp_seconds: float
+    timestamp_seconds: FiniteFloat
     image_path: str | None = None
     video_asset_id: str | None = None
     width: int | None = None
