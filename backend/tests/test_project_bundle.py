@@ -95,3 +95,29 @@ def test_bundle_does_not_crash_when_some_optional_files_are_missing(client: Test
     assert payload["video"]["source_type"] == "youtube"
     assert payload["frames"] is None
     assert payload["tracking"] is None
+
+
+def test_bundle_returns_typed_422_for_invalid_optional_json(client: TestClient, tmp_path: Path) -> None:
+    directory = write_project(tmp_path)
+    (directory / "video.json").write_text("{not valid json", encoding="utf-8")
+
+    response = client.get("/api/projects/project-1/bundle")
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["code"] == "INVALID_ARTIFACT_JSON"
+    assert payload["details"]["artifact"] == "video.json"
+    assert "fix or regenerate" in payload["debug_hint"]
+
+
+def test_bundle_returns_typed_422_for_invalid_optional_schema(client: TestClient, tmp_path: Path) -> None:
+    directory = write_project(tmp_path)
+    (directory / "video.json").write_text('{"project_id":"project-1"}', encoding="utf-8")
+
+    response = client.get("/api/projects/project-1/bundle")
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["code"] == "INVALID_ARTIFACT_SCHEMA"
+    assert payload["details"]["artifact"] == "video.json"
+    assert "VideoAsset" in payload["debug_hint"]
