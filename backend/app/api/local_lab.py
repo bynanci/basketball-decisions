@@ -10,7 +10,7 @@ from typing import Iterable
 from fastapi import APIRouter
 from pydantic import TypeAdapter, ValidationError
 
-from app.api.common import DATA_DIR, read_json, write_json_model
+from app.api.common import DATA_DIR, api_error, read_json, write_json_model
 from app.models import (
     DatasetListResponse,
     DatasetManifest,
@@ -21,15 +21,18 @@ from app.models import (
     ExtractFramesResponse,
     LocalLabProjectArtifact,
     LocalLabProjectsResponse,
+    Calibration,
     Project,
     QuizAttemptRecord,
     QuizPrompt,
+    RecognitionScoreProjectResponse,
     RecognitionTrainingSample,
     RunTrackingResponse,
     TrackReviewPatch,
     TrackTrainingLabel,
 )
 from app.models.base import utc_now
+from app.pipeline.recognition_quality import score_project_recognition
 
 router = APIRouter(prefix="/local-lab", tags=["local-lab"])
 
@@ -119,6 +122,49 @@ def list_local_lab_projects() -> LocalLabProjectsResponse:
             )
         )
     return LocalLabProjectsResponse(projects=projects)
+
+
+def _tracking_path(directory: Path) -> Path:
+    return directory / "tracking.json"
+
+
+def _review_patch_path(directory: Path) -> Path:
+    return directory / "tracking_review_patch.json"
+
+
+def _calibration_path(directory: Path) -> Path:
+    return directory / "calibration.json"
+
+
+@router.post("/recognition/score-project/{project_id}", response_model=RecognitionScoreProjectResponse)
+def score_project_recognition_quality(project_id: str) -> RecognitionScoreProjectResponse:
+    directory = DATA_DIR / project_id
+    tracking_path = _tracking_path(directory)
+    if not tracking_path.exists():
+        raise api_error(
+            404,
+            "TRACKING_NOT_FOUND",
+            "No tracking output exists for this project.",
+            {"project_id": project_id},
+            "Run tracking before scoring recognition quality.",
+        )
+
+    tracking = RunTrackingResponse.model_validate(read_json(tracking_path))
+    review_patch_path = _review_patch_path(directory)
+    review_patch = (
+        TrackReviewPatch.model_validate(read_json(review_patch_path))
+        if review_patch_path.exists()
+        else TrackReviewPatch()
+    )
+    calibration_path = _calibration_path(directory)
+    calibration = Calibration.model_validate(read_json(calibration_path)) if calibration_path.exists() else None
+    return score_project_recognition(
+        project_id=project_id,
+        detections=tracking.detections,
+        tracks=tracking.tracks,
+        patch=review_patch,
+        calibration=calibration,
+    )
 
 
 def _write_jsonl(path: Path, rows) -> None:

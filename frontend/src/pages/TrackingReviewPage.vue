@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
-import type { Detection, PlayerTrack, TrackReviewPatch, TrackReviewResponse } from '../api/client'
+import type { Detection, DetectionRecognitionScore, PlayerTrack, TrackRecognitionScore, TrackReviewPatch, TrackReviewResponse } from '../api/client'
 import { useProjectHydration } from '../composables/useProjectHydration'
 import { useProjectStore } from '../stores/projectStore'
 
@@ -22,10 +22,14 @@ const excludedTrackIds = ref<Set<string>>(new Set())
 const notes = ref('')
 const isLoadingReview = ref(false)
 const isSaving = ref(false)
+const isScoring = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
 const errorHint = ref('')
 const saveMessage = ref('')
+const recognitionMessage = ref('')
+const detectionScores = ref<DetectionRecognitionScore[]>([])
+const trackScores = ref<TrackRecognitionScore[]>([])
 
 const rawTracking = computed(() => review.value?.tracking ?? null)
 const detections = computed(() => rawTracking.value?.detections ?? project.value?.detections ?? [])
@@ -42,13 +46,16 @@ const overlayHeight = computed(() => currentFrame.value?.height ?? project.value
 const frameDetections = computed(() => detections.value.filter((detection) => detection.frame_index === currentFrameIndex.value))
 const rawTrackCount = computed(() => tracks.value.length)
 const cleanedTrackCount = computed(() => cleanedTracking.value?.tracks.length ?? 0)
+const detectionScoreById = computed(() => new Map(detectionScores.value.map((score) => [score.detection_id, score])))
+const trackScoreById = computed(() => new Map(trackScores.value.map((score) => [score.track_id, score])))
 
 const trackSummaries = computed(() =>
   tracks.value
     .map((track) => ({
       track,
       detectionCount: detections.value.filter((detection) => detection.track_id === track.track_id).length,
-      pointCount: track.points.length
+      pointCount: track.points.length,
+      score: trackScoreById.value.get(track.track_id) ?? null
     }))
     .sort((a, b) => b.pointCount - a.pointCount || a.track.track_id.localeCompare(b.track.track_id))
 )
@@ -127,6 +134,38 @@ function pathForTrack(track: PlayerTrack) {
   return track.points.map((point) => `${point.image_point_x},${point.image_point_y}`).join(' ')
 }
 
+function riskClass(label?: string | null) {
+  return `risk-${(label ?? 'unknown').toLowerCase()}`
+}
+
+function scoreForDetection(detection: Detection) {
+  return detectionScoreById.value.get(detection.detection_id) ?? null
+}
+
+function formatRisk(score?: DetectionRecognitionScore | TrackRecognitionScore | null) {
+  if (!score) return ''
+  return `${Math.round(score.false_positive_risk * 100)}% false-positive risk`
+}
+
+async function scoreRecognitionQuality() {
+  if (isScoring.value) return
+  isScoring.value = true
+  recognitionMessage.value = ''
+  errorMessage.value = ''
+  errorCode.value = ''
+  errorHint.value = ''
+  try {
+    const response = await apiClient.scoreRecognitionQuality(props.projectId)
+    detectionScores.value = response.detection_scores
+    trackScores.value = response.track_scores
+    recognitionMessage.value = `Scored ${response.detection_scores.length} detections and ${response.track_scores.length} tracks. High risk: ${response.summary.high_risk_detection_count} detections, ${response.summary.high_risk_track_count} tracks.`
+  } catch (error) {
+    showError(error, 'Could not score recognition quality.')
+  } finally {
+    isScoring.value = false
+  }
+}
+
 function buildPatch(): TrackReviewPatch {
   return {
     excluded_detection_ids: Array.from(excludedDetectionIds.value).sort(),
@@ -171,6 +210,7 @@ async function saveReview() {
       <p>Inspect raw person detections, exclude false-positive detections or full tracks, and save cleaned artifacts without overwriting raw tracking.</p>
     </div>
     <div class="hero-actions">
+      <button type="button" :disabled="isScoring || !hasTracking" @click="scoreRecognitionQuality">{{ isScoring ? 'Scoring…' : 'Score Recognition Quality' }}</button>
       <RouterLink class="button secondary" :to="`/projects/${projectId}/tracking`">Raw tracking</RouterLink>
       <RouterLink class="button secondary" :to="`/projects/${projectId}`">Project</RouterLink>
     </div>
@@ -208,6 +248,7 @@ async function saveReview() {
         <span><strong>{{ cleanedTrackCount }}</strong> cleaned tracks saved</span>
         <span><strong>{{ cleanedProjectedTracks.length }}</strong> cleaned projected tracks</span>
       </div>
+      <p v-if="recognitionMessage" class="success">{{ recognitionMessage }}</p>
       <p v-if="saveMessage" class="success">{{ saveMessage }}</p>
       <p class="muted">Raw tracking remains available; saved review output is stored separately as cleaned tracking and cleaned projected tracks.</p>
     </section>
@@ -246,6 +287,11 @@ async function saveReview() {
             <input type="checkbox" :checked="excludedDetectionIds.has(detection.detection_id)" @change="toggleDetection(detection.detection_id, checkedFromEvent($event))" />
             <span>Exclude detection</span>
             <strong>{{ detection.track_id ?? 'untracked' }}</strong>
+            <span v-if="scoreForDetection(detection)" class="risk-detail">
+              <span class="risk-badge" :class="riskClass(scoreForDetection(detection)?.recommended_label)">{{ scoreForDetection(detection)?.recommended_label }}</span>
+              <small>{{ formatRisk(scoreForDetection(detection)) }}</small>
+              <small v-for="reason in scoreForDetection(detection)?.reasons" :key="reason">{{ reason }}</small>
+            </span>
             <code>{{ detection.detection_id }}</code>
           </label>
         </div>
@@ -260,6 +306,11 @@ async function saveReview() {
             <span>
               <strong>{{ summary.track.track_id }}</strong>
               <small>{{ summary.pointCount }} points · {{ summary.detectionCount }} detections</small>
+              <span v-if="summary.score" class="risk-detail">
+                <span class="risk-badge" :class="riskClass(summary.score.recommended_label)">{{ summary.score.recommended_label }}</span>
+                <small>{{ formatRisk(summary.score) }}</small>
+                <small v-for="reason in summary.score.reasons" :key="reason">{{ reason }}</small>
+              </span>
             </span>
           </label>
         </div>
@@ -405,6 +456,37 @@ async function saveReview() {
 .qc-row code {
   color: #475569;
   margin-left: auto;
+}
+
+.risk-detail {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.risk-badge {
+  border-radius: 999px;
+  color: white;
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  padding: 0.15rem 0.45rem;
+  width: fit-content;
+}
+
+.risk-low {
+  background: #16a34a;
+}
+
+.risk-medium {
+  background: #d97706;
+}
+
+.risk-high {
+  background: #dc2626;
+}
+
+.risk-unknown {
+  background: #64748b;
 }
 
 .track-row span {
