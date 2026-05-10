@@ -7,11 +7,13 @@ import TrackingReviewPage from '../pages/TrackingReviewPage.vue'
 import PipelinePage from '../pages/PipelinePage.vue'
 import QuizBuilderPage from '../pages/QuizBuilderPage.vue'
 import QuizPlayPage from '../pages/QuizPlayPage.vue'
+import RoleEntryPage from '../pages/RoleEntryPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'home', component: HomePage },
+    { path: '/start', name: 'role-entry', component: RoleEntryPage },
     { path: '/projects/:projectId', name: 'project', component: ProjectPage, props: true },
     { path: '/projects/:projectId/calibration', name: 'calibration', component: CalibrationPage, props: true },
     { path: '/projects/:projectId/pipeline', name: 'pipeline', component: PipelinePage, props: true },

@@ -3,9 +3,11 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
 import { useProjectStore } from '../stores/projectStore'
+import { useRoleStore } from '../stores/roleStore'
 
 const router = useRouter()
 const projectStore = useProjectStore()
+const roleStore = useRoleStore()
 const projectName = ref('Demo Project')
 const youtubeUrl = ref('')
 const youtubeRightsConfirmed = ref(false)
@@ -15,6 +17,21 @@ const isSubmitting = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
 const errorHint = ref('')
+
+const recommendedSituations = computed(() => {
+  if (!roleStore.roleProfile?.situationTypes.length) {
+    return ['Pick and Roll', 'Drive and Kick', 'Help Rotation']
+  }
+
+  return roleStore.roleProfile.situationTypes.slice(0, 4).map(formatRole)
+})
+
+function formatRole(value: string) {
+  return value
+    .split('_')
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(' ')
+}
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -99,9 +116,11 @@ async function createYoutubeProject() {
 </script>
 
 <template>
-  <section class="card">
+  <section class="card hero-card">
+    <p class="eyebrow">Court IQ</p>
     <h1>Basketball video decision pipeline</h1>
     <p>Create a project from a local MP4 or YouTube URL, calibrate court keypoints manually, then inspect tracking overlays and a 2D projection.</p>
+    <RouterLink class="button" to="/start">Choose training role</RouterLink>
     <div v-if="errorMessage" class="error-card" role="alert">
       <strong>{{ errorCode }}</strong>
       <p>{{ errorMessage }}</p>
@@ -109,7 +128,25 @@ async function createYoutubeProject() {
     </div>
   </section>
 
-  <section class="grid">
+  <section v-if="roleStore.roleProfile" class="card role-mode-card">
+    <div>
+      <p class="eyebrow">Current mode</p>
+      <h2>Current mode: {{ roleStore.roleProfile.userRole }} / {{ roleStore.roleProfile.courtRole }}</h2>
+      <p>Role-aware recommendations are static for now, but your profile persists for future filtering.</p>
+    </div>
+    <div class="quick-links">
+      <a href="#project-creation">Continue projects</a>
+      <RouterLink to="/start">Change role</RouterLink>
+    </div>
+    <div class="recommendation-list">
+      <strong>Recommended situations</strong>
+      <ul>
+        <li v-for="situation in recommendedSituations" :key="situation">{{ situation }}</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="project-creation" class="grid">
     <form class="card" @submit.prevent="createUploadProject">
       <h2>Local MP4</h2>
       <label>

@@ -265,3 +265,17 @@ The following pieces are intentionally minimal:
 - **Tracking QC**: cleanup is reviewer-driven only and does not classify teams, read jerseys, detect referees automatically, or perform advanced re-identification.
 - **Persistence model**: project JSON files are local dev storage, not a production database.
 - **Decision Quiz**: the MVP is limited to one still-frame arrow prompt at a time; no accounts, sessions, video playback freeze, or learned EPV model are included.
+
+## Role-Based Entry Flow
+
+Court IQ now includes an optional frontend-first role entry flow at `/start`. It does not require authentication and does not block the existing project creation, upload, calibration, tracking, projection, or decision-prompt workflow.
+
+The selected role profile is stored in Pinia and persisted to browser `localStorage` under the `court-iq-role-profile` key so the Home page can restore the current mode after a refresh.
+
+The profile has three parts:
+
+- `UserRole` controls the product perspective and copy shown to the user. Supported values are `COACH`, `PLAYER`, `ANALYST`, and `FAN`.
+- `CourtRole` controls the on-court lens for future court situation filtering. Supported values include ball-handler, shooter, roller, screener, defender, low-man, trailer, and weak-side wing roles.
+- `SituationType` controls the training or analysis context the user wants to focus on, such as pick-and-roll, short-roll, spot-up, closeout attack, transition advantage, late-clock, post-double, drive-and-kick, help-rotation, low-man decisions, and off-ball relocation.
+
+For now, Home shows the selected mode, links back to the role entry page, links down to the existing project creation flow, and displays a static recommended situations list. EPV and deeper role-based filtering are intentionally not implemented yet.
