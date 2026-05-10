@@ -228,6 +228,22 @@ def _average(values: list[float | int]) -> float:
     return round(sum(values) / len(values), 4)
 
 
+def _source_trace(directory: Path) -> dict:
+    source_path = directory / "source.json"
+    if not source_path.exists():
+        return {"artifact": str(source_path), "allowed_for_training": False}
+    source = VideoSourceRecord.model_validate(read_json(source_path))
+    return {
+        "artifact": str(source_path),
+        "source_id": source.source_id,
+        "source_type": source.source_type,
+        "license_type": source.license_type,
+        "usage_scope": source.usage_scope,
+        "allowed_for_training": source.allowed_for_training,
+        "rights_confirmed": source.rights_confirmed,
+        "league_tag": source.league_tag,
+    }
+
 
 def _curated_dataset_storage_paths(dataset_type: str) -> dict[str, str]:
     directory = DATASETS_DIR / dataset_type
@@ -312,7 +328,9 @@ def _add_curated_pair(
     trace: dict,
     payload: dict,
     created_at: datetime,
+    source_trace: dict | None = None,
 ) -> None:
+    full_trace = {"project_id": project_id, "source_trace": source_trace or {}, **trace}
     samples.append(
         CuratedTrainingSample(
             sample_id=sample_id,
@@ -321,7 +339,7 @@ def _add_curated_pair(
             project_id=project_id,
             label=label,
             source=source,  # type: ignore[arg-type]
-            trace=trace,
+            trace=full_trace,
             payload=payload,
             created_at=created_at,
         )
@@ -336,7 +354,7 @@ def _add_curated_pair(
             label=label,
             source=source,  # type: ignore[arg-type]
             rationale=rationale,
-            trace=trace,
+            trace=full_trace,
             created_at=created_at,
         )
     )
@@ -377,6 +395,7 @@ def curate_recognition_dataset() -> DatasetManifest:
         review_patch = TrackReviewPatch.model_validate(read_json(review_path)) if review_path.exists() else TrackReviewPatch()
         project_id = (positive_tracking or raw_tracking).project_id  # type: ignore[union-attr]
         project_ids.add(project_id)
+        project_source_trace = _source_trace(directory)
 
         excluded_track_ids = set(review_patch.excluded_track_ids)
         excluded_detection_ids = set(review_patch.excluded_detection_ids)
@@ -408,6 +427,7 @@ def curate_recognition_dataset() -> DatasetManifest:
                 trace=trace,
                 payload=track.model_dump(mode="json"),
                 created_at=created_at,
+                source_trace=project_source_trace,
             )
 
         positive_detections: list[Detection] = [] if positive_tracking is None else [
@@ -437,6 +457,7 @@ def curate_recognition_dataset() -> DatasetManifest:
                 trace=trace,
                 payload=detection.model_dump(mode="json"),
                 created_at=created_at,
+                source_trace=project_source_trace,
             )
 
         raw_track_by_id = {track.track_id: track for track in raw_tracking.tracks} if raw_tracking is not None else {}
@@ -462,6 +483,7 @@ def curate_recognition_dataset() -> DatasetManifest:
                 trace=trace,
                 payload=track_payload,
                 created_at=created_at,
+                source_trace=project_source_trace,
             )
 
         raw_detection_by_id = {detection.detection_id: detection for detection in raw_tracking.detections} if raw_tracking is not None else {}
@@ -487,6 +509,7 @@ def curate_recognition_dataset() -> DatasetManifest:
                 trace=trace,
                 payload=detection.model_dump(mode="json") if detection is not None else {"detection_id": detection_id},
                 created_at=created_at,
+                source_trace=project_source_trace,
             )
 
     directory = DATASETS_DIR / "recognition"
@@ -523,10 +546,10 @@ def _option_label(prompt: QuizPrompt, option) -> tuple[str | None, str | None, s
         return "GOOD_DECISION", "QUIZ_AUTHOR", "Option is marked correct by the quiz author.", trace
     if within_best:
         return "GOOD_DECISION", "EXPECTED_VALUE", "Option expected value is within 0.1 of the prompt maximum expected value.", trace
-    if not option.is_correct:
-        return "BAD_DECISION", "QUIZ_AUTHOR", "Option is not marked correct by the quiz author.", trace
     if below_best:
         return "BAD_DECISION", "EXPECTED_VALUE", "Option expected value is lower than the prompt maximum by at least 0.25.", trace
+    if not option.is_correct:
+        return "BAD_DECISION", "QUIZ_AUTHOR", "Option is not marked correct by the quiz author.", trace
     return None, None, None, trace
 
 
@@ -555,6 +578,7 @@ def curate_decision_dataset() -> DatasetManifest:
         prompts = _read_json_list(directory / "quiz_prompts.json", _PROMPTS_ADAPTER)
         attempts = _read_json_list(directory / "quiz_attempts.json", _ATTEMPTS_ADAPTER)
         prompt_by_id = {prompt.prompt_id: prompt for prompt in prompts}
+        project_source_trace = _source_trace(directory)
 
         for prompt in prompts:
             project_ids.add(prompt.project_id)
@@ -580,6 +604,7 @@ def curate_decision_dataset() -> DatasetManifest:
                         "option": option.model_dump(mode="json"),
                     },
                     created_at=created_at,
+                    source_trace=project_source_trace,
                 )
 
         for attempt in attempts:
@@ -613,6 +638,7 @@ def curate_decision_dataset() -> DatasetManifest:
                     "prompt": prompt.model_dump(mode="json") if prompt is not None else None,
                 },
                 created_at=created_at,
+                source_trace=project_source_trace,
             )
 
     directory = DATASETS_DIR / "decision"
