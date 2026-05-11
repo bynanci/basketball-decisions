@@ -8,6 +8,7 @@
         <RouterLink to="/training">Training</RouterLink>
         <RouterLink to="/situations">Situations</RouterLink>
         <RouterLink to="/local-lab">Local Lab</RouterLink>
+        <RouterLink to="/player-value">Player Value</RouterLink>
         <RouterLink to="/reference-videos">Reference Videos</RouterLink>
       </nav>
     </header>

@@ -13,6 +13,7 @@ import SituationPreviewPage from '../pages/SituationPreviewPage.vue'
 import LocalLabPage from '../pages/LocalLabPage.vue'
 import ReferenceVideosPage from '../pages/ReferenceVideosPage.vue'
 import ReferenceVideoDetailPage from '../pages/ReferenceVideoDetailPage.vue'
+import PlayerValuePage from '../pages/PlayerValuePage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -22,6 +23,7 @@ export const router = createRouter({
     { path: '/training', name: 'training-lobby', component: TrainingLobbyPage },
     { path: '/situations', name: 'situation-preview', component: SituationPreviewPage },
     { path: '/local-lab', name: 'local-lab', component: LocalLabPage },
+    { path: '/player-value', name: 'player-value', component: PlayerValuePage },
     { path: '/reference-videos', name: 'reference-videos', component: ReferenceVideosPage },
     { path: '/reference-videos/:referenceId', name: 'reference-video-detail', component: ReferenceVideoDetailPage, props: true },
     { path: '/projects/:projectId', name: 'project', component: ProjectPage, props: true },

@@ -479,3 +479,54 @@ M12 adds a local, manual Player Identity layer so reviewers can associate one or
 - `player_key` is a local identifier intended for future Player Value features and is not a claim about a real-world player identity.
 - Raw tracking artifacts remain unchanged. Cleaned tracking review artifacts and player aliases are stored separately.
 - Project bundles include `player_aliases` when the artifact exists, allowing refresh-safe hydration of manual alias assignments.
+
+## Player Value v1
+
+M13 adds an explainable, local-only Player Value Engine that aggregates Decision Engine events by Player Identity aliases. It is available in the UI at `/player-value` and through:
+
+```bash
+curl -X POST http://localhost:8000/api/local-lab/player-value/build
+curl http://localhost:8000/api/local-lab/player-value
+```
+
+The build reads local JSON artifacts only:
+
+- `backend/app/data/datasets/player_value/player_decision_events.jsonl` from Decision Engine v1;
+- per-project `player_aliases.json` from Player Identity & Track Alias;
+- `tracking_cleaned.json` or `tracking.json` for participation scoring;
+- `tracking_review_patch.json` and local recognition quality scoring signals for reliability checks;
+- optional per-project `source.json` for trace metadata.
+
+Summaries are stored at:
+
+```text
+backend/app/data/datasets/player_value/player_value_summary.json
+```
+
+The v1 formula is intentionally transparent and deterministic:
+
+```text
+Player Value =
+  0.45 * avg_role_adjusted_score
++ 0.20 * consistency_score
++ 0.15 * recognition_reliability_score
++ 0.10 * improvement_score
++ 0.10 * participation_score
+```
+
+Component definitions:
+
+- `avg_role_adjusted_score` is the average Decision Engine role-adjusted score for linked decision events, falling back to `0` when there are no events.
+- `consistency_score` is `100 - stddev(role_adjusted_score)`, clipped to `0..100`.
+- `recognition_reliability_score` starts from local alias tracks and tracking-review/recognition risk signals. It falls back to `50` when no recognition score is available.
+- `improvement_score` compares first-half and second-half role-adjusted decision scores. Sparse summaries fall back to `50`.
+- `participation_score` uses the aliased track point-count percentile within the project and falls back to `50` when tracking is unavailable.
+
+Identity limitations are important:
+
+- Player Value v1 uses only the local `player_key` from `player_aliases.json`.
+- It does **not** claim real player names, jersey identities, or scouting-grade identity resolution.
+- If a decision event already includes `player_key`, that key is used. Otherwise, the builder looks for `track_id`, `track_ids`, or `source_track_ids` in the prompt/option/event trace and maps those track IDs through local aliases.
+- If no alias can be found, the summary uses `player_key="UNKNOWN"` and includes warnings rather than inventing an identity.
+
+Player Value v1 is not a learned Player Value model and is not scouting-grade. It is a local analytics summary intended to make decision-event quality, recognition reliability, trend, and participation assumptions inspectable before any future model work.
