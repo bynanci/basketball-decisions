@@ -74,7 +74,7 @@ def _write_prompt_with_track(directory: Path, project_id: str = "project-1", tra
                 "end": {"x": 0.2, "y": 0.2},
                 "is_correct": False,
                 "explanation": "No",
-                "trace": {"track_id": track_id},
+                "source_track_ids": [track_id],
             },
             {
                 "option_id": "B",
@@ -150,6 +150,27 @@ def test_uses_alias_when_track_id_maps_to_player_key(client: TestClient, tmp_pat
     assert summary["player_key"] == "P1"
     assert summary["display_name"] == "Local P1"
     assert summary["track_ids"] == ["track-1"]
+
+
+def test_context_only_event_does_not_use_alias_track_for_player_value(client: TestClient, tmp_path: Path) -> None:
+    directory = tmp_path / "project-1"
+    _write_project(directory)
+    write_json_model(
+        directory / "player_aliases.json",
+        PlayerAliasListResponse(
+            project_id="project-1",
+            aliases=[PlayerAlias(project_id="project-1", player_key="P1", track_ids=["track-1"], display_name="Local P1", team_side="HOME")],
+        ),
+    )
+    _write_events(tmp_path, [_event(context_track_ids=["track-1"], source_track_ids=[])])
+
+    response = client.post("/api/local-lab/player-value/build")
+
+    assert response.status_code == 200
+    summary = response.json()["summaries"][0]
+    assert summary["player_key"] == "UNKNOWN"
+    assert summary["track_ids"] == []
+    assert any("only frame context tracks" in warning for warning in summary["warnings"])
 
 
 def test_uses_alias_when_decision_event_persists_source_track_ids(client: TestClient, tmp_path: Path) -> None:

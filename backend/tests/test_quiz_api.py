@@ -263,7 +263,7 @@ def test_can_create_valid_prompt(client: TestClient, tmp_path: Path) -> None:
     assert (tmp_path / "project-1" / "quiz_prompts.json").exists()
 
 
-def test_create_prompt_persists_source_track_links_from_payload_and_frame_tracking(client: TestClient, tmp_path: Path) -> None:
+def test_create_prompt_keeps_context_and_source_track_links_separate(client: TestClient, tmp_path: Path) -> None:
     directory = write_project(tmp_path)
     write_tracking(directory)
     payload = valid_prompt_payload()
@@ -274,18 +274,21 @@ def test_create_prompt_persists_source_track_links_from_payload_and_frame_tracki
 
     assert response.status_code == 200
     prompt = response.json()
+    assert prompt["context_track_ids"] == ["track-1"]
     assert prompt["source_track_ids"] == ["manual-track"]
     assert prompt["options"][0]["source_track_ids"] == ["track-1"]
 
 
-def test_create_prompt_defaults_source_track_links_from_frame_tracking(client: TestClient, tmp_path: Path) -> None:
+def test_create_prompt_defaults_context_track_links_from_frame_tracking(client: TestClient, tmp_path: Path) -> None:
     directory = write_project(tmp_path)
     write_tracking(directory)
 
     response = client.post("/api/projects/project-1/quiz-prompts", json=valid_prompt_payload())
 
     assert response.status_code == 200
-    assert response.json()["source_track_ids"] == ["track-1"]
+    payload = response.json()
+    assert payload["context_track_ids"] == ["track-1"]
+    assert payload["source_track_ids"] == []
 
 
 def test_can_list_prompts(client: TestClient, tmp_path: Path) -> None:

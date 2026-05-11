@@ -483,6 +483,7 @@ export interface QuizPrompt {
   mode: QuizPromptMode
   question_mode: QuizQuestionMode
   time_limit_ms?: number | null
+  context_track_ids: string[]
   source_track_ids: string[]
   options: DecisionQuizOption[]
   explanation: string
@@ -508,6 +509,7 @@ export interface CreateQuizPromptRequest {
   mode: QuizPromptMode
   question_mode: QuizQuestionMode
   time_limit_ms?: number | null
+  context_track_ids?: string[]
   source_track_ids?: string[]
   options: DecisionQuizOption[]
   explanation: string

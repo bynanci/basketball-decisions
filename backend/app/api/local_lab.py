@@ -51,6 +51,7 @@ from app.models import (
 from app.models.base import utc_now
 from app.models.tracking import Detection, PlayerTrack
 from app.pipeline.recognition_quality import score_project_recognition
+from app.models.quiz import normalize_track_id_list
 from app.services.decision_engine import evaluate_attempt
 from app.services.decision_diagnostics import build_decision_diagnostics
 from app.services.dataset_health import dataset_health_response
@@ -983,21 +984,38 @@ def _read_decision_event_rows(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _track_ids_from_payload(payload: Any) -> set[str]:
-    track_ids: set[str] = set()
-    if isinstance(payload, dict):
-        for key, value in payload.items():
-            if key == "track_id" and isinstance(value, str) and value.strip():
-                track_ids.add(value.strip())
-            elif key in {"track_ids", "source_track_ids"} and isinstance(value, list):
-                track_ids.update(str(item).strip() for item in value if str(item).strip())
-            else:
-                track_ids.update(_track_ids_from_payload(value))
-    elif isinstance(payload, list):
-        for item in payload:
-            track_ids.update(_track_ids_from_payload(item))
-    return track_ids
+def _identity_track_ids_from_event_trace(
+    row: dict[str, Any], event: DecisionEvent, prompt: dict[str, Any]
+) -> tuple[set[str], bool]:
+    """Return identity-bearing track IDs without treating frame context as identity.
 
+    Migration safety: context_track_ids describe everyone visible in a frame. They
+    are intentionally excluded here so Player Value cannot pick the first alias
+    from a multi-player frame. The only fallback reads explicit option-level
+    source_track_ids from old prompt traces when an older event row lacks its own
+    source_track_ids.
+    """
+
+    source_track_ids = set(normalize_track_id_list(event.source_track_ids))
+    if source_track_ids:
+        return source_track_ids, False
+
+    fallback_track_ids: set[str] = set()
+    if event.selected_option_id and isinstance(prompt.get("options"), list):
+        for option in prompt["options"]:
+            if isinstance(option, dict) and option.get("option_id") in {event.selected_option_id, event.correct_option_id}:
+                fallback_track_ids.update(
+                    str(item).strip()
+                    for item in option.get("source_track_ids", [])
+                    if str(item).strip()
+                )
+    if fallback_track_ids:
+        return fallback_track_ids, False
+
+    context_track_ids = set(normalize_track_id_list(event.context_track_ids))
+    if not context_track_ids and isinstance(row.get("context_track_ids"), list):
+        context_track_ids = set(str(item).strip() for item in row["context_track_ids"] if str(item).strip())
+    return set(), bool(context_track_ids)
 
 def _raw_prompts_by_project() -> dict[str, dict[str, dict[str, Any]]]:
     prompts_by_project: dict[str, dict[str, dict[str, Any]]] = {}
@@ -1155,15 +1173,14 @@ def _build_player_value_response() -> PlayerValueBuildResponse:
             ) from exc
         project_id = event.project_id
         prompt = prompts_by_project.get(project_id, {}).get(event.prompt_id, {})
-        prompt_without_options = {key: value for key, value in prompt.items() if key != "options"}
-        candidate_track_ids = _track_ids_from_payload(row) | _track_ids_from_payload(prompt_without_options)
-        if event.selected_option_id and isinstance(prompt.get("options"), list):
-            for option in prompt["options"]:
-                if isinstance(option, dict) and option.get("option_id") in {event.selected_option_id, event.correct_option_id}:
-                    candidate_track_ids.update(_track_ids_from_payload(option))
+        candidate_track_ids, has_context_only_tracks = _identity_track_ids_from_event_trace(row, event, prompt)
 
         explicit_player_key = row.get("player_key")
         warning_messages: list[str] = []
+        if has_context_only_tracks:
+            warning_messages.append(
+                "Decision event has only frame context tracks and no identity-bearing source_track_ids; assigned to UNKNOWN."
+            )
         if isinstance(explicit_player_key, str) and explicit_player_key.strip():
             player_key = explicit_player_key.strip()
         else:

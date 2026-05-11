@@ -108,7 +108,8 @@ def test_decision_events_persist_prompt_and_option_source_track_links(
 ) -> None:
     monkeypatch.setattr(local_lab, "DATASETS_DIR", tmp_path / "datasets")
     prompt = _prompt(
-        source_track_ids=["frame-track"],
+        context_track_ids=["frame-track"],
+        source_track_ids=["prompt-actor-track"],
         options=[
             _option("A", expected_value=1.12) | {"source_track_ids": ["selected-track"]},
             _option("C", is_correct=True, expected_value=1.18) | {"source_track_ids": ["correct-track"]},
@@ -122,7 +123,8 @@ def test_decision_events_persist_prompt_and_option_source_track_links(
     assert response.status_code == 200
     output_path = tmp_path / "datasets" / "player_value" / "player_decision_events.jsonl"
     event = json.loads(output_path.read_text(encoding="utf-8").strip())
-    assert event["source_track_ids"] == ["frame-track", "selected-track", "correct-track"]
+    assert event["context_track_ids"] == ["frame-track"]
+    assert event["source_track_ids"] == ["prompt-actor-track", "selected-track", "correct-track"]
 
 
 def test_decision_events_use_rule_based_fallback_and_role_bonuses(

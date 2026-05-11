@@ -13,6 +13,8 @@ def _round_cost(value: float | None) -> float | None:
 
 
 def _source_track_ids(prompt: QuizPrompt, selected_option_id: str | None, correct_option_id: str) -> list[str]:
+    # Identity-bearing links only. Frame context tracks are persisted separately
+    # on DecisionEvent.context_track_ids and must never be promoted to source links.
     track_ids = list(prompt.source_track_ids)
     option_ids = {correct_option_id}
     if selected_option_id is not None:
@@ -117,6 +119,7 @@ def evaluate_attempt(prompt: QuizPrompt, attempt: QuizAttemptRecord) -> Decision
         response_time_ms=attempt.response_time_ms,
         timed_out=attempt.timed_out,
         evaluation_source=evaluation_source,
+        context_track_ids=prompt.context_track_ids,
         source_track_ids=_source_track_ids(prompt, attempt.selected_option_id, correct_option.option_id),
         explanations=explanations,
         created_at=utc_now(),

@@ -59,7 +59,7 @@ def _write_attempts(project_id: str, attempts: list[QuizAttemptRecord]) -> None:
     path.write_text(json.dumps([attempt.model_dump(mode="json") for attempt in attempts], indent=2), encoding="utf-8")
 
 
-def _frame_source_track_ids(project_id: str, frame_index: int) -> list[str]:
+def _frame_context_track_ids(project_id: str, frame_index: int) -> list[str]:
     directory = require_project_dir(project_id)
     tracking_path = directory / "tracking_cleaned.json" if (directory / "tracking_cleaned.json").exists() else directory / "tracking.json"
     if not tracking_path.exists():
@@ -158,7 +158,10 @@ def create_quiz_prompt(project_id: str, payload: CreateQuizPromptRequest) -> Qui
         mode=payload.mode,
         question_mode=payload.question_mode,
         time_limit_ms=payload.time_limit_ms,
-        source_track_ids=payload.source_track_ids or _frame_source_track_ids(project_id, payload.frame_index),
+        context_track_ids=payload.context_track_ids or _frame_context_track_ids(project_id, payload.frame_index),
+        # source_track_ids are identity-bearing links only; do not default them
+        # from all frame tracks or Player Value may attribute to the wrong alias.
+        source_track_ids=payload.source_track_ids,
         options=payload.options,
         explanation=payload.explanation,
         created_at=now,
