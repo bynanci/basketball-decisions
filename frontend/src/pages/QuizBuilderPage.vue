@@ -50,6 +50,14 @@ const situationTypes = SITUATION_TYPES as SituationType[]
 const project = computed(() => projectStore.getProject(props.projectId))
 const frameIndex = computed(() => Number(route.query.frameIndex))
 const selectedFrame = computed(() => project.value?.frames.find((frame) => frame.frame_index === frameIndex.value) ?? null)
+const selectedFrameForTrackMatching = computed(() => {
+  if (!selectedFrame.value) return null
+  return {
+    ...selectedFrame.value,
+    width: selectedFrame.value.width ?? project.value?.videoAsset?.width ?? null,
+    height: selectedFrame.value.height ?? project.value?.videoAsset?.height ?? null
+  }
+})
 const hasVideoSource = computed(() => project.value?.videoAsset?.source_type === 'upload' && !!project.value.videoAsset.asset_id)
 const effectiveMode = computed<QuizPromptMode>(() => (mode.value === 'VIDEO_FREEZE' && hasVideoSource.value ? 'VIDEO_FREEZE' : 'STILL_FRAME'))
 const imageSrc = computed(() => (Number.isFinite(frameIndex.value) ? apiClient.frameImageUrl(props.projectId, frameIndex.value) : ''))
@@ -135,8 +143,8 @@ function normalizeRoleFeedback(option: DecisionQuizOption) {
 }
 
 function sourceTrackIdsForOption(option: DecisionQuizOption) {
-  if (!project.value || !selectedFrame.value) return option.source_track_ids ?? []
-  return nearestSourceTrackIdsForOption(project.value, selectedFrame.value, option.start, option.source_track_ids ?? [])
+  if (!project.value || !selectedFrameForTrackMatching.value) return option.source_track_ids ?? []
+  return nearestSourceTrackIdsForOption(project.value, selectedFrameForTrackMatching.value, option.start, option.source_track_ids ?? [])
 }
 
 function createOption(payload: { start: DecisionArrowPoint; end: DecisionArrowPoint }) {
@@ -188,7 +196,7 @@ async function savePrompt() {
       role_feedback: normalizeRoleFeedback(option)
     }))
     const trackPayload = project.value
-      ? quizBuilderTrackPayload(project.value, selectedFrame.value, sanitizedOptions)
+      ? quizBuilderTrackPayload(project.value, selectedFrameForTrackMatching.value ?? selectedFrame.value, sanitizedOptions)
       : { context_track_ids: [], source_track_ids: [], options: sanitizedOptions.map((option) => ({ ...option, source_track_ids: option.source_track_ids ?? [] })) }
     const prompt = await apiClient.createQuizPrompt(props.projectId, {
       question: question.value,
