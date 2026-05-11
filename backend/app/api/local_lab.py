@@ -1189,9 +1189,10 @@ def _build_player_value_response() -> PlayerValueBuildResponse:
             if len(unique_aliases) == 1:
                 player_key = next(iter(unique_aliases))
             elif len(unique_aliases) > 1:
-                player_key = sorted(unique_aliases)[0]
+                player_key = "UNKNOWN"
+                alias_keys = ", ".join(sorted(unique_aliases))
                 warning_messages.append(
-                    f"Decision event {event.attempt_id} matched multiple aliases; used {player_key} without inventing identity."
+                    f"Decision event {event.attempt_id} matched multiple aliases ({alias_keys}); assigned to UNKNOWN instead of guessing identity."
                 )
             else:
                 player_key = "UNKNOWN"

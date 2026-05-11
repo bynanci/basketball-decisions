@@ -546,7 +546,9 @@ Quiz prompts separate frame context from player identity links:
 
 - `context_track_ids` are frame context only. They may contain every reviewed/cleaned track visible in the freeze frame so the prompt can keep local scene context.
 - `source_track_ids` are identity-bearing links. Prompt-level source links, and especially option-level source links, identify the player track(s) directly involved in a decision.
+- Quiz Builder links option source tracks by comparing normalized arrow starts to image-space track points. Pixel track points are normalized with the frame dimensions before distance matching, and reviewed `tracking_cleaned.json` tracks are preferred over raw tracking when review artifacts are present.
 - Player Value alias attribution uses only `source_track_ids`; it does not use `context_track_ids` to resolve aliases. This prevents multi-player frames from being assigned to the first sorted alias just because every visible track was stored with the prompt.
 - Prompts without identity-bearing source links can still train and evaluate decision logic. Their Player Value summaries may fall back to `UNKNOWN` attribution with a warning instead of guessing a player.
+- If identity-bearing source tracks map to multiple aliases, Player Value assigns the event to `UNKNOWN` with a warning instead of choosing the first sorted alias.
 
 Player Value v1 is not a learned Player Value model and is not scouting-grade. It is a local analytics summary intended to make decision-event quality, recognition reliability, trend, and participation assumptions inspectable before any future model work.
