@@ -1,4 +1,6 @@
+import builtins
 import json
+import pickle
 import sys
 import types
 from pathlib import Path
@@ -151,6 +153,70 @@ def _install_fake_sklearn(monkeypatch) -> None:
         monkeypatch.setitem(sys.modules, name, module)
 
 
+def _block_sklearn_imports(monkeypatch) -> None:
+    real_import = builtins.__import__
+
+    def blocked_import(name, *args, **kwargs):
+        if name == "sklearn" or name.startswith("sklearn."):
+            raise ImportError("No module named 'sklearn'")
+        return real_import(name, *args, **kwargs)
+
+    for module_name in list(sys.modules):
+        if module_name == "sklearn" or module_name.startswith("sklearn."):
+            monkeypatch.delitem(sys.modules, module_name, raising=False)
+    monkeypatch.setattr(builtins, "__import__", blocked_import)
+
+
+def _write_active_model_with_missing_sklearn_import(tmp_path: Path, monkeypatch) -> None:
+    sklearn = types.ModuleType("sklearn")
+    pipeline_module = types.ModuleType("sklearn.pipeline")
+    MissingModel = type("MissingModel", (), {})
+    MissingModel.__module__ = "sklearn.pipeline"
+    pipeline_module.MissingModel = MissingModel
+    monkeypatch.setitem(sys.modules, "sklearn", sklearn)
+    monkeypatch.setitem(sys.modules, "sklearn.pipeline", pipeline_module)
+
+    model_dir = tmp_path / "models" / "recognition" / "v001"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    with (model_dir / "model.pkl").open("wb") as file:
+        pickle.dump(MissingModel(), file)
+    (model_dir / "metrics.json").write_text(
+        json.dumps(
+            {
+                "accuracy": 1.0,
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1": 1.0,
+                "confusion_matrix": [[1, 0], [0, 1]],
+                "train_sample_count": 100,
+                "test_sample_count": 20,
+                "feature_importance": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (model_dir / "feature_schema.json").write_text(json.dumps({"feature_names": []}), encoding="utf-8")
+    (tmp_path / "models" / "recognition" / "model_registry.json").write_text(
+        json.dumps(
+            {
+                "active_version": "v001",
+                "models": [
+                    {
+                        "version": "v001",
+                        "active": True,
+                        "model_path": str(model_dir / "model.pkl"),
+                        "metrics_path": str(model_dir / "metrics.json"),
+                        "feature_schema_path": str(model_dir / "feature_schema.json"),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delitem(sys.modules, "sklearn", raising=False)
+    monkeypatch.delitem(sys.modules, "sklearn.pipeline", raising=False)
+
+
 def _write_tracking_project(tmp_path: Path, project_id: str) -> bytes:
     project_dir = tmp_path / project_id
     write_json_model(project_dir / "project.json", Project(project_id=project_id, name="Score me"))
@@ -188,6 +254,17 @@ def test_training_fails_cleanly_when_dataset_too_small(client: TestClient, tmp_p
     assert response.json()["details"]["sample_count"] == 1
 
 
+def test_training_without_sklearn_returns_dependency_error(client: TestClient, tmp_path: Path, monkeypatch) -> None:
+    _block_sklearn_imports(monkeypatch)
+    _write_curated_samples(tmp_path, _sufficient_rows())
+
+    response = client.post("/api/local-lab/models/recognition/train-baseline")
+
+    assert response.status_code == 501
+    assert response.json()["code"] == "SCIKIT_LEARN_NOT_INSTALLED"
+    assert response.json()["debug_hint"] == "install scikit-learn"
+
+
 def test_training_writes_registry_and_metrics_when_data_sufficient(client: TestClient, tmp_path: Path, monkeypatch) -> None:
     _install_fake_sklearn(monkeypatch)
     _write_curated_samples(tmp_path, _sufficient_rows())
@@ -211,6 +288,17 @@ def test_scoring_without_active_model_returns_clear_error(client: TestClient, tm
 
     assert response.status_code == 404
     assert response.json()["code"] == "NO_ACTIVE_RECOGNITION_MODEL"
+
+
+def test_model_scoring_missing_sklearn_returns_dependency_error(client: TestClient, tmp_path: Path, monkeypatch) -> None:
+    _write_tracking_project(tmp_path, "score-project")
+    _write_active_model_with_missing_sklearn_import(tmp_path, monkeypatch)
+
+    response = client.post("/api/local-lab/models/recognition/score-project/score-project")
+
+    assert response.status_code == 501
+    assert response.json()["code"] == "SCIKIT_LEARN_NOT_INSTALLED"
+    assert response.json()["debug_hint"] == "install scikit-learn"
 
 
 def test_model_scoring_does_not_mutate_project_artifacts(client: TestClient, tmp_path: Path, monkeypatch) -> None:

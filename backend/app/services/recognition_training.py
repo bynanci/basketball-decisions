@@ -255,6 +255,16 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _scikit_learn_dependency_error(exc: ImportError) -> None:
+    raise api_error(
+        501,
+        "SCIKIT_LEARN_NOT_INSTALLED",
+        "Recognition baseline training and scoring require scikit-learn, which is not installed.",
+        {},
+        "install scikit-learn",
+    ) from exc
+
+
 def train_baseline(datasets_dir: Path, models_dir: Path) -> RecognitionModelInfo:
     samples = read_curated_recognition_samples(datasets_dir)
     rows = extract_curated_feature_rows(samples)
@@ -266,13 +276,7 @@ def train_baseline(datasets_dir: Path, models_dir: Path) -> RecognitionModelInfo
         from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score  # type: ignore[import-not-found]
         from sklearn.pipeline import Pipeline  # type: ignore[import-not-found]
     except ImportError as exc:
-        raise api_error(
-            501,
-            "SCIKIT_LEARN_NOT_INSTALLED",
-            "Recognition baseline training requires scikit-learn, which is not installed.",
-            {},
-            "install scikit-learn",
-        ) from exc
+        _scikit_learn_dependency_error(exc)
 
     train_rows, test_rows = _split_rows(rows)
     model = Pipeline(
@@ -356,8 +360,13 @@ def _load_active_model(models_dir: Path) -> tuple[str, Any]:
             {"version": registry.active_version, "model_path": str(model_path)},
             "Re-train the recognition baseline to rebuild model.pkl.",
         )
-    with model_path.open("rb") as file:
-        return registry.active_version, pickle.load(file)
+    try:
+        with model_path.open("rb") as file:
+            return registry.active_version, pickle.load(file)
+    except ModuleNotFoundError as exc:
+        if exc.name and exc.name.startswith("sklearn"):
+            _scikit_learn_dependency_error(exc)
+        raise
 
 
 def _risk_scores(model: Any, rows: list[list[float | None]]) -> list[float]:
