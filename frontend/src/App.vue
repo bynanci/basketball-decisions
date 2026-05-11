@@ -10,6 +10,7 @@
         <RouterLink to="/local-lab">Local Lab</RouterLink>
         <RouterLink to="/player-value">Player Value</RouterLink>
         <RouterLink to="/reference-videos">Reference Videos</RouterLink>
+        <RouterLink to="/decision-rules">Decision Rules</RouterLink>
       </nav>
     </header>
     <main>

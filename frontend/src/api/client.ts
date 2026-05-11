@@ -932,6 +932,61 @@ export interface DecisionRuleDraft {
   updated_at: string
 }
 
+
+export type DecisionRuleStatus = 'ACTIVE' | 'DISABLED'
+
+export interface DecisionRule {
+  rule_id: string
+  source_draft_id?: string | null
+  court_role: CourtRoleTarget
+  situation_type: SituationType
+  condition_text: string
+  positive_cue: string
+  negative_cue: string
+  weight: number
+  explanation: string
+  status: DecisionRuleStatus
+  created_at: string
+  updated_at: string
+  approved_at: string
+  approved_by?: string | null
+}
+
+export interface DecisionRuleSet {
+  rule_set_id: string
+  name: string
+  version: number
+  rules: DecisionRule[]
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface DecisionRuleSetListResponse {
+  rule_sets: DecisionRuleSet[]
+  active_rule_set?: DecisionRuleSet | null
+}
+
+export interface ApproveDecisionRuleDraftRequest {
+  rule_set_id?: string | null
+  approved_by?: string | null
+}
+
+export interface CreateDecisionRuleSetRequest {
+  name: string
+  version?: number
+  active?: boolean
+}
+
+export interface UpdateDecisionRuleRequest {
+  condition_text?: string
+  positive_cue?: string
+  negative_cue?: string
+  weight?: number
+  explanation?: string
+  status?: DecisionRuleStatus
+}
+
 export interface ReferenceVideoDraftSummary {
   reference_only_source_count: number
   quiz_prompt_draft_count: number
@@ -1066,5 +1121,17 @@ export const apiClient = {
     request<DecisionRuleDraft>(`/reference-videos/${referenceId}/notes/${noteId}/rule-draft`, { method: 'POST' }),
   listReferenceQuizDrafts: (referenceId: string) => request<QuizPromptDraft[]>(`/reference-videos/${referenceId}/quiz-drafts`),
   listReferenceRuleDrafts: (referenceId: string) => request<DecisionRuleDraft[]>(`/reference-videos/${referenceId}/rule-drafts`),
+  listDecisionRuleDrafts: () => request<DecisionRuleDraft[]>('/decision-rules/drafts'),
+  approveDecisionRuleDraft: (draftId: string, payload: ApproveDecisionRuleDraftRequest = {}) =>
+    request<DecisionRule>(`/decision-rules/drafts/${draftId}/approve`, { method: 'POST', body: JSON.stringify(payload) }),
+  rejectDecisionRuleDraft: (draftId: string) =>
+    request<DecisionRuleDraft>(`/decision-rules/drafts/${draftId}/reject`, { method: 'POST' }),
+  listDecisionRuleSets: () => request<DecisionRuleSetListResponse>('/decision-rules/rule-sets'),
+  createDecisionRuleSet: (payload: CreateDecisionRuleSetRequest) =>
+    request<DecisionRuleSet>('/decision-rules/rule-sets', { method: 'POST', body: JSON.stringify(payload) }),
+  activateDecisionRuleSet: (ruleSetId: string) =>
+    request<DecisionRuleSet>(`/decision-rules/rule-sets/${ruleSetId}/activate`, { method: 'PUT' }),
+  updateDecisionRule: (ruleId: string, payload: UpdateDecisionRuleRequest) =>
+    request<DecisionRule>(`/decision-rules/rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getReferenceVideoSummary: () => request<ReferenceVideoDraftSummary>('/local-lab/reference-video-summary')
 }

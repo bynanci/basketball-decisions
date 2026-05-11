@@ -398,6 +398,11 @@ Reference video storage is local JSON only under `backend/app/data/reference_vid
 - `quiz_prompt_drafts.json` stores draft quiz prompts generated from breakdown notes.
 - `decision_rule_drafts.json` stores draft decision-rule candidates generated from breakdown notes.
 
+Decision rule approval storage is local JSON only under `backend/app/data/decision_rules/`:
+
+- `rule_sets.json` stores every human-managed rule set and its approved rules.
+- `active_rule_set.json` stores the currently active rule set snapshot used by downstream local rule consumers.
+
 Important governance behavior:
 
 - YouTube videos are stored as metadata only.
@@ -412,6 +417,26 @@ Breakdown notes can be converted into draft assets:
 - Rule drafts copy the note's role and situation, use `concept` as the condition, use `good_read` and `bad_read` as positive/negative cues, set `suggested_weight=1.0`, and keep `coaching_cue` as the explanation.
 
 Local Lab also displays reference-only source, prompt draft, and rule draft counts so users can see authoring progress without confusing drafts with exportable training data.
+
+## Decision Rule Approval Workflow
+
+M15 adds a human approval workflow for turning `DecisionRuleDraft` records into governed local decision rules. The frontend route is `/decision-rules`, and the backend API is mounted under `/api/decision-rules`. Reference breakdown notes still create drafts only; reference video rules are **not auto-approved**. A coach or reviewer must explicitly approve a draft before it appears in a rule set.
+
+Approval lifecycle API:
+
+```http
+GET /api/decision-rules/drafts
+POST /api/decision-rules/drafts/{draft_id}/approve
+POST /api/decision-rules/drafts/{draft_id}/reject
+GET /api/decision-rules/rule-sets
+POST /api/decision-rules/rule-sets
+PUT /api/decision-rules/rule-sets/{rule_set_id}/activate
+PUT /api/decision-rules/rules/{rule_id}
+```
+
+Drafts can also be rejected, which marks the draft reviewed without creating a rule. When a draft is approved, the backend creates a `DecisionRule`, copies `court_role`, `situation_type`, `condition_text`, `positive_cue`, `negative_cue`, and `explanation`, maps `suggested_weight` to `weight`, marks the rule `ACTIVE`, records approval metadata, and adds it to the selected rule set or the active/default rule set. Rules can later be marked `DISABLED` without deleting their audit trail. Rule sets can be created and activated, but only one rule set is active at a time.
+
+These active rules are deterministic local JSON configuration, not ML training data and not a learned model. Approving a rule from a reference-only breakdown does **not** export the original video, note, draft, or rule as a training sample. The rule set is intended to inform a future Decision Engine v2 rule layer while preserving the current source-governance boundary.
 
 ## Recognition Baseline Trainer
 

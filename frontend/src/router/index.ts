@@ -13,6 +13,7 @@ import SituationPreviewPage from '../pages/SituationPreviewPage.vue'
 import LocalLabPage from '../pages/LocalLabPage.vue'
 import ReferenceVideosPage from '../pages/ReferenceVideosPage.vue'
 import ReferenceVideoDetailPage from '../pages/ReferenceVideoDetailPage.vue'
+import DecisionRulesPage from '../pages/DecisionRulesPage.vue'
 import PlayerValuePage from '../pages/PlayerValuePage.vue'
 import PlayerValueDetailPage from '../pages/PlayerValueDetailPage.vue'
 
@@ -28,6 +29,7 @@ export const router = createRouter({
     { path: '/player-value/:projectId/:playerKey', name: 'player-value-detail', component: PlayerValueDetailPage, props: true },
     { path: '/reference-videos', name: 'reference-videos', component: ReferenceVideosPage },
     { path: '/reference-videos/:referenceId', name: 'reference-video-detail', component: ReferenceVideoDetailPage, props: true },
+    { path: '/decision-rules', name: 'decision-rules', component: DecisionRulesPage },
     { path: '/projects/:projectId', name: 'project', component: ProjectPage, props: true },
     { path: '/projects/:projectId/calibration', name: 'calibration', component: CalibrationPage, props: true },
     { path: '/projects/:projectId/pipeline', name: 'pipeline', component: PipelinePage, props: true },
