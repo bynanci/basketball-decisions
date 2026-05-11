@@ -13,7 +13,9 @@ export function effectiveQuizBuilderTracks(project: TrackProjectLike): PlayerTra
   const excluded = excludedTrackIds(project)
   const sourceTracks = project.trackingReview?.cleaned_tracking?.tracks?.length
     ? project.trackingReview.cleaned_tracking.tracks
-    : project.tracks
+    : project.trackingReview?.tracking?.tracks?.length
+      ? project.trackingReview.tracking.tracks
+      : project.tracks
   return sourceTracks.filter((track) => !excluded.has(track.track_id))
 }
 
