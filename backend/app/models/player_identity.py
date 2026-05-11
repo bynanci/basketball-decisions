@@ -37,12 +37,23 @@ class PlayerAlias(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
+    @field_validator("player_key")
+    @classmethod
+    def player_key_must_not_be_blank(cls, player_key: str) -> str:
+        normalized = player_key.strip()
+        if not normalized:
+            raise ValueError("player_key is required")
+        return normalized
+
     @field_validator("track_ids")
     @classmethod
     def track_ids_must_be_unique(cls, track_ids: list[str]) -> list[str]:
-        if len(track_ids) != len(set(track_ids)):
+        normalized_track_ids = [track_id.strip() for track_id in track_ids]
+        if any(not track_id for track_id in normalized_track_ids):
+            raise ValueError("track_ids must not contain blank values")
+        if len(normalized_track_ids) != len(set(normalized_track_ids)):
             raise ValueError("track_ids must be unique within each alias")
-        return track_ids
+        return normalized_track_ids
 
 
 class PlayerAliasListResponse(BaseModel):

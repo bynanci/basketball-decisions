@@ -54,6 +54,7 @@ def test_bundle_returns_project_with_null_optional_artifacts(client: TestClient,
     assert payload["tracking"] is None
     assert payload["projected_tracks"] is None
     assert payload["tracking_review"] is None
+    assert payload["player_aliases"] == {"project_id": "project-1", "aliases": []}
 
 
 def test_bundle_returns_video_when_video_json_exists(client: TestClient, tmp_path: Path) -> None:

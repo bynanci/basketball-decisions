@@ -48,4 +48,4 @@ class ProjectBundleResponse(BaseModel):
     tracking: RunTrackingResponse | None = None
     projected_tracks: ProjectTracksResponse | None = None
     tracking_review: TrackReviewResponse | None = None
-    player_aliases: PlayerAliasListResponse | None = None
+    player_aliases: PlayerAliasListResponse

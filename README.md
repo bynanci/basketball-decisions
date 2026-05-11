@@ -2,6 +2,17 @@
 
 A minimal runnable monorepo for basketball-video decision experiments. The repo has a Vite + Vue 3 + TypeScript frontend and a FastAPI backend with local JSON storage for projects, uploads, extracted frames, manual calibration, tracking, and projected 2D court paths.
 
+## Repository-level npm scripts
+
+For convenience, root-level npm scripts delegate to the frontend package:
+
+```bash
+npm test
+npm run build
+```
+
+Use `cd frontend && npm install` first when frontend dependencies have not been installed yet.
+
 ## Repository layout
 
 ```text
