@@ -1,13 +1,27 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { apiClient, isApiClientError, type ReviewQueueItem, type ReviewQueueItemType, type ReviewQueueStatus } from '../api/client'
+import { computed, onMounted, reactive, ref } from 'vue'
+import {
+  apiClient,
+  isApiClientError,
+  type ReviewActionLog,
+  type ReviewActionRequest,
+  type ReviewActionType,
+  type ReviewQueueItem,
+  type ReviewQueueItemType,
+  type ReviewQueueStatus
+} from '../api/client'
 
 const items = ref<ReviewQueueItem[]>([])
+const recentActions = ref<ReviewActionLog[]>([])
 const isLoading = ref(false)
 const isGenerating = ref(false)
 const updatingItemId = ref<string | null>(null)
 const statusMessage = ref('')
 const errorMessage = ref('')
+const selectedActions = reactive<Record<string, ReviewActionType | ''>>({})
+const actionNotes = reactive<Record<string, string>>({})
+const aliasPlayerKeys = reactive<Record<string, string>>({})
+const aliasTrackIds = reactive<Record<string, string>>({})
 
 const typeLabels: Record<ReviewQueueItemType, string> = {
   RECOGNITION_TRACK: 'Recognition tracks',
@@ -16,6 +30,20 @@ const typeLabels: Record<ReviewQueueItemType, string> = {
   DECISION_ATTEMPT: 'Decision attempts',
   PLAYER_VALUE_ATTRIBUTION: 'Player Value attribution',
   RULE_DRAFT: 'Rule drafts'
+}
+
+const actionLabels: Record<ReviewActionType, string> = {
+  MARK_TRACK_FALSE_POSITIVE: 'Mark false positive',
+  MARK_TRACK_VALID_PLAYER: 'Mark valid player',
+  ASSIGN_TRACK_TO_PLAYER_ALIAS: 'Assign to player alias',
+  OPEN_ALIAS_REVIEW: 'Open alias review task',
+  FLAG_PROMPT_LABEL_ISSUE: 'Flag prompt label issue',
+  UPDATE_PROMPT_EXPECTED_VALUE: 'Update expected value',
+  MARK_ATTEMPT_TEACHING_CASE: 'Mark teaching case',
+  APPROVE_RULE_DRAFT: 'Approve rule draft',
+  REJECT_RULE_DRAFT: 'Reject rule draft',
+  ACCEPT_UNKNOWN_ATTRIBUTION: 'Accept UNKNOWN attribution',
+  DISMISS_WITH_NOTE: 'Dismiss with note'
 }
 
 const typeOrder = Object.keys(typeLabels) as ReviewQueueItemType[]
@@ -51,11 +79,24 @@ function relatedLink(item: ReviewQueueItem) {
   return { to: '/local-lab', label: 'Open Local Lab' }
 }
 
+function syncActionDefaults() {
+  for (const item of items.value) {
+    if (!selectedActions[item.item_id]) selectedActions[item.item_id] = item.allowed_actions?.[0] ?? ''
+    if (!aliasTrackIds[item.item_id] && item.track_id) aliasTrackIds[item.item_id] = item.track_id
+  }
+}
+
+async function loadActions() {
+  recentActions.value = (await apiClient.listReviewActions()).slice(-10).reverse()
+}
+
 async function loadQueue() {
   isLoading.value = true
   errorMessage.value = ''
   try {
     items.value = await apiClient.listReviewQueue()
+    syncActionDefaults()
+    await loadActions()
     statusMessage.value = items.value.length ? `Loaded ${items.value.length} review item(s).` : 'No review queue has been generated yet.'
   } catch (error) {
     if (isApiClientError(error)) errorMessage.value = `${error.code}: ${error.message}`
@@ -71,6 +112,8 @@ async function generateQueue() {
   try {
     const response = await apiClient.generateReviewQueue()
     items.value = response.items
+    syncActionDefaults()
+    await loadActions()
     statusMessage.value = `Generated ${response.generated_count} item(s): ${response.open_count} open, ${response.resolved_count} resolved, ${response.dismissed_count} dismissed.`
   } catch (error) {
     if (isApiClientError(error)) errorMessage.value = `${error.code}: ${error.message}`
@@ -90,6 +133,41 @@ async function updateItem(item: ReviewQueueItem, status: ReviewQueueStatus) {
   } catch (error) {
     if (isApiClientError(error)) errorMessage.value = `${error.code}: ${error.message}`
     else errorMessage.value = error instanceof Error ? error.message : 'Could not update review item.'
+  } finally {
+    updatingItemId.value = null
+  }
+}
+
+async function performAction(item: ReviewQueueItem) {
+  const actionType = selectedActions[item.item_id]
+  const note = actionNotes[item.item_id]?.trim() || null
+  if (!actionType) return
+  if (actionType === 'DISMISS_WITH_NOTE' && !note) {
+    errorMessage.value = 'DISMISS_WITH_NOTE requires a note.'
+    return
+  }
+  const payload: ReviewActionRequest = { action_type: actionType, note, payload: {} }
+  if (actionType === 'ASSIGN_TRACK_TO_PLAYER_ALIAS') {
+    payload.payload = {
+      player_key: aliasPlayerKeys[item.item_id]?.trim(),
+      track_ids: (aliasTrackIds[item.item_id] || item.track_id || '')
+        .split(',')
+        .map((trackId) => trackId.trim())
+        .filter(Boolean),
+      team_side: 'UNKNOWN',
+      display_name: null
+    }
+  }
+  updatingItemId.value = item.item_id
+  errorMessage.value = ''
+  try {
+    const response = await apiClient.performReviewAction(item.item_id, payload)
+    items.value = items.value.map((candidate) => (candidate.item_id === response.item.item_id ? response.item : candidate))
+    recentActions.value = [response.action, ...recentActions.value].slice(0, 10)
+    statusMessage.value = `${actionLabels[response.action.action_type]} applied to ${response.item.item_id}. Action log: ${response.action.action_id}.`
+  } catch (error) {
+    if (isApiClientError(error)) errorMessage.value = `${error.code}: ${error.message}`
+    else errorMessage.value = error instanceof Error ? error.message : 'Could not perform review action.'
   } finally {
     updatingItemId.value = null
   }
@@ -153,16 +231,47 @@ onMounted(loadQueue)
           <template v-if="item.prompt_id"><dt>Prompt / draft</dt><dd><code>{{ item.prompt_id }}</code></dd></template>
           <template v-if="item.attempt_id"><dt>Attempt</dt><dd><code>{{ item.attempt_id }}</code></dd></template>
           <template v-if="item.track_id"><dt>Track</dt><dd><code>{{ item.track_id }}</code></dd></template>
+          <template v-if="item.detection_id"><dt>Detection</dt><dd><code>{{ item.detection_id }}</code></dd></template>
           <template v-if="item.player_key"><dt>Player</dt><dd><code>{{ item.player_key }}</code></dd></template>
           <template v-if="item.resolved_at"><dt>Closed</dt><dd>{{ formatDate(item.resolved_at) }}</dd></template>
         </dl>
 
         <div class="queue-actions">
           <RouterLink class="button-link" :to="relatedLink(item).to">{{ relatedLink(item).label }}</RouterLink>
-          <button class="ghost" :disabled="updatingItemId === item.item_id || item.status === 'RESOLVED'" @click="updateItem(item, 'RESOLVED')">Resolve</button>
-          <button class="ghost" :disabled="updatingItemId === item.item_id || item.status === 'DISMISSED'" @click="updateItem(item, 'DISMISSED')">Dismiss</button>
+          <select v-model="selectedActions[item.item_id]" :disabled="updatingItemId === item.item_id || item.status !== 'OPEN'">
+            <option v-for="action in item.allowed_actions" :key="action" :value="action">{{ actionLabels[action] }}</option>
+          </select>
+          <input
+            v-if="selectedActions[item.item_id] === 'ASSIGN_TRACK_TO_PLAYER_ALIAS'"
+            v-model="aliasPlayerKeys[item.item_id]"
+            placeholder="player_key, e.g. P1"
+          />
+          <input
+            v-if="selectedActions[item.item_id] === 'ASSIGN_TRACK_TO_PLAYER_ALIAS'"
+            v-model="aliasTrackIds[item.item_id]"
+            placeholder="track_ids comma separated"
+          />
+          <textarea v-model="actionNotes[item.item_id]" placeholder="Action note (required for dismiss)" rows="2" />
+          <button class="ghost" :disabled="updatingItemId === item.item_id || item.status !== 'OPEN'" @click="performAction(item)">Apply action</button>
           <button v-if="item.status !== 'OPEN'" class="ghost" :disabled="updatingItemId === item.item_id" @click="updateItem(item, 'OPEN')">Reopen</button>
         </div>
+      </article>
+    </section>
+
+    <section class="card queue-group">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Traceability</p>
+          <h2>Recent Review Actions</h2>
+        </div>
+        <span class="pill">{{ recentActions.length }} action(s)</span>
+      </div>
+      <div v-if="!recentActions.length" class="empty-state">No review actions have been logged yet.</div>
+      <article v-for="action in recentActions" :key="action.action_id" class="queue-item">
+        <p><strong>{{ actionLabels[action.action_type] }}</strong> · {{ action.status }} · {{ formatDate(action.created_at) }}</p>
+        <p><code>{{ action.item_id }}</code> <span v-if="action.project_id">in <code>{{ action.project_id }}</code></span></p>
+        <p v-if="action.note">{{ action.note }}</p>
+        <p v-if="action.warnings.length" class="muted">Warnings: {{ action.warnings.join(' ') }}</p>
       </article>
     </section>
   </section>

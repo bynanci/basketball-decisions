@@ -778,6 +778,19 @@ export type ReviewQueueItemType =
 
 export type ReviewQueuePriority = 'LOW' | 'MEDIUM' | 'HIGH'
 export type ReviewQueueStatus = 'OPEN' | 'RESOLVED' | 'DISMISSED'
+export type ReviewActionType =
+  | 'MARK_TRACK_FALSE_POSITIVE'
+  | 'MARK_TRACK_VALID_PLAYER'
+  | 'ASSIGN_TRACK_TO_PLAYER_ALIAS'
+  | 'OPEN_ALIAS_REVIEW'
+  | 'FLAG_PROMPT_LABEL_ISSUE'
+  | 'UPDATE_PROMPT_EXPECTED_VALUE'
+  | 'MARK_ATTEMPT_TEACHING_CASE'
+  | 'APPROVE_RULE_DRAFT'
+  | 'REJECT_RULE_DRAFT'
+  | 'ACCEPT_UNKNOWN_ATTRIBUTION'
+  | 'DISMISS_WITH_NOTE'
+export type ReviewActionStatus = 'APPLIED' | 'FAILED' | 'NO_OP'
 
 export interface ReviewQueueItem {
   item_id: string
@@ -787,12 +800,45 @@ export interface ReviewQueueItem {
   prompt_id?: string | null
   attempt_id?: string | null
   track_id?: string | null
+  detection_id?: string | null
   player_key?: string | null
   reason: string
   recommended_action: string
   status: ReviewQueueStatus
   created_at: string
   resolved_at?: string | null
+  allowed_actions: ReviewActionType[]
+}
+
+export interface ReviewActionRequest {
+  action_type: ReviewActionType
+  note?: string | null
+  payload?: Record<string, unknown>
+}
+
+export interface ReviewActionLog {
+  action_id: string
+  item_id: string
+  item_type: ReviewQueueItemType
+  action_type: ReviewActionType
+  project_id?: string | null
+  target_ref: Record<string, unknown>
+  payload: Record<string, unknown>
+  note?: string | null
+  status: ReviewActionStatus
+  warnings: string[]
+  created_at: string
+}
+
+export interface ReviewActionResponse {
+  item: ReviewQueueItem
+  action: ReviewActionLog
+}
+
+export interface ReviewActionFilters {
+  item_id?: string
+  project_id?: string
+  action_type?: ReviewActionType
 }
 
 export interface ReviewQueueGenerateResponse {
@@ -1081,6 +1127,16 @@ export const apiClient = {
   listReviewQueue: () => request<ReviewQueueItem[]>('/review-queue'),
   updateReviewQueueItem: (itemId: string, status: ReviewQueueStatus) =>
     request<ReviewQueueItem>(`/review-queue/${encodeURIComponent(itemId)}`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  performReviewAction: (itemId: string, payload: ReviewActionRequest) =>
+    request<ReviewActionResponse>(`/review-queue/${encodeURIComponent(itemId)}/actions`, { method: 'POST', body: JSON.stringify(payload) }),
+  listReviewActions: (filters: ReviewActionFilters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.item_id) params.set('item_id', filters.item_id)
+    if (filters.project_id) params.set('project_id', filters.project_id)
+    if (filters.action_type) params.set('action_type', filters.action_type)
+    const query = params.toString()
+    return request<ReviewActionLog[]>(`/review-queue/actions${query ? `?${query}` : ''}`)
+  },
   getRecognitionModelRegistry: () => request<RecognitionModelRegistry>('/local-lab/models/recognition'),
   trainRecognitionBaseline: () => request<RecognitionModelInfo>('/local-lab/models/recognition/train-baseline', { method: 'POST' }),
   scoreRecognitionQuality: (projectId: string) =>
