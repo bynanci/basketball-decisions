@@ -52,6 +52,15 @@ const selectedFrame = computed(() => project.value?.frames.find((frame) => frame
 const hasVideoSource = computed(() => project.value?.videoAsset?.source_type === 'upload' && !!project.value.videoAsset.asset_id)
 const effectiveMode = computed<QuizPromptMode>(() => (mode.value === 'VIDEO_FREEZE' && hasVideoSource.value ? 'VIDEO_FREEZE' : 'STILL_FRAME'))
 const imageSrc = computed(() => (Number.isFinite(frameIndex.value) ? apiClient.frameImageUrl(props.projectId, frameIndex.value) : ''))
+
+const frameTrackIds = computed(() => {
+  if (!project.value || !selectedFrame.value) return []
+  const frame = selectedFrame.value.frame_index
+  return project.value.tracks
+    .filter((track) => track.points.some((point) => point.frame_index === frame))
+    .map((track) => track.track_id)
+    .sort()
+})
 const validationErrors = computed(() => {
   const errors: string[] = []
   if (!selectedFrame.value) errors.push('Select an extracted frame before building a quiz.')
@@ -127,6 +136,24 @@ function normalizeRoleFeedback(option: DecisionQuizOption) {
   return Object.values(normalized).some(Boolean) ? normalized : null
 }
 
+function sourceTrackIdsForOption(option: DecisionQuizOption) {
+  if (!project.value || !selectedFrame.value) return option.source_track_ids ?? []
+  const frame = selectedFrame.value.frame_index
+  const candidates = project.value.tracks
+    .map((track) => {
+      const point = track.points.find((item) => item.frame_index === frame)
+      if (!point) return null
+      const distance = Math.hypot(point.image_point_x - option.start.x, point.image_point_y - option.start.y)
+      return { trackId: track.track_id, distance }
+    })
+    .filter((item): item is { trackId: string; distance: number } => item !== null)
+    .sort((a, b) => a.distance - b.distance)
+  const nearest = candidates[0]
+  const existing = option.source_track_ids ?? []
+  if (!nearest || nearest.distance > 0.12) return existing
+  return Array.from(new Set([...existing, nearest.trackId])).sort()
+}
+
 function createOption(payload: { start: DecisionArrowPoint; end: DecisionArrowPoint }) {
   if (options.value.length >= 5) {
     errorMessage.value = 'Maximum 5 arrows per prompt.'
@@ -173,7 +200,8 @@ async function savePrompt() {
       ...option,
       label: option.label.trim(),
       explanation: option.explanation.trim(),
-      role_feedback: normalizeRoleFeedback(option)
+      role_feedback: normalizeRoleFeedback(option),
+      source_track_ids: sourceTrackIdsForOption(option)
     }))
     const prompt = await apiClient.createQuizPrompt(props.projectId, {
       question: question.value,
@@ -193,6 +221,7 @@ async function savePrompt() {
       mode: effectiveMode.value,
       question_mode: questionMode.value,
       time_limit_ms: questionMode.value === 'QUICK_DECISION' ? timeLimitMs.value : null,
+      source_track_ids: frameTrackIds.value,
       options: sanitizedOptions,
       explanation: explanation.value.trim()
     })

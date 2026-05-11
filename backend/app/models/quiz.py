@@ -82,6 +82,7 @@ class DecisionQuizOption(BaseModel):
     is_correct: bool = False
     explanation: str
     role_feedback: DecisionRoleFeedback | None = None
+    source_track_ids: list[str] = Field(default_factory=list)
 
     @field_validator("option_id", "label", "explanation")
     @classmethod
@@ -89,6 +90,12 @@ class DecisionQuizOption(BaseModel):
         if not value.strip():
             raise ValueError("must not be blank")
         return value
+
+    @field_validator("source_track_ids")
+    @classmethod
+    def normalize_source_track_ids(cls, value: list[str]) -> list[str]:
+        normalized = [track_id.strip() for track_id in value if track_id.strip()]
+        return list(dict.fromkeys(normalized))
 
 
 class QuizPrompt(BaseModel):
@@ -113,6 +120,7 @@ class QuizPrompt(BaseModel):
     mode: QuizPromptMode = "STILL_FRAME"
     question_mode: QuizQuestionMode = "FREEZE_FRAME"
     time_limit_ms: int | None = Field(default=None, ge=1)
+    source_track_ids: list[str] = Field(default_factory=list)
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
     created_at: datetime = Field(default_factory=utc_now)
@@ -147,6 +155,12 @@ class QuizPrompt(BaseModel):
             return None
         stripped = value.strip()
         return stripped or None
+
+    @field_validator("source_track_ids")
+    @classmethod
+    def normalize_source_track_ids(cls, value: list[str]) -> list[str]:
+        normalized = [track_id.strip() for track_id in value if track_id.strip()]
+        return list(dict.fromkeys(normalized))
 
     @model_validator(mode="after")
     def validate_single_correct_option(self) -> "QuizPrompt":
@@ -187,6 +201,7 @@ class CreateQuizPromptRequest(BaseModel):
     mode: QuizPromptMode = "STILL_FRAME"
     question_mode: QuizQuestionMode = "FREEZE_FRAME"
     time_limit_ms: int | None = Field(default=None, ge=1)
+    source_track_ids: list[str] = Field(default_factory=list)
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
 
@@ -204,6 +219,12 @@ class CreateQuizPromptRequest(BaseModel):
             return None
         stripped = value.strip()
         return stripped or None
+
+    @field_validator("source_track_ids")
+    @classmethod
+    def normalize_source_track_ids(cls, value: list[str]) -> list[str]:
+        normalized = [track_id.strip() for track_id in value if track_id.strip()]
+        return list(dict.fromkeys(normalized))
 
     @model_validator(mode="after")
     def validate_single_correct_option(self) -> "CreateQuizPromptRequest":
@@ -307,6 +328,7 @@ class DecisionEvent(BaseModel):
     response_time_ms: int | None = Field(default=None, ge=0)
     timed_out: bool = False
     evaluation_source: DecisionEvaluationSource
+    source_track_ids: list[str] = Field(default_factory=list)
     explanations: list[str]
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -326,6 +348,12 @@ class DecisionEvent(BaseModel):
         if not stripped:
             raise ValueError("must not be blank")
         return stripped
+
+    @field_validator("source_track_ids")
+    @classmethod
+    def normalize_source_track_ids(cls, value: list[str]) -> list[str]:
+        normalized = [track_id.strip() for track_id in value if track_id.strip()]
+        return list(dict.fromkeys(normalized))
 
 
 # Backward-compatible extension-point names retained for imports/tests that may
