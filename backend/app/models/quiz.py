@@ -46,6 +46,13 @@ DecisionEvaluationSource = Literal["MANUAL_EXPECTED_VALUE", "RULE_BASED"]
 UserRole = Literal["COACH", "PLAYER", "ANALYST", "FAN"]
 
 
+def normalize_track_id_list(value: list[str]) -> list[str]:
+    """Trim, drop blanks, and de-duplicate track IDs while preserving order."""
+
+    normalized = [str(track_id).strip() for track_id in value if str(track_id).strip()]
+    return list(dict.fromkeys(normalized))
+
+
 class DecisionArrowPoint(BaseModel):
     """Normalized image point for an arrow endpoint."""
 
@@ -94,8 +101,7 @@ class DecisionQuizOption(BaseModel):
     @field_validator("source_track_ids")
     @classmethod
     def normalize_source_track_ids(cls, value: list[str]) -> list[str]:
-        normalized = [track_id.strip() for track_id in value if track_id.strip()]
-        return list(dict.fromkeys(normalized))
+        return normalize_track_id_list(value)
 
 
 class QuizPrompt(BaseModel):
@@ -120,6 +126,7 @@ class QuizPrompt(BaseModel):
     mode: QuizPromptMode = "STILL_FRAME"
     question_mode: QuizQuestionMode = "FREEZE_FRAME"
     time_limit_ms: int | None = Field(default=None, ge=1)
+    context_track_ids: list[str] = Field(default_factory=list)
     source_track_ids: list[str] = Field(default_factory=list)
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
@@ -130,15 +137,25 @@ class QuizPrompt(BaseModel):
     @classmethod
     def hydrate_legacy_role_fields(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            return {
+            hydrated = {
                 "court_role_target": "BALL_HANDLER",
                 "situation_type": "PICK_AND_ROLL",
                 "user_role_targets": [],
                 "role_instruction": None,
                 "question_mode": "FREEZE_FRAME",
                 "time_limit_ms": None,
+                "context_track_ids": [],
+                "source_track_ids": [],
                 **data,
             }
+            # Migration safety: prompts saved before context_track_ids existed often
+            # stored every visible frame track in source_track_ids. Treat those
+            # legacy links as frame context rather than identity-bearing links so
+            # newly generated Player Value events do not guess a player.
+            if "context_track_ids" not in data and data.get("source_track_ids"):
+                hydrated["context_track_ids"] = data.get("source_track_ids") or []
+                hydrated["source_track_ids"] = []
+            return hydrated
         return data
 
     @field_validator("project_id", "prompt_id", "question", "frame_id", "explanation")
@@ -156,11 +173,10 @@ class QuizPrompt(BaseModel):
         stripped = value.strip()
         return stripped or None
 
-    @field_validator("source_track_ids")
+    @field_validator("source_track_ids", "context_track_ids")
     @classmethod
-    def normalize_source_track_ids(cls, value: list[str]) -> list[str]:
-        normalized = [track_id.strip() for track_id in value if track_id.strip()]
-        return list(dict.fromkeys(normalized))
+    def normalize_track_ids(cls, value: list[str]) -> list[str]:
+        return normalize_track_id_list(value)
 
     @model_validator(mode="after")
     def validate_single_correct_option(self) -> "QuizPrompt":
@@ -201,6 +217,7 @@ class CreateQuizPromptRequest(BaseModel):
     mode: QuizPromptMode = "STILL_FRAME"
     question_mode: QuizQuestionMode = "FREEZE_FRAME"
     time_limit_ms: int | None = Field(default=None, ge=1)
+    context_track_ids: list[str] = Field(default_factory=list)
     source_track_ids: list[str] = Field(default_factory=list)
     options: list[DecisionQuizOption] = Field(min_length=2, max_length=5)
     explanation: str
@@ -220,11 +237,10 @@ class CreateQuizPromptRequest(BaseModel):
         stripped = value.strip()
         return stripped or None
 
-    @field_validator("source_track_ids")
+    @field_validator("source_track_ids", "context_track_ids")
     @classmethod
-    def normalize_source_track_ids(cls, value: list[str]) -> list[str]:
-        normalized = [track_id.strip() for track_id in value if track_id.strip()]
-        return list(dict.fromkeys(normalized))
+    def normalize_track_ids(cls, value: list[str]) -> list[str]:
+        return normalize_track_id_list(value)
 
     @model_validator(mode="after")
     def validate_single_correct_option(self) -> "CreateQuizPromptRequest":
@@ -328,6 +344,7 @@ class DecisionEvent(BaseModel):
     response_time_ms: int | None = Field(default=None, ge=0)
     timed_out: bool = False
     evaluation_source: DecisionEvaluationSource
+    context_track_ids: list[str] = Field(default_factory=list)
     source_track_ids: list[str] = Field(default_factory=list)
     explanations: list[str]
     created_at: datetime = Field(default_factory=utc_now)
@@ -349,11 +366,10 @@ class DecisionEvent(BaseModel):
             raise ValueError("must not be blank")
         return stripped
 
-    @field_validator("source_track_ids")
+    @field_validator("source_track_ids", "context_track_ids")
     @classmethod
-    def normalize_source_track_ids(cls, value: list[str]) -> list[str]:
-        normalized = [track_id.strip() for track_id in value if track_id.strip()]
-        return list(dict.fromkeys(normalized))
+    def normalize_track_ids(cls, value: list[str]) -> list[str]:
+        return normalize_track_id_list(value)
 
 
 # Backward-compatible extension-point names retained for imports/tests that may

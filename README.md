@@ -537,7 +537,16 @@ Identity limitations are important:
 
 - Player Value v1 uses only the local `player_key` from `player_aliases.json`.
 - It does **not** claim real player names, jersey identities, or scouting-grade identity resolution.
-- If a decision event already includes `player_key`, that key is used. Otherwise, the builder looks for `track_id`, `track_ids`, or `source_track_ids` in the prompt/option/event trace and maps those track IDs through local aliases.
+- If a decision event already includes `player_key`, that key is used. Otherwise, Player Value maps only identity-bearing `source_track_ids` through local aliases.
 - If no alias can be found, the summary uses `player_key="UNKNOWN"` and includes warnings rather than inventing an identity.
+
+### Player Value Link Integrity
+
+Quiz prompts separate frame context from player identity links:
+
+- `context_track_ids` are frame context only. They may contain every reviewed/cleaned track visible in the freeze frame so the prompt can keep local scene context.
+- `source_track_ids` are identity-bearing links. Prompt-level source links, and especially option-level source links, identify the player track(s) directly involved in a decision.
+- Player Value alias attribution uses only `source_track_ids`; it does not use `context_track_ids` to resolve aliases. This prevents multi-player frames from being assigned to the first sorted alias just because every visible track was stored with the prompt.
+- Prompts without identity-bearing source links can still train and evaluate decision logic. Their Player Value summaries may fall back to `UNKNOWN` attribution with a warning instead of guessing a player.
 
 Player Value v1 is not a learned Player Value model and is not scouting-grade. It is a local analytics summary intended to make decision-event quality, recognition reliability, trend, and participation assumptions inspectable before any future model work.

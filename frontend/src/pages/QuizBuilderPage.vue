@@ -8,6 +8,7 @@ import { useProjectHydration } from '../composables/useProjectHydration'
 import { useProjectStore } from '../stores/projectStore'
 import { useRoleStore } from '../stores/roleStore'
 import { COURT_ROLES, SITUATION_TYPES } from '../types/roles'
+import { frameContextTrackIds, nearestSourceTrackIdsForOption, quizBuilderTrackPayload } from '../utils/quizBuilderTracks'
 
 const props = defineProps<{ projectId: string }>()
 const route = useRoute()
@@ -55,12 +56,9 @@ const imageSrc = computed(() => (Number.isFinite(frameIndex.value) ? apiClient.f
 
 const frameTrackIds = computed(() => {
   if (!project.value || !selectedFrame.value) return []
-  const frame = selectedFrame.value.frame_index
-  return project.value.tracks
-    .filter((track) => track.points.some((point) => point.frame_index === frame))
-    .map((track) => track.track_id)
-    .sort()
+  return frameContextTrackIds(project.value, selectedFrame.value.frame_index)
 })
+const linkedOptionCount = computed(() => options.value.filter((option) => sourceTrackIdsForOption(option).length > 0).length)
 const validationErrors = computed(() => {
   const errors: string[] = []
   if (!selectedFrame.value) errors.push('Select an extracted frame before building a quiz.')
@@ -138,20 +136,7 @@ function normalizeRoleFeedback(option: DecisionQuizOption) {
 
 function sourceTrackIdsForOption(option: DecisionQuizOption) {
   if (!project.value || !selectedFrame.value) return option.source_track_ids ?? []
-  const frame = selectedFrame.value.frame_index
-  const candidates = project.value.tracks
-    .map((track) => {
-      const point = track.points.find((item) => item.frame_index === frame)
-      if (!point) return null
-      const distance = Math.hypot(point.image_point_x - option.start.x, point.image_point_y - option.start.y)
-      return { trackId: track.track_id, distance }
-    })
-    .filter((item): item is { trackId: string; distance: number } => item !== null)
-    .sort((a, b) => a.distance - b.distance)
-  const nearest = candidates[0]
-  const existing = option.source_track_ids ?? []
-  if (!nearest || nearest.distance > 0.12) return existing
-  return Array.from(new Set([...existing, nearest.trackId])).sort()
+  return nearestSourceTrackIdsForOption(project.value, selectedFrame.value, option.start, option.source_track_ids ?? [])
 }
 
 function createOption(payload: { start: DecisionArrowPoint; end: DecisionArrowPoint }) {
@@ -200,9 +185,11 @@ async function savePrompt() {
       ...option,
       label: option.label.trim(),
       explanation: option.explanation.trim(),
-      role_feedback: normalizeRoleFeedback(option),
-      source_track_ids: sourceTrackIdsForOption(option)
+      role_feedback: normalizeRoleFeedback(option)
     }))
+    const trackPayload = project.value
+      ? quizBuilderTrackPayload(project.value, selectedFrame.value, sanitizedOptions)
+      : { context_track_ids: [], source_track_ids: [], options: sanitizedOptions.map((option) => ({ ...option, source_track_ids: option.source_track_ids ?? [] })) }
     const prompt = await apiClient.createQuizPrompt(props.projectId, {
       question: question.value,
       court_role_target: selectedCourtRole,
@@ -221,8 +208,9 @@ async function savePrompt() {
       mode: effectiveMode.value,
       question_mode: questionMode.value,
       time_limit_ms: questionMode.value === 'QUICK_DECISION' ? timeLimitMs.value : null,
-      source_track_ids: frameTrackIds.value,
-      options: sanitizedOptions,
+      context_track_ids: trackPayload.context_track_ids,
+      source_track_ids: trackPayload.source_track_ids,
+      options: trackPayload.options,
       explanation: explanation.value.trim()
     })
     await router.push(`/projects/${props.projectId}/quiz/${prompt.prompt_id}`)
@@ -323,6 +311,8 @@ async function savePrompt() {
 
       <h2>Options</h2>
       <p class="muted">Manual expected value is temporary until EPV model exists.</p>
+      <p class="muted">Context tracks are all players visible in this frame. Source tracks identify the player(s) directly involved in the selected decision and are used for Player Value.</p>
+      <p v-if="options.length && linkedOptionCount === 0" class="warning-text">This prompt can still be used for decision training, but Player Value may fall back to UNKNOWN.</p>
       <article v-for="option in options" :key="option.option_id" :class="['option-card', { selected: option.option_id === selectedOptionId }]">
         <header>
           <strong>{{ option.option_id }}</strong>
@@ -332,6 +322,7 @@ async function savePrompt() {
         <label>Action type <select v-model="option.action_type"><option v-for="action in actionTypes" :key="action" :value="action">{{ action }}</option></select></label>
         <label>Expected value (optional, recommended) <input type="number" step="0.01" :value="formatExpectedValueInput(option.expected_value)" @input="updateExpectedValue(option, $event)" /></label>
         <label>Option explanation <textarea v-model="option.explanation" placeholder="What does this option create or miss?"></textarea></label>
+        <p class="muted">Linked source track: {{ sourceTrackIdsForOption(option).join(', ') || 'none' }}</p>
         <details class="role-feedback-panel">
           <summary>Role-specific feedback (optional)</summary>
           <p class="muted">Leave blank to fall back to the general option explanation.</p>
@@ -435,5 +426,13 @@ textarea {
 
 .muted {
   color: #64748b;
+}
+
+.warning-text {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  color: #92400e;
+  padding: 0.75rem;
 }
 </style>
