@@ -59,6 +59,14 @@ from .player_value import (
     SituationBreakdownItem,
 )
 from .source import LeagueTag, SourceLicenseType, SourceType, UsageScope, VideoSourceRecord
+from .review_queue import (
+    ReviewQueueGenerateResponse,
+    ReviewQueueItem,
+    ReviewQueueItemType,
+    ReviewQueuePriority,
+    ReviewQueueStatus,
+    UpdateReviewQueueItemRequest,
+)
 from .reference_video import (
     CreateReferenceVideoRequest,
     DecisionRuleDraft,
@@ -159,6 +167,12 @@ __all__ = [
     "ReferenceBreakdownNote",
     "ReferenceVideo",
     "ReferenceVideoDraftSummary",
+    "ReviewQueueGenerateResponse",
+    "ReviewQueueItem",
+    "ReviewQueueItemType",
+    "ReviewQueuePriority",
+    "ReviewQueueStatus",
+    "UpdateReviewQueueItemRequest",
     "ReferenceVideoListResponse",
     "UpsertReferenceBreakdownNoteRequest",
     "RecognitionTrainingSample",
