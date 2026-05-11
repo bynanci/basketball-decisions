@@ -31,8 +31,12 @@ from app.models import (
     PlayerAliasListResponse,
     PlayerValueBuildResponse,
     PlayerValueComponent,
+    PlayerValueEvidenceEvent,
+    PlayerValueEvidenceResponse,
     PlayerValueSummary,
     PlayerValueTrace,
+    RoleBreakdownItem,
+    SituationBreakdownItem,
     Calibration,
     Project,
     QuizAttemptRecord,
@@ -1329,9 +1333,203 @@ def _build_player_value_response() -> PlayerValueBuildResponse:
     return response
 
 
+def _decision_event_id(project_id: str, prompt_id: str, attempt_id: str) -> str:
+    return f"{project_id}:{prompt_id}:{attempt_id}"
+
+
+def _parse_decision_event_id(decision_event_id: str) -> tuple[str, str, str] | None:
+    parts = decision_event_id.split(":", 2)
+    if len(parts) != 3 or not all(part.strip() for part in parts):
+        return None
+    return parts[0], parts[1], parts[2]
+
+
+def _prompt_option_label(prompt: dict[str, Any] | None, option_id: str | None) -> str | None:
+    if not prompt or not option_id or not isinstance(prompt.get("options"), list):
+        return None
+    for option in prompt["options"]:
+        if isinstance(option, dict) and option.get("option_id") == option_id:
+            label = option.get("label")
+            return str(label) if label is not None else None
+    return None
+
+
+def _aliases_for_project(project_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    project_dir = DATA_DIR / project_id
+    alias_by_key: dict[str, Any] = {}
+    alias_by_track: dict[str, Any] = {}
+    alias_path = project_dir / "player_aliases.json"
+    if not alias_path.exists():
+        return alias_by_key, alias_by_track
+    try:
+        aliases = PlayerAliasListResponse.model_validate(read_json(alias_path))
+    except (json.JSONDecodeError, ValidationError):
+        return alias_by_key, alias_by_track
+    for alias in aliases.aliases:
+        alias_by_key[alias.player_key] = alias
+        for track_id in alias.track_ids:
+            alias_by_track[track_id] = alias
+    return alias_by_key, alias_by_track
+
+
+def _breakdown_item(name: str | None, rows: list[DecisionEvent], *, role: bool) -> RoleBreakdownItem | SituationBreakdownItem:
+    opportunity_costs = [float(event.opportunity_cost) for event in rows if event.opportunity_cost is not None]
+    payload = {
+        "event_count": len(rows),
+        "avg_role_adjusted_score": _average([float(event.role_adjusted_score) for event in rows]),
+        "avg_opportunity_cost": _avg_or_none(opportunity_costs),
+        "correct_rate": _average([1 if event.is_correct else 0 for event in rows]),
+        "timeout_rate": _average([1 if event.timed_out else 0 for event in rows]),
+    }
+    if role:
+        return RoleBreakdownItem(court_role=name, **payload)
+    return SituationBreakdownItem(situation_type=name, **payload)
+
+
+def _role_breakdown(events: list[DecisionEvent]) -> list[RoleBreakdownItem]:
+    grouped: dict[str | None, list[DecisionEvent]] = {}
+    for event in events:
+        grouped.setdefault(str(event.court_role_target) if event.court_role_target is not None else None, []).append(event)
+    return [_breakdown_item(role, rows, role=True) for role, rows in sorted(grouped.items(), key=lambda item: item[0] or "")]
+
+
+def _situation_breakdown(events: list[DecisionEvent]) -> list[SituationBreakdownItem]:
+    grouped: dict[str | None, list[DecisionEvent]] = {}
+    for event in events:
+        grouped.setdefault(str(event.situation_type) if event.situation_type is not None else None, []).append(event)
+    return [_breakdown_item(situation, rows, role=False) for situation, rows in sorted(grouped.items(), key=lambda item: item[0] or "")]
+
+
+def build_player_value_evidence(project_id: str, player_key: str) -> PlayerValueEvidenceResponse:
+    path = _player_value_summary_path()
+    if not path.exists():
+        raise api_error(
+            404,
+            "PLAYER_VALUE_SUMMARY_NOT_FOUND",
+            "Player Value summary was not found for this player.",
+            {"project_id": project_id, "player_key": player_key, "path": str(path)},
+            "Run POST /api/local-lab/player-value/build first.",
+        )
+
+    summary_response = PlayerValueBuildResponse.model_validate(read_json(path))
+    summary = next(
+        (item for item in summary_response.summaries if item.project_id == project_id and item.player_key == player_key),
+        None,
+    )
+    if summary is None:
+        raise api_error(
+            404,
+            "PLAYER_VALUE_SUMMARY_NOT_FOUND",
+            "Player Value summary was not found for this player.",
+            {"project_id": project_id, "player_key": player_key},
+            "Run POST /api/local-lab/player-value/build first.",
+        )
+
+    event_rows = _read_decision_event_rows(_decision_events_path())
+    events_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in event_rows:
+        try:
+            event = DecisionEvent.model_validate(row)
+        except ValidationError:
+            continue
+        events_by_key[(event.project_id, event.prompt_id, event.attempt_id)] = row
+
+    prompts = _raw_prompts_by_project().get(project_id, {})
+    alias_by_key, alias_by_track = _aliases_for_project(project_id)
+    summary_alias = alias_by_key.get(player_key)
+    evidence_events: list[PlayerValueEvidenceEvent] = []
+    decision_events: list[DecisionEvent] = []
+    warning_summary: list[str] = list(summary.warnings)
+
+    for trace_id in summary.trace.decision_event_ids:
+        parsed = _parse_decision_event_id(trace_id)
+        if parsed is None:
+            warning_summary.append(f"Trace decision event id {trace_id} is not parseable as project_id:prompt_id:attempt_id.")
+            continue
+        row = events_by_key.get(parsed)
+        if row is None:
+            warning_summary.append(f"Trace decision event {trace_id} is missing from player_decision_events.jsonl.")
+            continue
+
+        event = DecisionEvent.model_validate(row)
+        decision_events.append(event)
+        prompt = prompts.get(event.prompt_id)
+        event_warnings: list[str] = []
+        if prompt is None:
+            event_warnings.append("Prompt evidence is missing; question, explanation, and option labels are unavailable.")
+        source_track_ids, has_context_only_tracks = _identity_track_ids_from_event_trace(row, event, prompt or {})
+        normalized_source_track_ids = sorted(source_track_ids)
+        context_track_ids = normalize_track_id_list(event.context_track_ids)
+        if not normalized_source_track_ids:
+            event_warnings.append("Event has no identity-bearing source_track_ids; attribution may be UNKNOWN.")
+        if has_context_only_tracks or (context_track_ids and not normalized_source_track_ids):
+            event_warnings.append("context_track_ids are frame context only and were not used as alias evidence.")
+
+        linked_aliases = [alias_by_track[track_id] for track_id in normalized_source_track_ids if track_id in alias_by_track]
+        unique_aliases = {alias.player_key: alias for alias in linked_aliases}
+        event_alias = None
+        if len(unique_aliases) == 1:
+            event_alias = next(iter(unique_aliases.values()))
+        elif len(unique_aliases) > 1:
+            event_warnings.append("source_track_ids match multiple aliases; ambiguous identity falls back to UNKNOWN rather than guessing.")
+        elif summary_alias is not None and set(normalized_source_track_ids).intersection(set(summary_alias.track_ids)):
+            event_alias = summary_alias
+
+        if summary.confidence < 0.7:
+            event_warnings.append("Player Value confidence is low; inspect evidence before using this score.")
+
+        warning_summary.extend(event_warnings)
+        evidence_events.append(
+            PlayerValueEvidenceEvent(
+                decision_event_id=_decision_event_id(event.project_id, event.prompt_id, event.attempt_id),
+                project_id=event.project_id,
+                prompt_id=event.prompt_id,
+                attempt_id=event.attempt_id,
+                frame_id=event.frame_id,
+                frame_index=event.frame_index,
+                user_role=str(event.user_role) if event.user_role is not None else None,
+                court_role_target=str(event.court_role_target) if event.court_role_target is not None else None,
+                situation_type=str(event.situation_type) if event.situation_type is not None else None,
+                question_mode=str(event.question_mode) if event.question_mode is not None else None,
+                selected_option_id=event.selected_option_id,
+                correct_option_id=event.correct_option_id,
+                is_correct=event.is_correct,
+                raw_score=float(event.raw_score),
+                role_adjusted_score=float(event.role_adjusted_score),
+                opportunity_cost=float(event.opportunity_cost) if event.opportunity_cost is not None else None,
+                response_time_ms=event.response_time_ms,
+                timed_out=event.timed_out,
+                source_track_ids=normalized_source_track_ids,
+                context_track_ids=context_track_ids,
+                prompt_question=str(prompt.get("question")) if prompt and prompt.get("question") is not None else None,
+                prompt_explanation=str(prompt.get("explanation")) if prompt and prompt.get("explanation") is not None else None,
+                selected_option_label=_prompt_option_label(prompt, event.selected_option_id),
+                correct_option_label=_prompt_option_label(prompt, event.correct_option_id),
+                alias_player_key=event_alias.player_key if event_alias is not None else None,
+                alias_display_name=event_alias.display_name if event_alias is not None else None,
+                alias_team_side=str(event_alias.team_side) if event_alias is not None else None,
+                evidence_warnings=list(dict.fromkeys(event_warnings)),
+            )
+        )
+
+    return PlayerValueEvidenceResponse(
+        summary=summary,
+        events=evidence_events,
+        role_breakdown=_role_breakdown(decision_events),
+        situation_breakdown=_situation_breakdown(decision_events),
+        warning_summary=list(dict.fromkeys(warning_summary)),
+        generated_at=utc_now(),
+    )
+
+
 @router.post("/player-value/build", response_model=PlayerValueBuildResponse)
 def build_player_value() -> PlayerValueBuildResponse:
     return _build_player_value_response()
+
+
+@router.get("/player-value/{project_id}/{player_key}/evidence", response_model=PlayerValueEvidenceResponse)
+def get_player_value_evidence(project_id: str, player_key: str) -> PlayerValueEvidenceResponse:
+    return build_player_value_evidence(project_id, player_key)
 
 
 @router.get("/player-value", response_model=PlayerValueBuildResponse)

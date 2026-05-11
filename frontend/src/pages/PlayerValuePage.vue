@@ -115,6 +115,7 @@ onMounted(loadPlayerValue)
             <th>Confidence</th>
             <th>Events</th>
             <th>Warnings</th>
+            <th>Evidence</th>
           </tr>
         </thead>
         <tbody>
@@ -129,9 +130,14 @@ onMounted(loadPlayerValue)
               <td>{{ formatPercent(summary.confidence) }}</td>
               <td>{{ summary.decision_event_count }}</td>
               <td class="warning-cell">{{ describeWarnings(summary) }}</td>
+              <td>
+                <RouterLink class="button-link" :to="{ name: 'player-value-detail', params: { projectId: summary.project_id, playerKey: summary.player_key } }">
+                  View Evidence
+                </RouterLink>
+              </td>
             </tr>
             <tr v-if="expandedKeys.has(rowKey(summary))" class="expanded-row">
-              <td colspan="9">
+              <td colspan="10">
                 <div class="expanded-grid">
                   <section>
                     <h2>Component breakdown</h2>

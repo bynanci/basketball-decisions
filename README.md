@@ -552,3 +552,35 @@ Quiz prompts separate frame context from player identity links:
 - If identity-bearing source tracks map to multiple aliases, Player Value assigns the event to `UNKNOWN` with a warning instead of choosing the first sorted alias.
 
 Player Value v1 is not a learned Player Value model and is not scouting-grade. It is a local analytics summary intended to make decision-event quality, recognition reliability, trend, and participation assumptions inspectable before any future model work.
+
+## Player Value Evidence Dashboard
+
+M14 adds a per-player evidence dashboard for inspecting the local trace behind each Player Value summary. From the `/player-value` table, choose **View Evidence** for a row, or open the route directly:
+
+```text
+/player-value/{project_id}/{player_key}
+```
+
+The detail route reads the stored Player Value summary and expands `summary.trace.decision_event_ids` into the underlying local artifacts:
+
+- `backend/app/data/datasets/player_value/player_value_summary.json` for the selected summary and component breakdown;
+- `backend/app/data/datasets/player_value/player_decision_events.jsonl` for linked Decision Engine events;
+- per-project `quiz_prompts.json` for question text, prompt explanation, and selected/correct option labels;
+- per-project `player_aliases.json` for local alias metadata;
+- optional per-project `source.json` trace metadata already captured by the summary build.
+
+The evidence page shows:
+
+- header metrics such as `player_key`, display name if present, team side, role hint, score, confidence, and warnings;
+- the unchanged Player Value component breakdown;
+- role and situation breakdown tables with event count, average role-adjusted score, average opportunity cost, correct rate, and timeout rate;
+- a decision-event evidence table showing prompt/frame context, selected and correct options, scores, `source_track_ids`, `context_track_ids`, warnings, and links back to the project or prompt route when available;
+- an evidence warning panel for missing prompts, missing events, UNKNOWN attribution, absent `source_track_ids`, ambiguous alias fallback, and low confidence.
+
+Track-link semantics remain strict:
+
+- `source_track_ids` are identity-bearing evidence and are the only track IDs used for alias resolution.
+- `context_track_ids` are displayed for frame context only and are never promoted into alias evidence.
+- UNKNOWN attribution is intentionally visible rather than hidden when source evidence is missing or ambiguous.
+
+Player Value remains a local, explainable aggregation over saved JSON artifacts. It is not a learned model, does not perform jersey OCR, does not claim real player identity, and is not scouting-grade.

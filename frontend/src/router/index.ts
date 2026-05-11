@@ -14,6 +14,7 @@ import LocalLabPage from '../pages/LocalLabPage.vue'
 import ReferenceVideosPage from '../pages/ReferenceVideosPage.vue'
 import ReferenceVideoDetailPage from '../pages/ReferenceVideoDetailPage.vue'
 import PlayerValuePage from '../pages/PlayerValuePage.vue'
+import PlayerValueDetailPage from '../pages/PlayerValueDetailPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -24,6 +25,7 @@ export const router = createRouter({
     { path: '/situations', name: 'situation-preview', component: SituationPreviewPage },
     { path: '/local-lab', name: 'local-lab', component: LocalLabPage },
     { path: '/player-value', name: 'player-value', component: PlayerValuePage },
+    { path: '/player-value/:projectId/:playerKey', name: 'player-value-detail', component: PlayerValueDetailPage, props: true },
     { path: '/reference-videos', name: 'reference-videos', component: ReferenceVideosPage },
     { path: '/reference-videos/:referenceId', name: 'reference-video-detail', component: ReferenceVideoDetailPage, props: true },
     { path: '/projects/:projectId', name: 'project', component: ProjectPage, props: true },
