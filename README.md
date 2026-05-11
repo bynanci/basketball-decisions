@@ -445,3 +445,27 @@ curl -X POST "http://localhost:8000/api/local-lab/models/recognition/score-proje
 ```
 
 The response mirrors the recognition quality scoring shape and includes `model_version` plus model-based false-positive risk for each detection and track. Raw tracking, review patches, cleaned tracking, and projected-track artifacts are left unchanged.
+
+## Decision Diagnostics
+
+Decision Diagnostics are explainable, JSON-only analytics for Decision Engine quiz quality. They do **not** train an ML model. The report combines saved `quiz_prompts.json`, `quiz_attempts.json`, and `player_value/player_decision_events.jsonl` artifacts to identify:
+
+- prompt difficulty (`TOO_EASY`, `BALANCED`, `TOO_HARD`, `INSUFFICIENT_DATA`),
+- high opportunity-cost misses,
+- time-pressure warnings,
+- role and situation coverage gaps,
+- suspected label issues where the authored correct answer is rarely selected while one wrong option dominates.
+
+Build diagnostics with:
+
+```bash
+curl -X POST http://localhost:8000/api/local-lab/decision-diagnostics/build
+```
+
+Read the latest report with:
+
+```bash
+curl http://localhost:8000/api/local-lab/decision-diagnostics
+```
+
+The report is stored at `backend/app/data/datasets/decision/decision_diagnostics.json`. Local Lab shows the global summary, and prompt cards display difficulty badges after diagnostics have been built.

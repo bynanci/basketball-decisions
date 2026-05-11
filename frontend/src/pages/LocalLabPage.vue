@@ -6,6 +6,7 @@ import {
   type DatasetHealthWarning,
   type DatasetManifest,
   type DatasetSummary,
+  type DecisionDiagnosticsReport,
   type DecisionEventsBuildSummary,
   type LocalLabProjectArtifact,
   type RecognitionModelInfo,
@@ -24,11 +25,13 @@ const isLoading = ref(false)
 const isExportingRecognition = ref(false)
 const isExportingDecision = ref(false)
 const isBuildingDecisionEvents = ref(false)
+const isBuildingDecisionDiagnostics = ref(false)
 const isSeedingSources = ref(false)
 const isCuratingRecognition = ref(false)
 const isCuratingDecision = ref(false)
 const isTrainingRecognition = ref(false)
 const decisionEventsSummary = ref<DecisionEventsBuildSummary | null>(null)
+const decisionDiagnostics = ref<DecisionDiagnosticsReport | null>(null)
 const recognitionModelRegistry = ref<RecognitionModelRegistry | null>(null)
 const latestRecognitionModel = ref<RecognitionModelInfo | null>(null)
 const lastExportManifest = ref<DatasetManifest | null>(null)
@@ -132,6 +135,11 @@ async function refreshLocalLab() {
     referenceVideoSummary.value = referenceSummaryResponse
     recognitionModelRegistry.value = recognitionModelResponse
     latestRecognitionModel.value = recognitionModelResponse.active_model ?? recognitionModelResponse.models[recognitionModelResponse.models.length - 1] ?? null
+    try {
+      decisionDiagnostics.value = await apiClient.getDecisionDiagnostics()
+    } catch {
+      decisionDiagnostics.value = null
+    }
   } catch (error) {
     showError(error, 'Could not load the Local Lab registry.')
   } finally {
@@ -235,6 +243,21 @@ async function buildDecisionEvents() {
   }
 }
 
+async function buildDecisionDiagnostics() {
+  isBuildingDecisionDiagnostics.value = true
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    const report = await apiClient.buildDecisionDiagnostics()
+    decisionDiagnostics.value = report
+    statusMessage.value = `Built diagnostics for ${report.global_summary.prompt_count ?? report.prompt_diagnostics.length} decision prompts. No ML training was performed.`
+  } catch (error) {
+    showError(error, 'Could not build decision diagnostics.')
+  } finally {
+    isBuildingDecisionDiagnostics.value = false
+  }
+}
+
 async function seedCandidateSources() {
   isSeedingSources.value = true
   statusMessage.value = ''
@@ -278,6 +301,9 @@ onMounted(refreshLocalLab)
       </button>
       <button type="button" :disabled="isBuildingDecisionEvents" @click="buildDecisionEvents">
         {{ isBuildingDecisionEvents ? 'Building…' : 'Build Decision Events' }}
+      </button>
+      <button type="button" :disabled="isBuildingDecisionDiagnostics" @click="buildDecisionDiagnostics">
+        {{ isBuildingDecisionDiagnostics ? 'Building…' : 'Build Decision Diagnostics' }}
       </button>
       <button type="button" :disabled="isSeedingSources" @click="seedCandidateSources">
         {{ isSeedingSources ? 'Seeding…' : 'Seed Candidate Sources' }}
@@ -465,6 +491,41 @@ onMounted(refreshLocalLab)
         <dd>{{ decisionEventsSummary ? formatNumber(decisionEventsSummary.opportunity_cost_avg) : '—' }}</dd>
       </div>
     </dl>
+  </section>
+
+  <section class="card decision-events-card">
+    <div>
+      <p class="eyebrow">Decision diagnostics</p>
+      <h2>Quiz quality diagnostics</h2>
+      <p>Explainable analytics for prompt difficulty, high-cost misses, time pressure, role coverage, and suspected label issues. No ML training is performed.</p>
+    </div>
+    <dl>
+      <div>
+        <dt>Prompt count</dt>
+        <dd>{{ decisionDiagnostics?.global_summary.prompt_count ?? 'Not built' }}</dd>
+      </div>
+      <div>
+        <dt>Too easy</dt>
+        <dd>{{ decisionDiagnostics?.global_summary.too_easy_count ?? '—' }}</dd>
+      </div>
+      <div>
+        <dt>Too hard</dt>
+        <dd>{{ decisionDiagnostics?.global_summary.too_hard_count ?? '—' }}</dd>
+      </div>
+      <div>
+        <dt>Suspected label issues</dt>
+        <dd>{{ decisionDiagnostics?.global_summary.suspected_label_issue_count ?? '—' }}</dd>
+      </div>
+    </dl>
+    <ul v-if="decisionDiagnostics?.prompt_diagnostics.some((diagnostic) => diagnostic.suspected_label_issue)" class="warning-list">
+      <li v-for="diagnostic in decisionDiagnostics.prompt_diagnostics.filter((item) => item.suspected_label_issue).slice(0, 5)" :key="diagnostic.prompt_id">
+        <span class="severity-badge severity-high">LABEL</span>
+        <div>
+          <strong>{{ diagnostic.prompt_id }} · {{ diagnostic.most_selected_wrong_option_id }}</strong>
+          <p>{{ diagnostic.reasons.join(' ') }}</p>
+        </div>
+      </li>
+    </ul>
   </section>
 
   <section class="card reference-summary-card">

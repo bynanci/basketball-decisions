@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
-import type { LeagueTag, QuizPrompt, SourceLicenseType, UsageScope, VideoSourceRecord } from '../api/client'
+import type { DecisionDiagnosticsReport, LeagueTag, QuizPrompt, SourceLicenseType, UsageScope, VideoSourceRecord } from '../api/client'
 import Court2DView from '../components/Court2DView.vue'
 import VideoPlayer from '../components/VideoPlayer.vue'
 import { useProjectHydration } from '../composables/useProjectHydration'
@@ -24,6 +24,7 @@ const hasCalibration = computed(() => !!project.value?.calibration)
 const hasTracking = computed(() => !!project.value && (project.value.detections.length > 0 || project.value.tracks.length > 0 || project.value.projectedTracks.length > 0))
 const hasProjectedTracks = computed(() => (project.value?.projectedTracks.length ?? 0) > 0)
 const quizPrompts = ref<QuizPrompt[]>([])
+const decisionDiagnostics = ref<DecisionDiagnosticsReport | null>(null)
 const isLoadingQuizPrompts = ref(false)
 const quizErrorMessage = ref('')
 const quizErrorCode = ref('')
@@ -54,6 +55,7 @@ watch(() => project.value?.sourceGovernance, (source) => cloneSource(source), { 
 onMounted(() => {
   void ensureProjectHydrated(props.projectId, { force: true }).catch(() => undefined)
   void loadQuizPrompts()
+  void loadDecisionDiagnostics()
 })
 
 function showError(error: unknown) {
@@ -91,6 +93,25 @@ async function loadQuizPrompts() {
   }
 }
 
+
+async function loadDecisionDiagnostics() {
+  try {
+    decisionDiagnostics.value = await apiClient.getDecisionDiagnostics()
+  } catch {
+    decisionDiagnostics.value = null
+  }
+}
+
+function promptDifficulty(prompt: QuizPrompt) {
+  return decisionDiagnostics.value?.prompt_diagnostics.find(
+    (diagnostic) => diagnostic.project_id === prompt.project_id && diagnostic.prompt_id === prompt.prompt_id
+  )?.difficulty ?? 'NOT_BUILT'
+}
+
+function promptDifficultyLabel(prompt: QuizPrompt) {
+  const difficulty = promptDifficulty(prompt)
+  return difficulty === 'NOT_BUILT' ? 'Diagnostics not built' : difficulty.replace(/_/g, ' ')
+}
 
 function hasPromptExpectedValues(prompt: QuizPrompt) {
   return prompt.options.length > 0 && prompt.options.every((option) => typeof option.expected_value === 'number' && Number.isFinite(option.expected_value))
@@ -272,6 +293,7 @@ async function saveSourceGovernance() {
     <div v-else class="quiz-list">
       <article v-for="prompt in quizPrompts" :key="prompt.prompt_id" class="quiz-card">
         <strong>{{ prompt.question }}</strong>
+        <span class="difficulty-badge" :class="`difficulty-${promptDifficulty(prompt).toLowerCase().replace(/_/g, '-')}`">{{ promptDifficultyLabel(prompt) }}</span>
         <span>Frame {{ prompt.frame_index }} · {{ prompt.options.length }} options · {{ hasPromptExpectedValues(prompt) ? 'Expected values entered' : 'Expected values missing' }}</span>
         <RouterLink class="button small" :to="`/projects/${projectId}/quiz/${prompt.prompt_id}`">Play</RouterLink>
       </article>
@@ -437,4 +459,36 @@ async function saveSourceGovernance() {
 .muted {
   color: #64748b;
 }
+.difficulty-badge {
+  align-self: flex-start;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 0.2rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.difficulty-too-easy {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.difficulty-balanced {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.difficulty-too-hard {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.difficulty-insufficient-data,
+.difficulty-not-built {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
 </style>

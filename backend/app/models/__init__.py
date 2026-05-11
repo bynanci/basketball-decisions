@@ -1,5 +1,13 @@
 """Pydantic models for basketball decision project artifacts."""
 
+from .diagnostics import (
+    DecisionDiagnosticsGlobalSummary,
+    DecisionDiagnosticsReport,
+    DecisionPromptDiagnostics,
+    DecisionPromptDifficulty,
+    DecisionRoleDiagnostics,
+    DecisionSituationDiagnostics,
+)
 from .dataset import (
     DatasetHealthResponse,
     DatasetHealthWarning,
@@ -100,6 +108,12 @@ __all__ = [
     "DatasetHealthResponse",
     "DatasetHealthWarning",
     "DecisionDatasetHealth",
+    "DecisionDiagnosticsGlobalSummary",
+    "DecisionDiagnosticsReport",
+    "DecisionPromptDiagnostics",
+    "DecisionPromptDifficulty",
+    "DecisionRoleDiagnostics",
+    "DecisionSituationDiagnostics",
     "RecognitionDatasetHealth",
     "DatasetListResponse",
     "DatasetManifest",

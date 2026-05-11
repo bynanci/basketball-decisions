@@ -21,6 +21,7 @@ from app.models import (
     DatasetSummary,
     DecisionAttemptTrainingLabel,
     DecisionEvent,
+    DecisionDiagnosticsReport,
     DecisionEventsBuildSummary,
     DecisionTrainingSample,
     DetectionTrainingLabel,
@@ -46,6 +47,7 @@ from app.models.base import utc_now
 from app.models.tracking import Detection, PlayerTrack
 from app.pipeline.recognition_quality import score_project_recognition
 from app.services.decision_engine import evaluate_attempt
+from app.services.decision_diagnostics import build_decision_diagnostics
 from app.services.dataset_health import dataset_health_response
 from app.services.recognition_training import load_recognition_registry, score_project_with_model, train_baseline
 
@@ -889,6 +891,32 @@ def build_decision_events() -> DecisionEventsBuildSummary:
         avg_role_adjusted_score=_average([event.role_adjusted_score for event in events]),
         opportunity_cost_avg=_average(opportunity_costs),
     )
+
+
+def _decision_diagnostics_path() -> Path:
+    return DATASETS_DIR / "decision" / "decision_diagnostics.json"
+
+
+@router.post("/decision-diagnostics/build", response_model=DecisionDiagnosticsReport)
+def build_decision_diagnostics_report() -> DecisionDiagnosticsReport:
+    _ensure_dataset_dirs()
+    report = build_decision_diagnostics(list(_project_dirs()), DATASETS_DIR / "player_value" / "player_decision_events.jsonl")
+    write_json_model(_decision_diagnostics_path(), report)
+    return report
+
+
+@router.get("/decision-diagnostics", response_model=DecisionDiagnosticsReport)
+def get_decision_diagnostics_report() -> DecisionDiagnosticsReport:
+    path = _decision_diagnostics_path()
+    if not path.exists():
+        raise api_error(
+            404,
+            "DECISION_DIAGNOSTICS_NOT_FOUND",
+            "Decision diagnostics have not been built yet.",
+            {"path": str(path)},
+            "Run POST /api/local-lab/decision-diagnostics/build first.",
+        )
+    return DecisionDiagnosticsReport.model_validate(read_json(path))
 
 
 def _summary_for_dataset(dataset_type: str) -> DatasetSummary:
