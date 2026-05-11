@@ -4,6 +4,7 @@ import type {
   CourtKeypointPair,
   Detection,
   FrameAsset,
+  PlayerAliasListResponse,
   PlayerTrack,
   ProjectBundleResponse,
   ProjectedPlayerTrack,
@@ -34,6 +35,7 @@ export interface ProjectRecord {
   trackingPipelineOutput?: RunTrackingResponse['pipeline_output'] | null
   trackingDebugMetadata?: RunTrackingResponse['debug_metadata'] | null
   trackingReview?: TrackReviewResponse | null
+  playerAliases?: PlayerAliasListResponse | null
 }
 
 interface ProjectState {
@@ -60,7 +62,8 @@ function createEmptyProject(input: Omit<Partial<ProjectRecord>, 'frames' | 'cali
     projectedTracks: [],
     trackingPipelineOutput: null,
     trackingDebugMetadata: null,
-    trackingReview: null
+    trackingReview: null,
+    playerAliases: null
   }
 }
 
@@ -129,6 +132,10 @@ export const useProjectStore = defineStore('projectStore', {
       project.trackingPipelineOutput = payload.pipelineOutput ?? project.trackingPipelineOutput
       project.trackingDebugMetadata = payload.debugMetadata ?? project.trackingDebugMetadata
     },
+    setPlayerAliases(projectId: string, playerAliases: PlayerAliasListResponse | null) {
+      const project = this.getProject(projectId)
+      if (project) project.playerAliases = playerAliases
+    },
     hydrateProjectFromBundle(bundle: ProjectBundleResponse) {
       const projectId = bundle.project.project_id
       const existing = this.getProject(projectId)
@@ -151,6 +158,7 @@ export const useProjectStore = defineStore('projectStore', {
       project.trackingPipelineOutput = bundle.tracking?.pipeline_output ?? null
       project.trackingDebugMetadata = bundle.tracking?.debug_metadata ?? null
       project.trackingReview = bundle.tracking_review ?? null
+      project.playerAliases = bundle.player_aliases ?? null
 
       if (!existing) {
         this.projects.push(project)

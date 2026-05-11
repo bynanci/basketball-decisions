@@ -237,6 +237,9 @@ class LocalLabProjectArtifact(BaseModel):
     has_projected_tracks: bool
     quiz_prompt_count: int
     quiz_attempt_count: int
+    player_alias_count: int = 0
+    aliased_track_count: int = 0
+    unaliased_track_count: int = 0
     updated_at: datetime | None = None
     source: VideoSourceRecord | None = None
 

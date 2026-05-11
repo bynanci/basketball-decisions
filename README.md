@@ -469,3 +469,13 @@ curl http://localhost:8000/api/local-lab/decision-diagnostics
 ```
 
 The report is stored at `backend/app/data/datasets/decision/decision_diagnostics.json`. Local Lab shows the global summary, and prompt cards display difficulty badges after diagnostics have been built.
+
+## Player Identity & Track Alias
+
+M12 adds a local, manual Player Identity layer so reviewers can associate one or more `track_id` values with a stable project-scoped `player_key` such as `P1`, `P2`, or `P3`.
+
+- Aliases are stored per project at `backend/data/projects/{project_id}/player_aliases.json`.
+- Alias assignment is reviewer-driven from Tracking Review; the MVP does not perform jersey recognition, team classification, or automatic re-identification.
+- `player_key` is a local identifier intended for future Player Value features and is not a claim about a real-world player identity.
+- Raw tracking artifacts remain unchanged. Cleaned tracking review artifacts and player aliases are stored separately.
+- Project bundles include `player_aliases` when the artifact exists, allowing refresh-safe hydration of manual alias assignments.

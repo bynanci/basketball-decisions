@@ -28,6 +28,7 @@ from app.models import (
     ExtractFramesResponse,
     LocalLabProjectArtifact,
     LocalLabProjectsResponse,
+    PlayerAliasListResponse,
     Calibration,
     Project,
     QuizAttemptRecord,
@@ -105,6 +106,32 @@ def _safe_count_json_list(path: Path, adapter) -> int:
         return 0
 
 
+def _player_alias_counts(directory: Path) -> tuple[int, int, int]:
+    alias_path = directory / "player_aliases.json"
+    alias_count = 0
+    aliased_track_ids: set[str] = set()
+    if alias_path.exists():
+        try:
+            aliases = PlayerAliasListResponse.model_validate(read_json(alias_path))
+            alias_count = len(aliases.aliases)
+            aliased_track_ids = {track_id for alias in aliases.aliases for track_id in alias.track_ids}
+        except (json.JSONDecodeError, ValidationError):
+            alias_count = 0
+            aliased_track_ids = set()
+
+    tracking_path = directory / "tracking_cleaned.json" if (directory / "tracking_cleaned.json").exists() else directory / "tracking.json"
+    if not tracking_path.exists():
+        return alias_count, len(aliased_track_ids), 0
+    try:
+        tracking = RunTrackingResponse.model_validate(read_json(tracking_path))
+    except (json.JSONDecodeError, ValidationError):
+        return alias_count, len(aliased_track_ids), 0
+
+    track_ids = {track.track_id for track in tracking.tracks}
+    aliased_existing = aliased_track_ids.intersection(track_ids)
+    return alias_count, len(aliased_existing), len(track_ids - aliased_existing)
+
+
 def _latest_artifact_timestamp(directory: Path, project: Project) -> datetime:
     latest_datetime = project.updated_at
     for path in directory.rglob("*.json"):
@@ -123,6 +150,8 @@ def list_local_lab_projects() -> LocalLabProjectsResponse:
         if frames_path.exists():
             frame_count = len(ExtractFramesResponse.model_validate(read_json(frames_path)).frames)
 
+        player_alias_count, aliased_track_count, unaliased_track_count = _player_alias_counts(directory)
+
         projects.append(
             LocalLabProjectArtifact(
                 project_id=project.project_id,
@@ -136,6 +165,9 @@ def list_local_lab_projects() -> LocalLabProjectsResponse:
                 has_projected_tracks=(directory / "projected_tracks.json").exists() or (directory / "projected_tracks_cleaned.json").exists(),
                 quiz_prompt_count=_safe_count_json_list(directory / "quiz_prompts.json", _PROMPTS_ADAPTER),
                 quiz_attempt_count=_safe_count_json_list(directory / "quiz_attempts.json", _ATTEMPTS_ADAPTER),
+                player_alias_count=player_alias_count,
+                aliased_track_count=aliased_track_count,
+                unaliased_track_count=unaliased_track_count,
                 updated_at=_latest_artifact_timestamp(directory, project),
                 source=VideoSourceRecord.model_validate(read_json(directory / "source.json")) if (directory / "source.json").exists() else None,
             )

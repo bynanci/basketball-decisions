@@ -79,6 +79,28 @@ export interface VideoSourceRecord {
   notes?: string | null
 }
 
+export type TeamSide = 'HOME' | 'AWAY' | 'UNKNOWN'
+export type PlayerAliasSource = 'MANUAL' | 'HEURISTIC' | 'MODEL'
+
+export interface PlayerAlias {
+  player_key: string
+  project_id: string
+  track_ids: string[]
+  display_name?: string | null
+  team_side: TeamSide
+  role_hint?: string | null
+  confidence: number
+  source: PlayerAliasSource
+  notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface PlayerAliasListResponse {
+  project_id: string
+  aliases: PlayerAlias[]
+}
+
 export interface ProjectBundleResponse {
   project: Project
   video?: VideoAsset | null
@@ -88,6 +110,7 @@ export interface ProjectBundleResponse {
   tracking?: RunTrackingResponse | null
   projected_tracks?: ProjectTracksResponse | null
   tracking_review?: TrackReviewResponse | null
+  player_aliases?: PlayerAliasListResponse | null
 }
 
 export interface ListProjectsResponse {
@@ -590,6 +613,9 @@ export interface LocalLabProjectArtifact {
   quiz_attempt_count: number
   updated_at?: string | null
   source?: VideoSourceRecord | null
+  player_alias_count: number
+  aliased_track_count: number
+  unaliased_track_count: number
 }
 
 export interface LocalLabProjectsResponse {
@@ -852,6 +878,9 @@ export const apiClient = {
   scoreRecognitionModel: (projectId: string) =>
     request<RecognitionScoreProjectResponse>(`/local-lab/models/recognition/score-project/${projectId}`, { method: 'POST' }),
   getProjectBundle: (projectId: string) => request<ProjectBundleResponse>(`/projects/${projectId}/bundle`),
+  getPlayerAliases: (projectId: string) => request<PlayerAliasListResponse>(`/projects/${projectId}/player-aliases`),
+  savePlayerAliases: (projectId: string, payload: PlayerAliasListResponse, strict = false) =>
+    request<PlayerAliasListResponse>(`/projects/${projectId}/player-aliases${strict ? '?strict=true' : ''}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getProjectSource: (projectId: string) => request<VideoSourceRecord>(`/projects/${projectId}/source`),
   updateProjectSource: (projectId: string, payload: VideoSourceRecord) =>
     request<VideoSourceRecord>(`/projects/${projectId}/source`, { method: 'PUT', body: JSON.stringify(payload) }),
