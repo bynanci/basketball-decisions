@@ -40,6 +40,12 @@ from .calibration import (
 from .errors import ApiErrorResponse
 from .project import Project, ProjectBundleResponse, ProjectCreateRequest, ProjectCreateResponse
 from .player_identity import PlayerAlias, PlayerAliasListResponse, PlayerAliasSource, TeamSide
+from .player_value import (
+    PlayerValueBuildResponse,
+    PlayerValueComponent,
+    PlayerValueSummary,
+    PlayerValueTrace,
+)
 from .source import LeagueTag, SourceLicenseType, SourceType, UsageScope, VideoSourceRecord
 from .reference_video import (
     CreateReferenceVideoRequest,
@@ -156,6 +162,10 @@ __all__ = [
     "FrameAsset",
     "FreezeFrame",
     "ImagePoint",
+    "PlayerValueBuildResponse",
+    "PlayerValueComponent",
+    "PlayerValueSummary",
+    "PlayerValueTrace",
     "PlayerAlias",
     "PlayerAliasListResponse",
     "PlayerAliasSource",

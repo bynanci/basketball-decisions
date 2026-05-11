@@ -714,6 +714,54 @@ export interface DatasetListResponse {
   datasets: DatasetSummary[]
 }
 
+
+export interface PlayerValueComponent {
+  name: string
+  value: number
+  weight: number
+  contribution: number
+  explanation: string
+}
+
+export interface PlayerValueTrace {
+  project_ids: string[]
+  track_ids: string[]
+  decision_event_ids: string[]
+  prompt_ids: string[]
+  source_ids: string[]
+}
+
+export interface PlayerValueSummary {
+  project_id: string
+  player_key: string
+  display_name?: string | null
+  team_side: TeamSide
+  role_hint?: string | null
+  track_ids: string[]
+  decision_event_count: number
+  avg_raw_decision_score: number
+  avg_role_adjusted_score: number
+  avg_opportunity_cost?: number | null
+  correct_rate: number
+  timeout_rate: number
+  recognition_reliability_score: number
+  consistency_score: number
+  improvement_score: number
+  participation_score: number
+  player_value_score: number
+  components: PlayerValueComponent[]
+  confidence: number
+  warnings: string[]
+  trace: PlayerValueTrace
+  created_at: string
+}
+
+export interface PlayerValueBuildResponse {
+  summaries: PlayerValueSummary[]
+  generated_at: string
+  warnings: string[]
+}
+
 export interface DecisionEventsBuildSummary {
   event_count: number
   avg_raw_score: number
@@ -870,6 +918,8 @@ export const apiClient = {
   curateDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/curate', { method: 'POST' }),
   buildDecisionEvents: () => request<DecisionEventsBuildSummary>('/local-lab/decision-events/build', { method: 'POST' }),
   buildDecisionDiagnostics: () => request<DecisionDiagnosticsReport>('/local-lab/decision-diagnostics/build', { method: 'POST' }),
+  buildPlayerValue: () => request<PlayerValueBuildResponse>('/local-lab/player-value/build', { method: 'POST' }),
+  getPlayerValue: () => request<PlayerValueBuildResponse>('/local-lab/player-value'),
   getDecisionDiagnostics: () => request<DecisionDiagnosticsReport>('/local-lab/decision-diagnostics'),
   getRecognitionModelRegistry: () => request<RecognitionModelRegistry>('/local-lab/models/recognition'),
   trainRecognitionBaseline: () => request<RecognitionModelInfo>('/local-lab/models/recognition/train-baseline', { method: 'POST' }),

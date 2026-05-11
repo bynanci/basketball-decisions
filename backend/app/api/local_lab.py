@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from fastapi import APIRouter
 from pydantic import TypeAdapter, ValidationError
@@ -29,6 +29,10 @@ from app.models import (
     LocalLabProjectArtifact,
     LocalLabProjectsResponse,
     PlayerAliasListResponse,
+    PlayerValueBuildResponse,
+    PlayerValueComponent,
+    PlayerValueSummary,
+    PlayerValueTrace,
     Calibration,
     Project,
     QuizAttemptRecord,
@@ -950,6 +954,380 @@ def get_decision_diagnostics_report() -> DecisionDiagnosticsReport:
         )
     return DecisionDiagnosticsReport.model_validate(read_json(path))
 
+
+def _player_value_summary_path() -> Path:
+    return DATASETS_DIR / "player_value" / "player_value_summary.json"
+
+
+def _decision_events_path() -> Path:
+    return DATASETS_DIR / "player_value" / "player_decision_events.jsonl"
+
+
+def _read_decision_event_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError as exc:
+            raise api_error(
+                422,
+                "INVALID_DECISION_EVENTS_JSONL",
+                "Player decision events contain invalid JSONL.",
+                {"path": str(path), "line": line_number, "error": str(exc)},
+                "Rebuild decision events before building Player Value summaries.",
+            ) from exc
+    return rows
+
+
+def _track_ids_from_payload(payload: Any) -> set[str]:
+    track_ids: set[str] = set()
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key == "track_id" and isinstance(value, str) and value.strip():
+                track_ids.add(value.strip())
+            elif key in {"track_ids", "source_track_ids"} and isinstance(value, list):
+                track_ids.update(str(item).strip() for item in value if str(item).strip())
+            else:
+                track_ids.update(_track_ids_from_payload(value))
+    elif isinstance(payload, list):
+        for item in payload:
+            track_ids.update(_track_ids_from_payload(item))
+    return track_ids
+
+
+def _raw_prompts_by_project() -> dict[str, dict[str, dict[str, Any]]]:
+    prompts_by_project: dict[str, dict[str, dict[str, Any]]] = {}
+    for directory in _project_dirs():
+        path = directory / "quiz_prompts.json"
+        if not path.exists():
+            continue
+        try:
+            raw_prompts = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(raw_prompts, list):
+            continue
+        for prompt in raw_prompts:
+            if not isinstance(prompt, dict):
+                continue
+            project_id = str(prompt.get("project_id") or directory.name)
+            prompt_id = str(prompt.get("prompt_id") or "")
+            if prompt_id:
+                prompts_by_project.setdefault(project_id, {})[prompt_id] = prompt
+    return prompts_by_project
+
+
+def _source_id_for_project(directory: Path) -> str | None:
+    source_path = directory / "source.json"
+    if not source_path.exists():
+        return None
+    try:
+        source = VideoSourceRecord.model_validate(read_json(source_path))
+    except (json.JSONDecodeError, ValidationError):
+        return None
+    return source.source_id
+
+
+def _tracking_for_player_value(directory: Path) -> RunTrackingResponse | None:
+    for filename in ("tracking_cleaned.json", "tracking.json"):
+        path = directory / filename
+        if path.exists():
+            try:
+                return RunTrackingResponse.model_validate(read_json(path))
+            except (json.JSONDecodeError, ValidationError):
+                return None
+    return None
+
+
+def _review_patch_for_player_value(directory: Path) -> TrackReviewPatch:
+    path = directory / "tracking_review_patch.json"
+    if not path.exists():
+        return TrackReviewPatch()
+    try:
+        return TrackReviewPatch.model_validate(read_json(path))
+    except (json.JSONDecodeError, ValidationError):
+        return TrackReviewPatch()
+
+
+def _recognition_scores_for_project(project_id: str, directory: Path) -> RecognitionScoreProjectResponse | None:
+    tracking_path = directory / "tracking.json"
+    if not tracking_path.exists():
+        return None
+    try:
+        tracking = RunTrackingResponse.model_validate(read_json(tracking_path))
+        calibration_path = directory / "calibration.json"
+        calibration = Calibration.model_validate(read_json(calibration_path)) if calibration_path.exists() else None
+        return score_project_recognition(
+            project_id=project_id,
+            detections=tracking.detections,
+            tracks=tracking.tracks,
+            patch=_review_patch_for_player_value(directory),
+            calibration=calibration,
+        )
+    except (json.JSONDecodeError, ValidationError):
+        return None
+
+
+def _population_stddev(values: list[float]) -> float:
+    if len(values) <= 1:
+        return 0.0
+    mean = sum(values) / len(values)
+    return (sum((value - mean) ** 2 for value in values) / len(values)) ** 0.5
+
+
+def _clip_score(value: float) -> float:
+    return round(min(100.0, max(0.0, value)), 4)
+
+
+def _avg_or_none(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return round(sum(values) / len(values), 4)
+
+
+def _component(name: str, value: float, weight: float, explanation: str) -> PlayerValueComponent:
+    return PlayerValueComponent(
+        name=name,
+        value=round(value, 4),
+        weight=weight,
+        contribution=round(value * weight, 4),
+        explanation=explanation,
+    )
+
+
+def _build_player_value_response() -> PlayerValueBuildResponse:
+    _ensure_dataset_dirs()
+    generated_at = utc_now()
+    global_warnings: list[str] = []
+    event_rows = _read_decision_event_rows(_decision_events_path())
+    if not event_rows:
+        global_warnings.append("No player decision events were found; run Decision Engine v1 first.")
+
+    prompts_by_project = _raw_prompts_by_project()
+    project_dirs = {directory.name: directory for directory in _project_dirs()}
+    alias_by_project_key: dict[tuple[str, str], Any] = {}
+    project_has_aliases: dict[str, bool] = {}
+    source_ids_by_project: dict[str, str] = {}
+    tracking_by_project: dict[str, RunTrackingResponse | None] = {}
+    review_by_project: dict[str, TrackReviewPatch] = {}
+    recognition_by_project: dict[str, RecognitionScoreProjectResponse | None] = {}
+
+    track_alias_lookup: dict[tuple[str, str], Any] = {}
+    for project_id, directory in project_dirs.items():
+        source_id = _source_id_for_project(directory)
+        if source_id:
+            source_ids_by_project[project_id] = source_id
+        aliases: PlayerAliasListResponse | None = None
+        alias_path = directory / "player_aliases.json"
+        if alias_path.exists():
+            try:
+                aliases = PlayerAliasListResponse.model_validate(read_json(alias_path))
+            except (json.JSONDecodeError, ValidationError):
+                global_warnings.append(f"Project {project_id} has invalid player_aliases.json; events may be UNKNOWN.")
+        project_has_aliases[project_id] = bool(aliases and aliases.aliases)
+        if aliases:
+            for alias in aliases.aliases:
+                alias_by_project_key[(project_id, alias.player_key)] = alias
+                for track_id in alias.track_ids:
+                    track_alias_lookup[(project_id, track_id)] = alias
+        tracking_by_project[project_id] = _tracking_for_player_value(directory)
+        review_by_project[project_id] = _review_patch_for_player_value(directory)
+        recognition_by_project[project_id] = _recognition_scores_for_project(project_id, directory)
+
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    event_track_ids: dict[tuple[str, str], set[str]] = {}
+    link_warnings: dict[tuple[str, str], list[str]] = {}
+
+    for row in event_rows:
+        try:
+            event = DecisionEvent.model_validate(row)
+        except ValidationError as exc:
+            raise api_error(
+                422,
+                "INVALID_DECISION_EVENT_SCHEMA",
+                "A player decision event does not match the DecisionEvent schema.",
+                {"errors": exc.errors(), "event": row},
+                "Rebuild decision events before building Player Value summaries.",
+            ) from exc
+        project_id = event.project_id
+        prompt = prompts_by_project.get(project_id, {}).get(event.prompt_id, {})
+        prompt_without_options = {key: value for key, value in prompt.items() if key != "options"}
+        candidate_track_ids = _track_ids_from_payload(row) | _track_ids_from_payload(prompt_without_options)
+        if event.selected_option_id and isinstance(prompt.get("options"), list):
+            for option in prompt["options"]:
+                if isinstance(option, dict) and option.get("option_id") in {event.selected_option_id, event.correct_option_id}:
+                    candidate_track_ids.update(_track_ids_from_payload(option))
+
+        explicit_player_key = row.get("player_key")
+        warning_messages: list[str] = []
+        if isinstance(explicit_player_key, str) and explicit_player_key.strip():
+            player_key = explicit_player_key.strip()
+        else:
+            linked_aliases = [track_alias_lookup[(project_id, track_id)] for track_id in sorted(candidate_track_ids) if (project_id, track_id) in track_alias_lookup]
+            unique_aliases = {alias.player_key: alias for alias in linked_aliases}
+            if len(unique_aliases) == 1:
+                player_key = next(iter(unique_aliases))
+            elif len(unique_aliases) > 1:
+                player_key = sorted(unique_aliases)[0]
+                warning_messages.append(
+                    f"Decision event {event.attempt_id} matched multiple aliases; used {player_key} without inventing identity."
+                )
+            else:
+                player_key = "UNKNOWN"
+                if project_has_aliases.get(project_id):
+                    warning_messages.append(
+                        f"Decision event {event.attempt_id} could not be linked to an alias from available track trace."
+                    )
+                else:
+                    warning_messages.append(
+                        f"Project {project_id} has no player aliases; assigned decision event {event.attempt_id} to UNKNOWN."
+                    )
+
+        group_key = (project_id, player_key)
+        grouped.setdefault(group_key, []).append(row)
+        event_track_ids.setdefault(group_key, set()).update(candidate_track_ids)
+        link_warnings.setdefault(group_key, []).extend(warning_messages)
+
+    summaries: list[PlayerValueSummary] = []
+    for (project_id, player_key), rows in sorted(grouped.items()):
+        directory = project_dirs.get(project_id)
+        events = [DecisionEvent.model_validate(row) for row in rows]
+        alias = alias_by_project_key.get((project_id, player_key))
+        trace_track_ids = set(event_track_ids.get((project_id, player_key), set()))
+        alias_track_ids = set(alias.track_ids) if alias is not None else set()
+        summary_track_ids = sorted(alias_track_ids | trace_track_ids)
+        warnings = list(dict.fromkeys(link_warnings.get((project_id, player_key), [])))
+
+        raw_scores = [float(event.raw_score) for event in events]
+        role_scores = [float(event.role_adjusted_score) for event in events]
+        opportunity_costs = [float(event.opportunity_cost) for event in events if event.opportunity_cost is not None]
+        avg_role_adjusted = _average(role_scores)
+        consistency_score = _clip_score(100.0 - _population_stddev(role_scores))
+        if len(role_scores) < 4:
+            improvement_score = 50.0
+            warnings.append("Improvement score fell back to 50 because fewer than 4 decision events were available.")
+        else:
+            midpoint = len(role_scores) // 2
+            first_half = sum(role_scores[:midpoint]) / len(role_scores[:midpoint])
+            second_half = sum(role_scores[midpoint:]) / len(role_scores[midpoint:])
+            improvement_score = _clip_score(50.0 + ((second_half - first_half) / 2.0))
+
+        tracking = tracking_by_project.get(project_id)
+        if tracking is None:
+            participation_score = 50.0
+            warnings.append("Participation score fell back to 50 because no tracking artifact was available.")
+        else:
+            point_counts = [len(track.points) for track in tracking.tracks]
+            track_points = {track.track_id: len(track.points) for track in tracking.tracks}
+            player_point_count = sum(track_points.get(track_id, 0) for track_id in summary_track_ids)
+            if not point_counts or player_point_count == 0:
+                participation_score = 50.0
+                warnings.append("Participation score fell back to 50 because aliased tracks had no tracked points.")
+            else:
+                participation_score = _clip_score(100.0 * sum(1 for count in point_counts if count <= player_point_count) / len(point_counts))
+
+        recognition = recognition_by_project.get(project_id)
+        review_patch = review_by_project.get(project_id, TrackReviewPatch())
+        if not summary_track_ids or recognition is None:
+            recognition_reliability_score = 50.0
+            warnings.append("Recognition reliability fell back to 50 because no alias track recognition score was available.")
+        else:
+            risk_by_track = {score.track_id: score.false_positive_risk for score in recognition.track_scores}
+            per_track_scores: list[float] = []
+            for track_id in summary_track_ids:
+                score = 100.0
+                if track_id in review_patch.excluded_track_ids:
+                    score -= 50.0
+                risk = risk_by_track.get(track_id)
+                if risk is None:
+                    score -= 10.0
+                elif risk >= 0.7:
+                    score -= 30.0
+                elif risk >= 0.4:
+                    score -= 15.0
+                per_track_scores.append(_clip_score(score))
+            recognition_reliability_score = _average(per_track_scores)
+
+        components = [
+            _component("avg_role_adjusted_score", avg_role_adjusted, 0.45, "Average Decision Engine role-adjusted score for linked events."),
+            _component("consistency_score", consistency_score, 0.20, "100 minus population standard deviation of role-adjusted scores, clipped to 0..100."),
+            _component("recognition_reliability_score", recognition_reliability_score, 0.15, "Alias track reliability from local recognition/tracking review risk signals."),
+            _component("improvement_score", improvement_score, 0.10, "Second-half versus first-half role-adjusted decision score trend; falls back to 50 if sparse."),
+            _component("participation_score", participation_score, 0.10, "Aliased track point-count percentile within the local project; falls back to 50 if tracking is missing."),
+        ]
+        player_value_score = round(sum(component.contribution for component in components), 4)
+
+        confidence = 0.0
+        confidence += min(len(events) / 5.0, 1.0) * 0.4
+        confidence += (0.0 if player_key == "UNKNOWN" else 0.3)
+        confidence += (0.2 if recognition is not None else 0.0)
+        confidence += (0.1 if len(events) >= 5 and player_key != "UNKNOWN" else 0.0)
+        if len(events) < 5:
+            warnings.append("Confidence is reduced because fewer than 5 decision events were linked.")
+        if player_key == "UNKNOWN":
+            warnings.append("Identity is UNKNOWN; no real or inferred player name is claimed.")
+        confidence = round(min(1.0, max(0.0, confidence)), 4)
+
+        source_ids = [source_ids_by_project[project_id]] if project_id in source_ids_by_project else []
+        summaries.append(
+            PlayerValueSummary(
+                project_id=project_id,
+                player_key=player_key,
+                display_name=alias.display_name if alias is not None else None,
+                team_side=alias.team_side if alias is not None else "UNKNOWN",
+                role_hint=alias.role_hint if alias is not None else None,
+                track_ids=summary_track_ids,
+                decision_event_count=len(events),
+                avg_raw_decision_score=_average(raw_scores),
+                avg_role_adjusted_score=avg_role_adjusted,
+                avg_opportunity_cost=_avg_or_none(opportunity_costs),
+                correct_rate=_average([1 if event.is_correct else 0 for event in events]),
+                timeout_rate=_average([1 if event.timed_out else 0 for event in events]),
+                recognition_reliability_score=recognition_reliability_score,
+                consistency_score=consistency_score,
+                improvement_score=improvement_score,
+                participation_score=participation_score,
+                player_value_score=player_value_score,
+                components=components,
+                confidence=confidence,
+                warnings=list(dict.fromkeys(warnings)),
+                trace=PlayerValueTrace(
+                    project_ids=[project_id],
+                    track_ids=summary_track_ids,
+                    decision_event_ids=[f"{event.project_id}:{event.prompt_id}:{event.attempt_id}" for event in events],
+                    prompt_ids=sorted({event.prompt_id for event in events}),
+                    source_ids=source_ids,
+                ),
+                created_at=generated_at,
+            )
+        )
+
+    response = PlayerValueBuildResponse(summaries=summaries, generated_at=generated_at, warnings=list(dict.fromkeys(global_warnings)))
+    write_json_model(_player_value_summary_path(), response)
+    return response
+
+
+@router.post("/player-value/build", response_model=PlayerValueBuildResponse)
+def build_player_value() -> PlayerValueBuildResponse:
+    return _build_player_value_response()
+
+
+@router.get("/player-value", response_model=PlayerValueBuildResponse)
+def get_player_value() -> PlayerValueBuildResponse:
+    path = _player_value_summary_path()
+    if not path.exists():
+        raise api_error(
+            404,
+            "PLAYER_VALUE_NOT_FOUND",
+            "Player Value summaries have not been built yet.",
+            {"path": str(path)},
+            "Run POST /api/local-lab/player-value/build first.",
+        )
+    return PlayerValueBuildResponse.model_validate(read_json(path))
 
 def _summary_for_dataset(dataset_type: str) -> DatasetSummary:
     _ensure_dataset_dirs()
