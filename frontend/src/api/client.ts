@@ -486,6 +486,66 @@ export interface CreateQuizPromptRequest {
   options: DecisionQuizOption[]
   explanation: string
 }
+export type DecisionPromptDifficulty = 'TOO_EASY' | 'BALANCED' | 'TOO_HARD' | 'INSUFFICIENT_DATA'
+
+export interface DecisionPromptDiagnostics {
+  prompt_id: string
+  project_id: string
+  court_role_target: CourtRoleTarget
+  situation_type: SituationType
+  question_mode: QuizQuestionMode
+  attempt_count: number
+  correct_rate: number
+  avg_score: number
+  avg_role_adjusted_score: number
+  avg_opportunity_cost: number
+  timeout_rate: number
+  most_selected_wrong_option_id?: string | null
+  difficulty: DecisionPromptDifficulty
+  suspected_label_issue: boolean
+  reasons: string[]
+}
+
+export interface DecisionRoleDiagnostics {
+  court_role: CourtRoleTarget
+  prompt_count: number
+  attempt_count: number
+  avg_score: number
+  avg_opportunity_cost: number
+  timeout_rate: number
+  weakest_situation_types: SituationType[]
+}
+
+export interface DecisionSituationDiagnostics {
+  situation_type: SituationType
+  prompt_count: number
+  attempt_count: number
+  avg_score: number
+  avg_opportunity_cost: number
+  timeout_rate: number
+}
+
+export interface DecisionDiagnosticsGlobalSummary {
+  prompt_count: number
+  attempt_count: number
+  too_easy_count: number
+  too_hard_count: number
+  balanced_count: number
+  insufficient_data_count: number
+  suspected_label_issue_count: number
+  high_cost_prompt_count: number
+  time_pressure_prompt_count: number
+  analytics_only: boolean
+}
+
+export interface DecisionDiagnosticsReport {
+  generated_at: string
+  prompt_diagnostics: DecisionPromptDiagnostics[]
+  role_diagnostics: DecisionRoleDiagnostics[]
+  situation_diagnostics: DecisionSituationDiagnostics[]
+  global_summary: DecisionDiagnosticsGlobalSummary
+}
+
 
 export interface QuizAttemptRequest {
   selected_option_id?: string | null
@@ -783,6 +843,8 @@ export const apiClient = {
   curateRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/curate', { method: 'POST' }),
   curateDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/curate', { method: 'POST' }),
   buildDecisionEvents: () => request<DecisionEventsBuildSummary>('/local-lab/decision-events/build', { method: 'POST' }),
+  buildDecisionDiagnostics: () => request<DecisionDiagnosticsReport>('/local-lab/decision-diagnostics/build', { method: 'POST' }),
+  getDecisionDiagnostics: () => request<DecisionDiagnosticsReport>('/local-lab/decision-diagnostics'),
   getRecognitionModelRegistry: () => request<RecognitionModelRegistry>('/local-lab/models/recognition'),
   trainRecognitionBaseline: () => request<RecognitionModelInfo>('/local-lab/models/recognition/train-baseline', { method: 'POST' }),
   scoreRecognitionQuality: (projectId: string) =>

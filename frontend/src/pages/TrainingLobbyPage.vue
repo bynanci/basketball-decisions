@@ -2,13 +2,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
-import type { ListProjectsResponse, Project, QuizPrompt } from '../api/client'
+import type { DecisionDiagnosticsReport, ListProjectsResponse, Project, QuizPrompt } from '../api/client'
 import { useRoleStore } from '../stores/roleStore'
 
 const roleStore = useRoleStore()
 const projects = ref<ListProjectsResponse['projects']>([])
 const selectedProjectId = ref('')
 const prompts = ref<QuizPrompt[]>([])
+const decisionDiagnostics = ref<DecisionDiagnosticsReport | null>(null)
 const isLoadingProjects = ref(false)
 const isLoadingPrompts = ref(false)
 const projectErrorMessage = ref('')
@@ -45,6 +46,7 @@ const recommendedPrompts = computed(() => {
 onMounted(() => {
   if (roleProfile.value) {
     void loadProjects()
+    void loadDecisionDiagnostics()
   }
 })
 
@@ -55,6 +57,25 @@ watch(selectedProjectId, (projectId) => {
     prompts.value = []
   }
 })
+
+async function loadDecisionDiagnostics() {
+  try {
+    decisionDiagnostics.value = await apiClient.getDecisionDiagnostics()
+  } catch {
+    decisionDiagnostics.value = null
+  }
+}
+
+function promptDifficulty(prompt: QuizPrompt) {
+  return decisionDiagnostics.value?.prompt_diagnostics.find(
+    (diagnostic) => diagnostic.project_id === prompt.project_id && diagnostic.prompt_id === prompt.prompt_id
+  )?.difficulty ?? 'NOT_BUILT'
+}
+
+function promptDifficultyLabel(prompt: QuizPrompt) {
+  const difficulty = promptDifficulty(prompt)
+  return difficulty === 'NOT_BUILT' ? 'Diagnostics not built' : difficulty.replace(/_/g, ' ')
+}
 
 function formatRole(value: string) {
   return value
@@ -208,6 +229,7 @@ async function loadPrompts(projectId: Project['project_id']) {
       <div v-else class="prompt-grid">
         <article v-for="prompt in recommendedPrompts" :key="prompt.prompt_id" class="prompt-card compact-prompt-card">
           <h3>{{ prompt.question }}</h3>
+          <span class="difficulty-badge" :class="`difficulty-${promptDifficulty(prompt).toLowerCase().replace(/_/g, '-')}`">{{ promptDifficultyLabel(prompt) }}</span>
           <dl>
             <div><dt>Court role</dt><dd>{{ prompt.court_role_target }}</dd></div>
             <div><dt>Situation</dt><dd>{{ prompt.situation_type }}</dd></div>
@@ -233,6 +255,7 @@ async function loadPrompts(projectId: Project['project_id']) {
       <div v-else class="prompt-grid">
         <article v-for="prompt in prompts" :key="prompt.prompt_id" class="prompt-card compact-prompt-card">
           <h3>{{ prompt.question }}</h3>
+          <span class="difficulty-badge" :class="`difficulty-${promptDifficulty(prompt).toLowerCase().replace(/_/g, '-')}`">{{ promptDifficultyLabel(prompt) }}</span>
           <dl>
             <div><dt>Court role</dt><dd>{{ prompt.court_role_target }}</dd></div>
             <div><dt>Situation</dt><dd>{{ prompt.situation_type }}</dd></div>
@@ -356,6 +379,38 @@ select {
 
 .muted {
   color: #64748b;
+}
+
+.difficulty-badge {
+  align-self: flex-start;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 0.2rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.difficulty-too-easy {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.difficulty-balanced {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.difficulty-too-hard {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.difficulty-insufficient-data,
+.difficulty-not-built {
+  background: #f3f4f6;
+  color: #4b5563;
 }
 
 @media (max-width: 720px) {
