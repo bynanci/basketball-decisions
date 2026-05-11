@@ -12,6 +12,17 @@ def _round_cost(value: float | None) -> float | None:
     return round(value, 4)
 
 
+def _source_track_ids(prompt: QuizPrompt, selected_option_id: str | None, correct_option_id: str) -> list[str]:
+    track_ids = list(prompt.source_track_ids)
+    option_ids = {correct_option_id}
+    if selected_option_id is not None:
+        option_ids.add(selected_option_id)
+    for option in prompt.options:
+        if option.option_id in option_ids:
+            track_ids.extend(option.source_track_ids)
+    return list(dict.fromkeys(track_ids))
+
+
 def evaluate_attempt(prompt: QuizPrompt, attempt: QuizAttemptRecord) -> DecisionEvent:
     """Evaluate a persisted quiz attempt into an explainable decision event.
 
@@ -106,6 +117,7 @@ def evaluate_attempt(prompt: QuizPrompt, attempt: QuizAttemptRecord) -> Decision
         response_time_ms=attempt.response_time_ms,
         timed_out=attempt.timed_out,
         evaluation_source=evaluation_source,
+        source_track_ids=_source_track_ids(prompt, attempt.selected_option_id, correct_option.option_id),
         explanations=explanations,
         created_at=utc_now(),
     )

@@ -14,8 +14,12 @@ from app.models import (
     ExtractFramesRequest,
     ExtractFramesResponse,
     FrameAsset,
+    PlayerTrack,
     Project,
     QuizPrompt,
+    RunTrackingRequest,
+    RunTrackingResponse,
+    TrackPoint,
 )
 
 
@@ -24,8 +28,6 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(common, "DATA_DIR", tmp_path)
     monkeypatch.setattr(projects, "DATA_DIR", tmp_path)
     return TestClient(app)
-
-
 
 
 def write_project_without_frames(tmp_path: Path, project_id: str = "project-1") -> Path:
@@ -53,6 +55,43 @@ def write_project(tmp_path: Path, project_id: str = "project-1") -> Path:
     )
     write_json_model(directory / "frames" / "index.json", frames)
     return directory
+
+
+def write_tracking(directory: Path, project_id: str = "project-1") -> None:
+    write_json_model(
+        directory / "tracking.json",
+        RunTrackingResponse(
+            project_id=project_id,
+            request=RunTrackingRequest(project_id=project_id),
+            tracks=[
+                PlayerTrack(
+                    track_id="track-1",
+                    points=[
+                        TrackPoint(
+                            frame_id="frame-1",
+                            frame_index=7,
+                            timestamp_seconds=2.8,
+                            image_point_x=0.25,
+                            image_point_y=0.4,
+                        )
+                    ],
+                ),
+                PlayerTrack(
+                    track_id="track-off-frame",
+                    points=[
+                        TrackPoint(
+                            frame_id="frame-2",
+                            frame_index=8,
+                            timestamp_seconds=3.0,
+                            image_point_x=0.5,
+                            image_point_y=0.5,
+                        )
+                    ],
+                ),
+            ],
+            detections=[],
+        ),
+    )
 
 
 def option(option_id: str, *, is_correct: bool = False, expected_value: float | None = None) -> dict:
@@ -200,8 +239,6 @@ def test_cannot_create_prompt_with_out_of_range_arrow_coordinates(client: TestCl
     assert response.json()["code"] == "REQUEST_VALIDATION_ERROR"
 
 
-
-
 def test_cannot_create_prompt_before_frame_extraction(client: TestClient, tmp_path: Path) -> None:
     write_project_without_frames(tmp_path)
 
@@ -224,6 +261,31 @@ def test_can_create_valid_prompt(client: TestClient, tmp_path: Path) -> None:
     assert prompt["question_mode"] == "FREEZE_FRAME"
     assert prompt["time_limit_ms"] is None
     assert (tmp_path / "project-1" / "quiz_prompts.json").exists()
+
+
+def test_create_prompt_persists_source_track_links_from_payload_and_frame_tracking(client: TestClient, tmp_path: Path) -> None:
+    directory = write_project(tmp_path)
+    write_tracking(directory)
+    payload = valid_prompt_payload()
+    payload["source_track_ids"] = [" manual-track ", "manual-track"]
+    payload["options"][0]["source_track_ids"] = [" track-1 ", "track-1"]
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=payload)
+
+    assert response.status_code == 200
+    prompt = response.json()
+    assert prompt["source_track_ids"] == ["manual-track"]
+    assert prompt["options"][0]["source_track_ids"] == ["track-1"]
+
+
+def test_create_prompt_defaults_source_track_links_from_frame_tracking(client: TestClient, tmp_path: Path) -> None:
+    directory = write_project(tmp_path)
+    write_tracking(directory)
+
+    response = client.post("/api/projects/project-1/quiz-prompts", json=valid_prompt_payload())
+
+    assert response.status_code == 200
+    assert response.json()["source_track_ids"] == ["track-1"]
 
 
 def test_can_list_prompts(client: TestClient, tmp_path: Path) -> None:

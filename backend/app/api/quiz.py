@@ -6,7 +6,7 @@ import json
 from uuid import uuid4
 
 from fastapi import APIRouter, Query
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from app.api.common import api_error, require_project_dir
 from app.models import (
@@ -16,6 +16,7 @@ from app.models import (
     QuizAttemptRequest,
     QuizAttemptResponse,
     QuizPrompt,
+    RunTrackingResponse,
     SituationType,
 )
 from app.models.base import utc_now
@@ -56,6 +57,23 @@ def _read_attempts(project_id: str) -> list[QuizAttemptRecord]:
 def _write_attempts(project_id: str, attempts: list[QuizAttemptRecord]) -> None:
     path = _attempts_path(project_id)
     path.write_text(json.dumps([attempt.model_dump(mode="json") for attempt in attempts], indent=2), encoding="utf-8")
+
+
+def _frame_source_track_ids(project_id: str, frame_index: int) -> list[str]:
+    directory = require_project_dir(project_id)
+    tracking_path = directory / "tracking_cleaned.json" if (directory / "tracking_cleaned.json").exists() else directory / "tracking.json"
+    if not tracking_path.exists():
+        return []
+    try:
+        tracking = RunTrackingResponse.model_validate_json(tracking_path.read_text(encoding="utf-8"))
+    except ValidationError:
+        return []
+    track_ids = [
+        track.track_id
+        for track in tracking.tracks
+        if any(point.frame_index == frame_index for point in track.points)
+    ]
+    return sorted(dict.fromkeys(track_ids))
 
 
 def _find_prompt(project_id: str, prompt_id: str) -> QuizPrompt:
@@ -140,6 +158,7 @@ def create_quiz_prompt(project_id: str, payload: CreateQuizPromptRequest) -> Qui
         mode=payload.mode,
         question_mode=payload.question_mode,
         time_limit_ms=payload.time_limit_ms,
+        source_track_ids=payload.source_track_ids or _frame_source_track_ids(project_id, payload.frame_index),
         options=payload.options,
         explanation=payload.explanation,
         created_at=now,

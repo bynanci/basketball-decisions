@@ -460,6 +460,7 @@ export interface DecisionQuizOption {
   is_correct: boolean
   explanation: string
   role_feedback?: DecisionRoleFeedback | null
+  source_track_ids?: string[]
 }
 
 export interface QuizPrompt {
@@ -482,6 +483,7 @@ export interface QuizPrompt {
   mode: QuizPromptMode
   question_mode: QuizQuestionMode
   time_limit_ms?: number | null
+  source_track_ids: string[]
   options: DecisionQuizOption[]
   explanation: string
   created_at: string
@@ -506,6 +508,7 @@ export interface CreateQuizPromptRequest {
   mode: QuizPromptMode
   question_mode: QuizQuestionMode
   time_limit_ms?: number | null
+  source_track_ids?: string[]
   options: DecisionQuizOption[]
   explanation: string
 }

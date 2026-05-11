@@ -152,6 +152,26 @@ def test_uses_alias_when_track_id_maps_to_player_key(client: TestClient, tmp_pat
     assert summary["track_ids"] == ["track-1"]
 
 
+def test_uses_alias_when_decision_event_persists_source_track_ids(client: TestClient, tmp_path: Path) -> None:
+    directory = tmp_path / "project-1"
+    _write_project(directory)
+    write_json_model(
+        directory / "player_aliases.json",
+        PlayerAliasListResponse(
+            project_id="project-1",
+            aliases=[PlayerAlias(project_id="project-1", player_key="P1", track_ids=["track-1"], display_name="Local P1", team_side="HOME")],
+        ),
+    )
+    _write_events(tmp_path, [_event(source_track_ids=["track-1"])])
+
+    response = client.post("/api/local-lab/player-value/build")
+
+    assert response.status_code == 200
+    summary = response.json()["summaries"][0]
+    assert summary["player_key"] == "P1"
+    assert summary["track_ids"] == ["track-1"]
+
+
 def test_score_components_sum_correctly_and_summary_is_stored(client: TestClient, tmp_path: Path) -> None:
     directory = tmp_path / "project-1"
     _write_project(directory)
