@@ -17,6 +17,7 @@ import DecisionRulesPage from '../pages/DecisionRulesPage.vue'
 import PlayerValuePage from '../pages/PlayerValuePage.vue'
 import PlayerValueDetailPage from '../pages/PlayerValueDetailPage.vue'
 import ReviewQueuePage from '../pages/ReviewQueuePage.vue'
+import ModelRegistryPage from '../pages/ModelRegistryPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -29,6 +30,7 @@ export const router = createRouter({
     { path: '/player-value', name: 'player-value', component: PlayerValuePage },
     { path: '/player-value/:projectId/:playerKey', name: 'player-value-detail', component: PlayerValueDetailPage, props: true },
     { path: '/review-queue', name: 'review-queue', component: ReviewQueuePage },
+    { path: '/model-registry', name: 'model-registry', component: ModelRegistryPage },
     { path: '/reference-videos', name: 'reference-videos', component: ReferenceVideosPage },
     { path: '/reference-videos/:referenceId', name: 'reference-video-detail', component: ReferenceVideoDetailPage, props: true },
     { path: '/decision-rules', name: 'decision-rules', component: DecisionRulesPage },

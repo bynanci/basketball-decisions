@@ -100,6 +100,35 @@ class RecognitionModelMetrics(BaseModel):
     feature_importance: dict[str, float] | None = None
 
 
+class RecognitionDatasetLineage(BaseModel):
+    """Dataset lineage captured at recognition model training time."""
+
+    dataset_type: Literal["recognition"] = "recognition"
+    manifest_path: str
+    samples_path: str
+    labels_path: str
+    dataset_fingerprint: str
+    manifest_fingerprint: str | None = None
+    samples_fingerprint: str | None = None
+    labels_fingerprint: str | None = None
+    sample_count: int = 0
+    label_count: int = 0
+    source_project_ids: list[str] = Field(default_factory=list)
+    exported_at: datetime | None = None
+
+
+class RecognitionEvaluationReport(BaseModel):
+    """Registered immutable evaluation report for a recognition model."""
+
+    report_id: str
+    model_version: str
+    created_at: datetime = Field(default_factory=utc_now)
+    metrics_path: str
+    report_path: str
+    dataset_fingerprint: str
+    metrics: RecognitionModelMetrics
+
+
 class RecognitionModelInfo(BaseModel):
     """Registered local recognition model metadata."""
 
@@ -109,6 +138,10 @@ class RecognitionModelInfo(BaseModel):
     model_path: str
     metrics_path: str
     feature_schema_path: str
+    lineage_path: str | None = None
+    evaluation_report_path: str | None = None
+    dataset_fingerprint: str | None = None
+    dataset_lineage: RecognitionDatasetLineage | None = None
     metrics: RecognitionModelMetrics | None = None
 
 
@@ -119,3 +152,32 @@ class RecognitionModelRegistry(BaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
     models: list[RecognitionModelInfo] = Field(default_factory=list)
     active_model: RecognitionModelInfo | None = None
+
+
+class RecognitionModelComparison(BaseModel):
+    """Metric comparison between two recognition model versions."""
+
+    base_version: str
+    candidate_version: str
+    base_model: RecognitionModelInfo
+    candidate_model: RecognitionModelInfo
+    metric_deltas: dict[str, float] = Field(default_factory=dict)
+
+
+class RecognitionActivationRequest(BaseModel):
+    activate: bool = True
+    reason: str | None = None
+
+
+class RecognitionActivationResponse(BaseModel):
+    active_version: str | None = None
+    previous_active_version: str | None = None
+    activated_version: str
+    updated_at: datetime = Field(default_factory=utc_now)
+    reason: str | None = None
+    registry: RecognitionModelRegistry
+
+
+class RecognitionEvaluationReportRegistry(BaseModel):
+    reports: list[RecognitionEvaluationReport] = Field(default_factory=list)
+    updated_at: datetime = Field(default_factory=utc_now)

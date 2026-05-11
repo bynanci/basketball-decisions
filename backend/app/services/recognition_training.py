@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pickle
 from dataclasses import dataclass
@@ -18,6 +19,11 @@ from app.models import (
     DetectionBox,
     DetectionRecognitionScore,
     PlayerTrack,
+    RecognitionActivationResponse,
+    RecognitionDatasetLineage,
+    RecognitionEvaluationReport,
+    RecognitionEvaluationReportRegistry,
+    RecognitionModelComparison,
     RecognitionModelInfo,
     RecognitionModelMetrics,
     RecognitionModelRegistry,
@@ -36,7 +42,6 @@ from app.pipeline.recognition_quality import (
 
 POSITIVE_LABELS = {"PLAYER", "VALID_PLAYER_TRACK"}
 NEGATIVE_LABELS = {"FALSE_POSITIVE", "FALSE_POSITIVE_TRACK"}
-MODEL_VERSION = "v001"
 FEATURE_SCHEMA_VERSION = "1.0"
 TRACK_FEATURES = [
     "point_count",
@@ -232,6 +237,59 @@ def _split_rows(rows: list[FeatureRow]) -> tuple[list[FeatureRow], list[FeatureR
     return list(train), list(test)
 
 
+
+def _file_sha256(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _dataset_lineage(datasets_dir: Path) -> RecognitionDatasetLineage:
+    recognition_dir = datasets_dir / "recognition"
+    manifest_path = recognition_dir / "dataset_manifest.json"
+    samples_path = recognition_dir / "curated_samples.jsonl"
+    labels_path = recognition_dir / "curated_labels.jsonl"
+    manifest_fingerprint = _file_sha256(manifest_path)
+    samples_fingerprint = _file_sha256(samples_path)
+    labels_fingerprint = _file_sha256(labels_path)
+    digest = hashlib.sha256()
+    for value in (manifest_fingerprint, samples_fingerprint, labels_fingerprint):
+        digest.update((value or "missing").encode("utf-8"))
+    manifest: dict[str, Any] = {}
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            manifest = {}
+    return RecognitionDatasetLineage(
+        manifest_path=str(manifest_path),
+        samples_path=str(samples_path),
+        labels_path=str(labels_path),
+        dataset_fingerprint=digest.hexdigest(),
+        manifest_fingerprint=manifest_fingerprint,
+        samples_fingerprint=samples_fingerprint,
+        labels_fingerprint=labels_fingerprint,
+        sample_count=int(manifest.get("sample_count") or 0),
+        label_count=int(manifest.get("label_count") or 0),
+        source_project_ids=list(manifest.get("source_project_ids") or []),
+        exported_at=manifest.get("exported_at"),
+    )
+
+
+def _next_model_version(models_dir: Path, registry: RecognitionModelRegistry) -> str:
+    versions = {model.version for model in registry.models}
+    if models_dir.exists():
+        versions.update(path.name for path in models_dir.iterdir() if path.is_dir() and path.name.startswith("v"))
+    max_version = 0
+    for version in versions:
+        if len(version) == 4 and version.startswith("v") and version[1:].isdigit():
+            max_version = max(max_version, int(version[1:]))
+    return f"v{max_version + 1:03d}"
+
 def _load_registry(models_dir: Path) -> RecognitionModelRegistry:
     path = models_dir / "model_registry.json"
     if not path.exists():
@@ -246,6 +304,10 @@ def load_recognition_registry(models_dir: Path) -> RecognitionModelRegistry:
         metrics_path = models_dir / model.version / "metrics.json"
         if metrics_path.exists():
             model.metrics = RecognitionModelMetrics.model_validate(json.loads(metrics_path.read_text(encoding="utf-8")))
+        lineage_path = models_dir / model.version / "dataset_lineage.json"
+        if lineage_path.exists():
+            model.dataset_lineage = RecognitionDatasetLineage.model_validate(json.loads(lineage_path.read_text(encoding="utf-8")))
+            model.dataset_fingerprint = model.dataset_lineage.dataset_fingerprint
     registry.active_model = next((model for model in registry.models if model.version == active_version), None)
     return registry
 
@@ -265,7 +327,7 @@ def _scikit_learn_dependency_error(exc: ImportError) -> None:
     ) from exc
 
 
-def train_baseline(datasets_dir: Path, models_dir: Path) -> RecognitionModelInfo:
+def train_baseline(datasets_dir: Path, models_dir: Path, activate: bool = False) -> RecognitionModelInfo:
     samples = read_curated_recognition_samples(datasets_dir)
     rows = extract_curated_feature_rows(samples)
     validate_training_rows(rows)
@@ -309,8 +371,18 @@ def train_baseline(datasets_dir: Path, models_dir: Path) -> RecognitionModelInfo
         "feature_importance": feature_importance,
     }
 
-    version_dir = models_dir / MODEL_VERSION
-    version_dir.mkdir(parents=True, exist_ok=True)
+    registry = _load_registry(models_dir)
+    version = _next_model_version(models_dir, registry)
+    version_dir = models_dir / version
+    if version_dir.exists():
+        raise api_error(
+            409,
+            "RECOGNITION_MODEL_VERSION_EXISTS",
+            "The next recognition model version folder already exists.",
+            {"version": version, "model_dir": str(version_dir)},
+            "Inspect model_registry.json and existing model folders before retrying; model folders are immutable.",
+        )
+    version_dir.mkdir(parents=True, exist_ok=False)
     with (version_dir / "model.pkl").open("wb") as file:
         pickle.dump(model, file)
     _write_json(version_dir / "metrics.json", metrics_payload)
@@ -318,28 +390,143 @@ def train_baseline(datasets_dir: Path, models_dir: Path) -> RecognitionModelInfo
         version_dir / "feature_schema.json",
         {"schema_version": FEATURE_SCHEMA_VERSION, "feature_names": FEATURE_NAMES, "positive_class": 0, "negative_risk_class": 1},
     )
+    lineage = _dataset_lineage(datasets_dir)
+    _write_json(version_dir / "dataset_lineage.json", lineage.model_dump(mode="json"))
 
     created_at = utc_now()
+    metrics = RecognitionModelMetrics.model_validate(metrics_payload)
+    report = RecognitionEvaluationReport(
+        report_id=f"{version}-evaluation",
+        model_version=version,
+        created_at=created_at,
+        metrics_path=str(version_dir / "metrics.json"),
+        report_path=str(version_dir / "evaluation_report.json"),
+        dataset_fingerprint=lineage.dataset_fingerprint,
+        metrics=metrics,
+    )
+    _write_json(version_dir / "evaluation_report.json", report.model_dump(mode="json"))
+    _register_evaluation_report(models_dir, report)
+
     info = RecognitionModelInfo(
-        version=MODEL_VERSION,
-        active=True,
+        version=version,
+        active=activate,
         created_at=created_at,
         model_path=str(version_dir / "model.pkl"),
         metrics_path=str(version_dir / "metrics.json"),
         feature_schema_path=str(version_dir / "feature_schema.json"),
-        metrics=RecognitionModelMetrics.model_validate(metrics_payload),
+        lineage_path=str(version_dir / "dataset_lineage.json"),
+        evaluation_report_path=str(version_dir / "evaluation_report.json"),
+        dataset_fingerprint=lineage.dataset_fingerprint,
+        dataset_lineage=lineage,
+        metrics=metrics,
     )
-    registry = _load_registry(models_dir)
-    registry.active_version = MODEL_VERSION
+    if activate:
+        registry.active_version = version
     registry.updated_at = created_at
-    registry.models = [model for model in registry.models if model.version != MODEL_VERSION]
     registry.models.append(info)
     for model_info in registry.models:
-        model_info.active = model_info.version == MODEL_VERSION
-    registry.active_model = info
+        model_info.active = bool(registry.active_version and model_info.version == registry.active_version)
+    registry.active_model = next((model for model in registry.models if model.version == registry.active_version), None)
     _write_json(models_dir / "model_registry.json", registry.model_dump(mode="json"))
     return info
 
+
+
+def load_evaluation_report_registry(models_dir: Path) -> RecognitionEvaluationReportRegistry:
+    path = models_dir / "evaluation_reports.json"
+    if not path.exists():
+        return RecognitionEvaluationReportRegistry()
+    return RecognitionEvaluationReportRegistry.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+
+def _register_evaluation_report(models_dir: Path, report: RecognitionEvaluationReport) -> None:
+    registry = load_evaluation_report_registry(models_dir)
+    registry.reports = [existing for existing in registry.reports if existing.report_id != report.report_id]
+    registry.reports.append(report)
+    registry.updated_at = report.created_at
+    _write_json(models_dir / "evaluation_reports.json", registry.model_dump(mode="json"))
+
+
+def _model_by_version(registry: RecognitionModelRegistry, version: str) -> RecognitionModelInfo:
+    model = next((model for model in registry.models if model.version == version), None)
+    if model is None:
+        raise api_error(
+            404,
+            "RECOGNITION_MODEL_VERSION_NOT_FOUND",
+            "The requested recognition model version is not registered.",
+            {"version": version},
+            "Choose a version from GET /api/local-lab/models/recognition.",
+        )
+    return model
+
+
+def get_model_version(models_dir: Path, version: str) -> RecognitionModelInfo:
+    registry = load_recognition_registry(models_dir)
+    return _model_by_version(registry, version)
+
+
+def compare_models(models_dir: Path, base_version: str, candidate_version: str) -> RecognitionModelComparison:
+    registry = load_recognition_registry(models_dir)
+    base_model = _model_by_version(registry, base_version)
+    candidate_model = _model_by_version(registry, candidate_version)
+    deltas: dict[str, float] = {}
+    if base_model.metrics and candidate_model.metrics:
+        for metric in ("accuracy", "precision", "recall", "f1"):
+            deltas[metric] = round(float(getattr(candidate_model.metrics, metric)) - float(getattr(base_model.metrics, metric)), 6)
+        deltas["train_sample_count"] = float(candidate_model.metrics.train_sample_count - base_model.metrics.train_sample_count)
+        deltas["test_sample_count"] = float(candidate_model.metrics.test_sample_count - base_model.metrics.test_sample_count)
+    return RecognitionModelComparison(
+        base_version=base_version,
+        candidate_version=candidate_version,
+        base_model=base_model,
+        candidate_model=candidate_model,
+        metric_deltas=deltas,
+    )
+
+
+def activate_model(models_dir: Path, version: str, reason: str | None = None) -> RecognitionActivationResponse:
+    registry = load_recognition_registry(models_dir)
+    model = _model_by_version(registry, version)
+    model_path = models_dir / version / "model.pkl"
+    if not model_path.exists():
+        raise api_error(
+            404,
+            "RECOGNITION_MODEL_FILE_NOT_FOUND",
+            "The requested recognition model file is missing.",
+            {"version": version, "model_path": str(model_path)},
+            "Activate only immutable versions with an existing model.pkl artifact.",
+        )
+    previous = registry.active_version
+    now = utc_now()
+    registry.active_version = version
+    registry.updated_at = now
+    for model_info in registry.models:
+        model_info.active = model_info.version == version
+    registry.active_model = next((model_info for model_info in registry.models if model_info.version == version), model)
+    events_path = models_dir / "model_registry_events.json"
+    try:
+        events = json.loads(events_path.read_text(encoding="utf-8")) if events_path.exists() else []
+    except json.JSONDecodeError:
+        events = []
+    events.append({
+        "event_id": f"recognition-{version}-{now.isoformat()}",
+        "model_family": "recognition",
+        "event_type": "ACTIVATED",
+        "version": version,
+        "previous_active_version": previous,
+        "reason": reason,
+        "created_at": now.isoformat(),
+    })
+    _write_json(events_path, events)
+    _write_json(models_dir / "model_registry.json", registry.model_dump(mode="json"))
+    return RecognitionActivationResponse(
+        active_version=version,
+        previous_active_version=previous,
+        activated_version=version,
+        updated_at=now,
+        reason=reason,
+        registry=registry,
+    )
 
 def _load_active_model(models_dir: Path) -> tuple[str, Any]:
     registry = _load_registry(models_dir)

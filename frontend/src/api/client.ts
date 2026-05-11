@@ -393,6 +393,31 @@ export interface RecognitionModelMetrics {
   feature_importance?: Record<string, number> | null
 }
 
+export interface RecognitionDatasetLineage {
+  dataset_type: 'recognition'
+  manifest_path: string
+  samples_path: string
+  labels_path: string
+  dataset_fingerprint: string
+  manifest_fingerprint?: string | null
+  samples_fingerprint?: string | null
+  labels_fingerprint?: string | null
+  sample_count: number
+  label_count: number
+  source_project_ids: string[]
+  exported_at?: string | null
+}
+
+export interface RecognitionEvaluationReport {
+  report_id: string
+  model_version: string
+  created_at: string
+  metrics_path: string
+  report_path: string
+  dataset_fingerprint: string
+  metrics: RecognitionModelMetrics
+}
+
 export interface RecognitionModelInfo {
   version: string
   active: boolean
@@ -400,6 +425,10 @@ export interface RecognitionModelInfo {
   model_path: string
   metrics_path: string
   feature_schema_path: string
+  lineage_path?: string | null
+  evaluation_report_path?: string | null
+  dataset_fingerprint?: string | null
+  dataset_lineage?: RecognitionDatasetLineage | null
   metrics?: RecognitionModelMetrics | null
 }
 
@@ -408,6 +437,28 @@ export interface RecognitionModelRegistry {
   updated_at: string
   models: RecognitionModelInfo[]
   active_model?: RecognitionModelInfo | null
+}
+
+export interface RecognitionModelComparison {
+  base_version: string
+  candidate_version: string
+  base_model: RecognitionModelInfo
+  candidate_model: RecognitionModelInfo
+  metric_deltas: Record<string, number>
+}
+
+export interface RecognitionActivationResponse {
+  active_version?: string | null
+  previous_active_version?: string | null
+  activated_version: string
+  updated_at: string
+  reason?: string | null
+  registry: RecognitionModelRegistry
+}
+
+export interface RecognitionEvaluationReportRegistry {
+  reports: RecognitionEvaluationReport[]
+  updated_at: string
 }
 
 export type DecisionActionType = 'PASS' | 'DRIVE' | 'SHOT' | 'RESET' | 'HOLD'
@@ -1138,7 +1189,15 @@ export const apiClient = {
     return request<ReviewActionLog[]>(`/review-queue/actions${query ? `?${query}` : ''}`)
   },
   getRecognitionModelRegistry: () => request<RecognitionModelRegistry>('/local-lab/models/recognition'),
-  trainRecognitionBaseline: () => request<RecognitionModelInfo>('/local-lab/models/recognition/train-baseline', { method: 'POST' }),
+  compareRecognitionModels: (baseVersion: string, candidateVersion: string) =>
+    request<RecognitionModelComparison>(`/local-lab/models/recognition/compare?base_version=${encodeURIComponent(baseVersion)}&candidate_version=${encodeURIComponent(candidateVersion)}`),
+  activateRecognitionModel: (version: string, reason?: string) =>
+    request<RecognitionActivationResponse>(`/local-lab/models/recognition/${encodeURIComponent(version)}/activate`, {
+      method: 'POST',
+      body: JSON.stringify({ activate: true, reason: reason ?? null })
+    }),
+  getRecognitionEvaluationReports: () => request<RecognitionEvaluationReportRegistry>('/local-lab/models/recognition/evaluation-reports'),
+  trainRecognitionBaseline: (activate = false) => request<RecognitionModelInfo>(`/local-lab/models/recognition/train-baseline${activate ? '?activate=true' : ''}`, { method: 'POST' }),
   scoreRecognitionQuality: (projectId: string) =>
     request<RecognitionScoreProjectResponse>(`/local-lab/recognition/score-project/${projectId}`, { method: 'POST' }),
   scoreRecognitionModel: (projectId: string) =>
