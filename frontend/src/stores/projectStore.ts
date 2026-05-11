@@ -158,7 +158,7 @@ export const useProjectStore = defineStore('projectStore', {
       project.trackingPipelineOutput = bundle.tracking?.pipeline_output ?? null
       project.trackingDebugMetadata = bundle.tracking?.debug_metadata ?? null
       project.trackingReview = bundle.tracking_review ?? null
-      project.playerAliases = bundle.player_aliases ?? null
+      project.playerAliases = bundle.player_aliases
 
       if (!existing) {
         this.projects.push(project)

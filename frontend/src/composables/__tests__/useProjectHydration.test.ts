@@ -23,7 +23,8 @@ function bundle(projectId = 'project-1'): ProjectBundleResponse {
     frames: null,
     calibration: null,
     tracking: null,
-    projected_tracks: null
+    projected_tracks: null,
+    player_aliases: { project_id: projectId, aliases: [] }
   }
 }
 

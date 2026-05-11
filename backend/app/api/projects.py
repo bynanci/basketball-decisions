@@ -13,6 +13,7 @@ from app.models import (
     Calibration,
     ExtractFramesResponse,
     Project,
+    PlayerAliasListResponse,
     ProjectBundleResponse,
     ProjectCreateRequest,
     ProjectCreateResponse,
@@ -112,7 +113,8 @@ def get_project_bundle(project_id: str) -> ProjectBundleResponse:
         tracking=_read_optional_artifact(directory, "tracking.json", RunTrackingResponse),
         projected_tracks=_read_optional_artifact(directory, "projected_tracks.json", ProjectTracksResponse),
         tracking_review=_read_tracking_review_artifact(directory, project_id),
-        player_aliases=read_player_aliases(directory, project_id),
+        player_aliases=read_player_aliases(directory, project_id)
+        or PlayerAliasListResponse(project_id=project_id, aliases=[]),
     )
 
 

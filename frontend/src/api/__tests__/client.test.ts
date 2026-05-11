@@ -45,7 +45,8 @@ describe('apiClient.getProjectBundle', () => {
       frames: null,
       calibration: null,
       tracking: null,
-      projected_tracks: null
+      projected_tracks: null,
+      player_aliases: { project_id: 'project-1', aliases: [] }
     }
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) })
     vi.stubGlobal('fetch', fetchMock)

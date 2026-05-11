@@ -110,7 +110,7 @@ export interface ProjectBundleResponse {
   tracking?: RunTrackingResponse | null
   projected_tracks?: ProjectTracksResponse | null
   tracking_review?: TrackReviewResponse | null
-  player_aliases?: PlayerAliasListResponse | null
+  player_aliases: PlayerAliasListResponse
 }
 
 export interface ListProjectsResponse {

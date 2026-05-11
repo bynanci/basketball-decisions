@@ -65,6 +65,15 @@ def test_duplicate_track_id_across_aliases_rejected(client: TestClient, tmp_path
     assert response.status_code == 422
 
 
+def test_blank_and_trimmed_track_ids_rejected(client: TestClient, tmp_path: Path) -> None:
+    write_project(tmp_path)
+    payload = alias_payload()
+    payload["aliases"][0]["track_ids"] = [" track-1 ", "track-1"]
+
+    response = client.put("/api/projects/project-1/player-aliases", json=payload)
+
+    assert response.status_code == 422
+
 def test_missing_project_returns_404(client: TestClient) -> None:
     response = client.get("/api/projects/missing/player-aliases")
 
