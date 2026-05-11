@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+from .base import utc_now
 
 
 class DetectionRecognitionFeatures(BaseModel):
@@ -46,6 +51,8 @@ class DetectionRecognitionScore(BaseModel):
     recommended_label: str
     reasons: list[str] = Field(default_factory=list)
     features: DetectionRecognitionFeatures
+    model_version: str | None = None
+    scoring_source: Literal["RULE", "MODEL"] = "RULE"
 
 
 class TrackRecognitionScore(BaseModel):
@@ -56,6 +63,8 @@ class TrackRecognitionScore(BaseModel):
     recommended_label: str
     reasons: list[str] = Field(default_factory=list)
     features: TrackRecognitionFeatures
+    model_version: str | None = None
+    scoring_source: Literal["RULE", "MODEL"] = "RULE"
 
 
 class RecognitionScoreSummary(BaseModel):
@@ -63,6 +72,8 @@ class RecognitionScoreSummary(BaseModel):
 
     high_risk_detection_count: int
     high_risk_track_count: int
+    model_version: str | None = None
+    scoring_source: Literal["RULE", "MODEL"] = "RULE"
 
 
 class RecognitionScoreProjectResponse(BaseModel):
@@ -72,3 +83,39 @@ class RecognitionScoreProjectResponse(BaseModel):
     detection_scores: list[DetectionRecognitionScore] = Field(default_factory=list)
     track_scores: list[TrackRecognitionScore] = Field(default_factory=list)
     summary: RecognitionScoreSummary
+    model_version: str | None = None
+    scoring_source: Literal["RULE", "MODEL"] = "RULE"
+
+
+class RecognitionModelMetrics(BaseModel):
+    """Saved metrics for a local recognition baseline."""
+
+    accuracy: float
+    precision: float
+    recall: float
+    f1: float
+    confusion_matrix: list[list[int]]
+    train_sample_count: int
+    test_sample_count: int
+    feature_importance: dict[str, float] | None = None
+
+
+class RecognitionModelInfo(BaseModel):
+    """Registered local recognition model metadata."""
+
+    version: str
+    active: bool = False
+    created_at: datetime = Field(default_factory=utc_now)
+    model_path: str
+    metrics_path: str
+    feature_schema_path: str
+    metrics: RecognitionModelMetrics | None = None
+
+
+class RecognitionModelRegistry(BaseModel):
+    """Local registry for recognition baseline models."""
+
+    active_version: str | None = None
+    updated_at: datetime = Field(default_factory=utc_now)
+    models: list[RecognitionModelInfo] = Field(default_factory=list)
+    active_model: RecognitionModelInfo | None = None

@@ -31,6 +31,8 @@ from app.models import (
     Project,
     QuizAttemptRecord,
     QuizPrompt,
+    RecognitionModelInfo,
+    RecognitionModelRegistry,
     RecognitionScoreProjectResponse,
     RecognitionTrainingSample,
     RunTrackingResponse,
@@ -45,10 +47,12 @@ from app.models.tracking import Detection, PlayerTrack
 from app.pipeline.recognition_quality import score_project_recognition
 from app.services.decision_engine import evaluate_attempt
 from app.services.dataset_health import dataset_health_response
+from app.services.recognition_training import load_recognition_registry, score_project_with_model, train_baseline
 
 router = APIRouter(prefix="/local-lab", tags=["local-lab"])
 
 DATASETS_DIR = Path(__file__).resolve().parents[1] / "data" / "datasets"
+RECOGNITION_MODELS_DIR = Path(__file__).resolve().parents[1] / "data" / "models" / "recognition"
 DATASET_TYPES = ("recognition", "decision", "player_value")
 _PROMPTS_ADAPTER = TypeAdapter(list[QuizPrompt])
 _ATTEMPTS_ADAPTER = TypeAdapter(list[QuizAttemptRecord])
@@ -219,6 +223,38 @@ def score_project_recognition_quality(project_id: str) -> RecognitionScoreProjec
         patch=review_patch,
         calibration=calibration,
     )
+
+
+@router.get("/models/recognition", response_model=RecognitionModelRegistry)
+def get_recognition_model_registry() -> RecognitionModelRegistry:
+    RECOGNITION_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    return load_recognition_registry(RECOGNITION_MODELS_DIR)
+
+
+@router.post("/models/recognition/train-baseline", response_model=RecognitionModelInfo)
+def train_recognition_baseline() -> RecognitionModelInfo:
+    _ensure_dataset_dirs()
+    RECOGNITION_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    return train_baseline(DATASETS_DIR, RECOGNITION_MODELS_DIR)
+
+
+@router.post("/models/recognition/score-project/{project_id}", response_model=RecognitionScoreProjectResponse)
+def score_project_recognition_model(project_id: str) -> RecognitionScoreProjectResponse:
+    directory = DATA_DIR / project_id
+    tracking_path = _tracking_path(directory)
+    if not tracking_path.exists():
+        raise api_error(
+            404,
+            "TRACKING_NOT_FOUND",
+            "No tracking output exists for this project.",
+            {"project_id": project_id},
+            "Run tracking before scoring recognition quality.",
+        )
+
+    tracking = RunTrackingResponse.model_validate(read_json(tracking_path))
+    calibration_path = _calibration_path(directory)
+    calibration = Calibration.model_validate(read_json(calibration_path)) if calibration_path.exists() else None
+    return score_project_with_model(project_id, tracking, RECOGNITION_MODELS_DIR, calibration)
 
 
 def _write_jsonl(path: Path, rows) -> None:
