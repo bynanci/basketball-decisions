@@ -8,7 +8,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api import common, local_lab, projects, reference_videos, sources  # noqa: E402
+from app.api import common, decision_rules, local_lab, projects, reference_videos, sources  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -25,4 +25,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(reference_videos, "BREAKDOWN_NOTES_PATH", tmp_path / "reference_videos" / "breakdown_notes.json")
     monkeypatch.setattr(reference_videos, "QUIZ_PROMPT_DRAFTS_PATH", tmp_path / "reference_videos" / "quiz_prompt_drafts.json")
     monkeypatch.setattr(reference_videos, "DECISION_RULE_DRAFTS_PATH", tmp_path / "reference_videos" / "decision_rule_drafts.json")
+    monkeypatch.setattr(decision_rules, "REFERENCE_VIDEO_DIR", tmp_path / "reference_videos")
+    monkeypatch.setattr(decision_rules, "DECISION_RULE_DRAFTS_PATH", tmp_path / "reference_videos" / "decision_rule_drafts.json")
+    monkeypatch.setattr(decision_rules, "DECISION_RULES_DIR", tmp_path / "decision_rules")
+    monkeypatch.setattr(decision_rules, "RULE_SETS_PATH", tmp_path / "decision_rules" / "rule_sets.json")
+    monkeypatch.setattr(decision_rules, "ACTIVE_RULE_SET_PATH", tmp_path / "decision_rules" / "active_rule_set.json")
     return TestClient(app)

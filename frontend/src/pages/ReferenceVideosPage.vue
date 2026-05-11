@@ -70,6 +70,7 @@ onMounted(loadReferenceVideos)
       Save YouTube or web video links as source-governed reference metadata, then manually extract concepts and coaching reads on the detail page.
       These sources stay reference-only and are not training eligible.
     </p>
+    <RouterLink class="button" to="/decision-rules">Review Decision Rule Drafts</RouterLink>
     <p v-if="statusMessage" class="success-message">{{ statusMessage }}</p>
     <div v-if="errorMessage" class="error-card" role="alert">
       <strong>{{ errorCode }}</strong>
