@@ -21,6 +21,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(review_queue, "DATA_DIR", tmp_path)
     monkeypatch.setattr(review_queue, "DATASETS_DIR", tmp_path / "datasets")
     monkeypatch.setattr(review_queue, "REVIEW_QUEUE_PATH", tmp_path / "review_queue.json")
+    monkeypatch.setattr(review_queue, "REVIEW_ACTION_LOG_PATH", tmp_path / "review_queue" / "review_action_log.json")
     monkeypatch.setattr(review_queue, "DECISION_RULE_DRAFTS_PATH", tmp_path / "reference_videos" / "decision_rule_drafts.json")
     monkeypatch.setattr(local_lab, "RECOGNITION_MODELS_DIR", tmp_path / "models" / "recognition")
     monkeypatch.setattr(sources, "SOURCE_REGISTRY_PATH", tmp_path / "source_registry.json")

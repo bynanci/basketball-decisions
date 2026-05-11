@@ -103,3 +103,57 @@ describe('apiClient.getPlayerValueEvidence', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/local-lab/player-value/project%201/P%2F1/evidence', { headers: expect.any(Headers) })
   })
 })
+
+describe('review queue action client', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('posts explicit review actions to the item action endpoint', async () => {
+    const payload = {
+      item: {
+        item_id: 'rq-1',
+        item_type: 'RECOGNITION_TRACK',
+        priority: 'HIGH',
+        reason: 'risk',
+        recommended_action: 'review',
+        status: 'RESOLVED',
+        created_at: '2026-01-01T00:00:00Z',
+        allowed_actions: ['MARK_TRACK_FALSE_POSITIVE']
+      },
+      action: {
+        action_id: 'review-action-1',
+        item_id: 'rq-1',
+        item_type: 'RECOGNITION_TRACK',
+        action_type: 'MARK_TRACK_FALSE_POSITIVE',
+        project_id: 'project-1',
+        target_ref: {},
+        payload: {},
+        note: 'not a player',
+        status: 'APPLIED',
+        warnings: [],
+        created_at: '2026-01-01T00:00:00Z'
+      }
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiClient.performReviewAction('rq-1', { action_type: 'MARK_TRACK_FALSE_POSITIVE', note: 'not a player', payload: {} })).resolves.toEqual(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/review-queue/rq-1/actions', {
+      method: 'POST',
+      headers: expect.any(Headers),
+      body: JSON.stringify({ action_type: 'MARK_TRACK_FALSE_POSITIVE', note: 'not a player', payload: {} })
+    })
+  })
+
+  it('lists review actions with filters', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue([]) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiClient.listReviewActions({ item_id: 'rq-1', project_id: 'project-1', action_type: 'DISMISS_WITH_NOTE' })).resolves.toEqual([])
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/review-queue/actions?item_id=rq-1&project_id=project-1&action_type=DISMISS_WITH_NOTE', { headers: expect.any(Headers) })
+  })
+})

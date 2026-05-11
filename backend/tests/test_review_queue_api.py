@@ -201,3 +201,118 @@ def test_resolve_and_dismiss_review_queue_items_without_mutating_sources(client:
     regenerated = client.post("/api/review-queue/generate")
     persisted = next(item for item in regenerated.json()["items"] if item["item_id"] == item_id)
     assert persisted["status"] == "RESOLVED"
+
+
+def _item_by_type(payload: dict, item_type: str) -> dict:
+    return next(item for item in payload["items"] if item["item_type"] == item_type)
+
+
+def test_allowed_actions_are_returned_for_review_queue_items(client: TestClient, tmp_path: Path) -> None:
+    directory = _write_project(tmp_path)
+    _write_recognition_artifacts(directory)
+    _write_diagnostics(tmp_path)
+    _write_decision_events(tmp_path)
+    _write_player_value(tmp_path)
+    _write_rule_drafts(tmp_path)
+
+    payload = client.post("/api/review-queue/generate").json()
+
+    assert "MARK_TRACK_FALSE_POSITIVE" in _item_by_type(payload, "RECOGNITION_TRACK")["allowed_actions"]
+    assert "FLAG_PROMPT_LABEL_ISSUE" in _item_by_type(payload, "DECISION_PROMPT")["allowed_actions"]
+    assert "MARK_ATTEMPT_TEACHING_CASE" in _item_by_type(payload, "DECISION_ATTEMPT")["allowed_actions"]
+    assert "APPROVE_RULE_DRAFT" in _item_by_type(payload, "RULE_DRAFT")["allowed_actions"]
+    assert "DISMISS_WITH_NOTE" in _item_by_type(payload, "PLAYER_VALUE_ATTRIBUTION")["allowed_actions"]
+
+
+def test_mark_track_false_positive_updates_review_patch_and_logs_action(client: TestClient, tmp_path: Path) -> None:
+    directory = _write_project(tmp_path)
+    _write_recognition_artifacts(directory)
+    generated = client.post("/api/review-queue/generate").json()
+    item = _item_by_type(generated, "RECOGNITION_TRACK")
+    source_tracking_before = (directory / "tracking.json").read_text(encoding="utf-8")
+
+    response = client.post(f"/api/review-queue/{item['item_id']}/actions", json={"action_type": "MARK_TRACK_FALSE_POSITIVE", "note": "not a player", "payload": {}})
+
+    assert response.status_code == 200
+    assert response.json()["item"]["status"] == "RESOLVED"
+    patch = json.loads((directory / "tracking_review_patch.json").read_text(encoding="utf-8"))
+    assert item["track_id"] in patch["excluded_track_ids"]
+    assert (directory / "tracking.json").read_text(encoding="utf-8") == source_tracking_before
+    actions = client.get("/api/review-queue/actions", params={"item_id": item["item_id"]}).json()
+    assert actions[0]["action_type"] == "MARK_TRACK_FALSE_POSITIVE"
+    assert actions[0]["status"] == "APPLIED"
+
+
+def test_assign_track_to_player_alias_creates_updates_and_rejects_overlaps(client: TestClient, tmp_path: Path) -> None:
+    directory = _write_project(tmp_path)
+    _write_recognition_artifacts(directory)
+    generated = client.post("/api/review-queue/generate").json()
+    item = _item_by_type(generated, "RECOGNITION_TRACK")
+
+    created = client.post(
+        f"/api/review-queue/{item['item_id']}/actions",
+        json={"action_type": "ASSIGN_TRACK_TO_PLAYER_ALIAS", "note": "assign", "payload": {"player_key": "P1", "track_ids": [item["track_id"]], "team_side": "UNKNOWN"}},
+    )
+
+    assert created.status_code == 200
+    aliases = json.loads((directory / "player_aliases.json").read_text(encoding="utf-8"))
+    assert aliases["aliases"][0]["player_key"] == "P1"
+    assert item["track_id"] in aliases["aliases"][0]["track_ids"]
+
+    # Reopen only the queue item so a second explicit action can be attempted.
+    client.put(f"/api/review-queue/{item['item_id']}", json={"status": "OPEN"})
+    rejected = client.post(
+        f"/api/review-queue/{item['item_id']}/actions",
+        json={"action_type": "ASSIGN_TRACK_TO_PLAYER_ALIAS", "payload": {"player_key": "P2", "track_ids": [item["track_id"]]}},
+    )
+    assert rejected.status_code == 409
+    actions = client.get("/api/review-queue/actions", params={"item_id": item["item_id"]}).json()
+    assert [action["status"] for action in actions] == ["APPLIED", "FAILED"]
+
+
+def test_prompt_label_issue_and_teaching_case_artifacts_are_written(client: TestClient, tmp_path: Path) -> None:
+    directory = _write_project(tmp_path)
+    _write_diagnostics(tmp_path)
+    _write_decision_events(tmp_path)
+    generated = client.post("/api/review-queue/generate").json()
+    prompt_item = _item_by_type(generated, "DECISION_PROMPT")
+    attempt_item = _item_by_type(generated, "DECISION_ATTEMPT")
+
+    prompt_response = client.post(
+        f"/api/review-queue/{prompt_item['item_id']}/actions",
+        json={"action_type": "FLAG_PROMPT_LABEL_ISSUE", "note": "label appears reversed", "payload": {"reason": "manual review"}},
+    )
+    attempt_response = client.post(
+        f"/api/review-queue/{attempt_item['item_id']}/actions",
+        json={"action_type": "MARK_ATTEMPT_TEACHING_CASE", "note": "good film room example", "payload": {}},
+    )
+
+    assert prompt_response.status_code == 200
+    assert attempt_response.status_code == 200
+    prompt_notes = json.loads((directory / "prompt_review_notes.json").read_text(encoding="utf-8"))
+    teaching_cases = json.loads((directory / "teaching_cases.json").read_text(encoding="utf-8"))
+    assert prompt_notes[0]["prompt_id"] == "prompt-label-issue"
+    assert teaching_cases[0]["attempt_id"] == "attempt-high-cost"
+
+
+def test_rule_draft_approve_and_dismiss_with_note(client: TestClient, tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_diagnostics(tmp_path)
+    _write_rule_drafts(tmp_path)
+    generated = client.post("/api/review-queue/generate").json()
+    rule_item = _item_by_type(generated, "RULE_DRAFT")
+    prompt_item = _item_by_type(generated, "DECISION_PROMPT")
+
+    approved = client.post(f"/api/review-queue/{rule_item['item_id']}/actions", json={"action_type": "APPROVE_RULE_DRAFT", "payload": {"approved_by": "tester"}})
+    missing_note = client.post(f"/api/review-queue/{prompt_item['item_id']}/actions", json={"action_type": "DISMISS_WITH_NOTE", "payload": {}})
+    dismissed = client.post(f"/api/review-queue/{prompt_item['item_id']}/actions", json={"action_type": "DISMISS_WITH_NOTE", "note": "duplicate", "payload": {}})
+
+    assert approved.status_code == 200
+    assert approved.json()["item"]["status"] == "RESOLVED"
+    drafts = json.loads((tmp_path / "reference_videos" / "decision_rule_drafts.json").read_text(encoding="utf-8"))
+    assert drafts[0]["status"] == "APPROVED"
+    rule_sets = json.loads((tmp_path / "decision_rules" / "rule_sets.json").read_text(encoding="utf-8"))
+    assert rule_sets[0]["rules"][0]["source_draft_id"] == "draft-1"
+    assert missing_note.status_code == 422
+    assert dismissed.status_code == 200
+    assert dismissed.json()["item"]["status"] == "DISMISSED"

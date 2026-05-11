@@ -60,6 +60,11 @@ from .player_value import (
 )
 from .source import LeagueTag, SourceLicenseType, SourceType, UsageScope, VideoSourceRecord
 from .review_queue import (
+    ReviewActionLog,
+    ReviewActionRequest,
+    ReviewActionResponse,
+    ReviewActionStatus,
+    ReviewActionType,
     ReviewQueueGenerateResponse,
     ReviewQueueItem,
     ReviewQueueItemType,
@@ -167,6 +172,11 @@ __all__ = [
     "ReferenceBreakdownNote",
     "ReferenceVideo",
     "ReferenceVideoDraftSummary",
+    "ReviewActionLog",
+    "ReviewActionRequest",
+    "ReviewActionResponse",
+    "ReviewActionStatus",
+    "ReviewActionType",
     "ReviewQueueGenerateResponse",
     "ReviewQueueItem",
     "ReviewQueueItemType",

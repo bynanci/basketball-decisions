@@ -609,3 +609,20 @@ Track-link semantics remain strict:
 - UNKNOWN attribution is intentionally visible rather than hidden when source evidence is missing or ambiguous.
 
 Player Value remains a local, explainable aggregation over saved JSON artifacts. It is not a learned model, does not perform jersey OCR, does not claim real player identity, and is not scouting-grade.
+
+## Review Queue Action Workflow
+
+The Review Queue (`/review-queue`) is an explicit local workflow for resolving active-learning items surfaced from recognition scoring, decision diagnostics, Player Value evidence, and rule draft governance. Generating the queue only surfaces candidates; it does not auto-mutate source artifacts.
+
+Reviewers can apply queue actions through `POST /api/review-queue/{item_id}/actions`. Each action is explicit, validated against the item type, and persisted to `backend/app/data/review_queue/review_action_log.json` so artifact changes and no-op follow-ups remain traceable. The action log can be queried with `GET /api/review-queue/actions` and optional `item_id`, `project_id`, or `action_type` filters.
+
+Action handlers intentionally mutate only local review artifacts:
+
+- Track false-positive actions update or create the project `tracking_review_patch.json` by adding excluded track or detection IDs; raw `tracking.json` remains immutable.
+- Player alias assignment updates project-local `player_aliases.json` only after a reviewer provides a `player_key` and track IDs; overlapping track ownership is rejected rather than guessed.
+- Prompt label issues are saved to project `prompt_review_notes.json`.
+- Teaching-case decisions are saved to project `teaching_cases.json`.
+- Rule draft approve/reject actions reuse the existing decision-rule draft workflow.
+- Accepting UNKNOWN Player Value attribution records the decision without inventing a fake player identity.
+
+Player identity remains manual and local: reviewers must choose when to connect tracks to a local alias, and the queue never creates real-world identity claims or trains a model from these actions.
