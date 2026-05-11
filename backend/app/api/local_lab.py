@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from fastapi import APIRouter
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app.api.common import DATA_DIR, api_error, read_json, write_json_model
 from app.api.reference_videos import reference_video_summary
@@ -41,6 +41,10 @@ from app.models import (
     Project,
     QuizAttemptRecord,
     QuizPrompt,
+    RecognitionActivationRequest,
+    RecognitionActivationResponse,
+    RecognitionEvaluationReportRegistry,
+    RecognitionModelComparison,
     RecognitionModelInfo,
     RecognitionModelRegistry,
     RecognitionScoreProjectResponse,
@@ -59,9 +63,14 @@ from app.models.quiz import normalize_track_id_list
 from app.services.decision_engine import evaluate_attempt
 from app.services.decision_diagnostics import build_decision_diagnostics
 from app.services.dataset_health import dataset_health_response
-from app.services.recognition_training import load_recognition_registry, score_project_with_model, train_baseline
+from app.services.recognition_training import activate_model, compare_models, get_model_version, load_evaluation_report_registry, load_recognition_registry, score_project_with_model, train_baseline
 
 router = APIRouter(prefix="/local-lab", tags=["local-lab"])
+
+
+class RecognitionModelCompareRequest(BaseModel):
+    base_version: str
+    candidate_version: str
 
 DATASETS_DIR = Path(__file__).resolve().parents[1] / "data" / "datasets"
 RECOGNITION_MODELS_DIR = Path(__file__).resolve().parents[1] / "data" / "models" / "recognition"
@@ -275,10 +284,54 @@ def get_recognition_model_registry() -> RecognitionModelRegistry:
 
 
 @router.post("/models/recognition/train-baseline", response_model=RecognitionModelInfo)
-def train_recognition_baseline() -> RecognitionModelInfo:
+def train_recognition_baseline(activate: bool = False) -> RecognitionModelInfo:
     _ensure_dataset_dirs()
     RECOGNITION_MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    return train_baseline(DATASETS_DIR, RECOGNITION_MODELS_DIR)
+    return train_baseline(DATASETS_DIR, RECOGNITION_MODELS_DIR, activate=activate)
+
+
+@router.get("/models/recognition/compare", response_model=RecognitionModelComparison)
+def compare_recognition_models(base_version: str, candidate_version: str) -> RecognitionModelComparison:
+    RECOGNITION_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    return compare_models(RECOGNITION_MODELS_DIR, base_version, candidate_version)
+
+
+@router.post("/models/recognition/compare", response_model=RecognitionModelComparison)
+def post_compare_recognition_models(payload: RecognitionModelCompareRequest) -> RecognitionModelComparison:
+    RECOGNITION_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    return compare_models(RECOGNITION_MODELS_DIR, payload.base_version, payload.candidate_version)
+
+
+@router.get("/models/recognition/evaluations", response_model=RecognitionEvaluationReportRegistry)
+def get_recognition_evaluations_alias() -> RecognitionEvaluationReportRegistry:
+    RECOGNITION_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    return load_evaluation_report_registry(RECOGNITION_MODELS_DIR)
+
+
+@router.get("/models/recognition/evaluation-reports", response_model=RecognitionEvaluationReportRegistry)
+def get_recognition_evaluation_reports() -> RecognitionEvaluationReportRegistry:
+    RECOGNITION_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    return load_evaluation_report_registry(RECOGNITION_MODELS_DIR)
+
+
+@router.get("/models/recognition/{version}", response_model=RecognitionModelInfo)
+def get_recognition_model_version(version: str) -> RecognitionModelInfo:
+    RECOGNITION_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    return get_model_version(RECOGNITION_MODELS_DIR, version)
+
+
+@router.post("/models/recognition/{version}/activate", response_model=RecognitionActivationResponse)
+def activate_recognition_model(version: str, payload: RecognitionActivationRequest | None = None) -> RecognitionActivationResponse:
+    RECOGNITION_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    if payload is not None and not payload.activate:
+        raise api_error(
+            400,
+            "RECOGNITION_ACTIVATION_REQUIRED",
+            "Activation requests must set activate=true.",
+            {"version": version},
+            "Call this endpoint only when intentionally activating or rolling back to a registered model version.",
+        )
+    return activate_model(RECOGNITION_MODELS_DIR, version, payload.reason if payload else None)
 
 
 @router.post("/models/recognition/score-project/{project_id}", response_model=RecognitionScoreProjectResponse)

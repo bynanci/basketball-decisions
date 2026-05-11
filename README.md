@@ -438,41 +438,71 @@ Drafts can also be rejected, which marks the draft reviewed without creating a r
 
 These active rules are deterministic local JSON configuration, not ML training data and not a learned model. Approving a rule from a reference-only breakdown does **not** export the original video, note, draft, or rule as a training sample. The rule set is intended to inform a future Decision Engine v2 rule layer while preserving the current source-governance boundary.
 
-## Recognition Baseline Trainer
+## Recognition Model Registry Governance
 
-The M10 Recognition Baseline Trainer adds a lightweight local classifier for false-positive detection/track risk. It is intentionally scoped as a CPU-friendly baseline, not a detector training pipeline.
+The recognition baseline trainer is governed by a local, immutable model registry. It remains intentionally scoped to recognition false-positive risk only; it does **not** train YOLO, use a cloud registry, auto-promote models, or implement Player Value model training.
 
 Key properties:
 
-- **Local model only:** training reads the curated recognition JSONL dataset from `backend/app/data/datasets/recognition/` and writes model artifacts to `backend/app/data/models/recognition/`.
-- **CPU-friendly:** the backend uses scikit-learn when it is installed and returns a clear `501` error with `debug_hint: install scikit-learn` when it is not available.
-- **Not YOLO:** the trainer does not train YOLO, download weights, require CUDA, or require a GPU.
-- **Recommendations only:** model scoring returns false-positive risk recommendations per detection/track and does not delete, clean, or mutate tracking artifacts.
+- **Immutable versions:** every training run creates the next folder under `backend/app/data/models/recognition/` (`v001`, `v002`, `v003`, ...). Existing model folders are never overwritten.
+- **Explicit activation:** newly trained models are drafts by default. They become active only when training is called with `activate=true` or when a reviewer activates an existing version.
+- **Active-model scoring:** project scoring loads `model_registry.json.active_version`; it does not score with the newest folder just because it exists.
+- **Dataset lineage:** each model version records `dataset_lineage.json` with the curated recognition manifest, samples, labels, per-file hashes, and a combined dataset fingerprint.
+- **Evaluation reports:** each version writes `evaluation_report.json`, and the registry keeps `evaluation_reports.json` for comparison and audit.
+- **Local model only:** training reads curated recognition JSONL from `backend/app/data/datasets/recognition/` and writes local artifacts to `backend/app/data/models/recognition/`.
+- **CPU-friendly:** the backend uses scikit-learn when installed and returns a clear `501` error with `debug_hint: install scikit-learn` when it is unavailable.
 
-Train the baseline from curated recognition samples:
+Train a draft recognition baseline from curated recognition samples:
 
 ```bash
 curl -X POST "http://localhost:8000/api/local-lab/models/recognition/train-baseline"
 ```
 
+Train and activate in one explicit request:
+
+```bash
+curl -X POST "http://localhost:8000/api/local-lab/models/recognition/train-baseline?activate=true"
+```
+
 Training validates that the curated dataset has at least 100 total positive/negative recognition samples, at least 10 positive samples (`PLAYER`, `VALID_PLAYER_TRACK`), and at least 10 negative samples (`FALSE_POSITIVE`, `FALSE_POSITIVE_TRACK`). When possible, the train/test split is grouped by `project_id` so test rows come from held-out projects rather than random rows.
 
-The active model registry is available at:
+The model registry is available at:
 
 ```bash
 curl "http://localhost:8000/api/local-lab/models/recognition"
 ```
 
-The registry records the active model version and points to the versioned artifacts:
+The registry points to immutable versioned artifacts:
 
 ```text
 backend/app/data/models/recognition/model_registry.json
+backend/app/data/models/recognition/evaluation_reports.json
 backend/app/data/models/recognition/v001/model.pkl
 backend/app/data/models/recognition/v001/metrics.json
 backend/app/data/models/recognition/v001/feature_schema.json
+backend/app/data/models/recognition/v001/dataset_lineage.json
+backend/app/data/models/recognition/v001/evaluation_report.json
 ```
 
-`metrics.json` includes accuracy, precision, recall, F1, confusion matrix, train/test sample counts, and feature importance when exposed by the fitted classifier.
+Activate a candidate or roll back to an earlier version with the same explicit workflow:
+
+```bash
+curl -X POST "http://localhost:8000/api/local-lab/models/recognition/v001/activate" \
+  -H "Content-Type: application/json" \
+  -d '{"activate": true, "reason": "manual rollback after review"}'
+```
+
+Compare two registered versions:
+
+```bash
+curl "http://localhost:8000/api/local-lab/models/recognition/compare?base_version=v001&candidate_version=v002"
+```
+
+List registered evaluation reports:
+
+```bash
+curl "http://localhost:8000/api/local-lab/models/recognition/evaluation-reports"
+```
 
 Score a project with the active trained model:
 
@@ -480,7 +510,7 @@ Score a project with the active trained model:
 curl -X POST "http://localhost:8000/api/local-lab/models/recognition/score-project/{project_id}"
 ```
 
-The response mirrors the recognition quality scoring shape and includes `model_version` plus model-based false-positive risk for each detection and track. Raw tracking, review patches, cleaned tracking, and projected-track artifacts are left unchanged.
+The response mirrors the recognition quality scoring shape and includes `model_version` plus model-based false-positive risk for each detection and track. Raw tracking, review patches, cleaned tracking, and projected-track artifacts are left unchanged. The frontend exposes the registry at `/model-registry`.
 
 ## Decision Diagnostics
 

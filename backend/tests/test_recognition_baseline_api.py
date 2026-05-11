@@ -274,9 +274,17 @@ def test_training_writes_registry_and_metrics_when_data_sufficient(client: TestC
     assert response.status_code == 200
     payload = response.json()
     assert payload["version"] == "v001"
+    assert payload["active"] is False
+    assert payload["dataset_fingerprint"]
+    assert payload["dataset_lineage"]["dataset_fingerprint"] == payload["dataset_fingerprint"]
     assert payload["metrics"]["train_sample_count"] > 0
     assert (tmp_path / "models" / "recognition" / "model_registry.json").exists()
     assert (tmp_path / "models" / "recognition" / "v001" / "model.pkl").exists()
+    assert (tmp_path / "models" / "recognition" / "v001" / "dataset_lineage.json").exists()
+    assert (tmp_path / "models" / "recognition" / "v001" / "evaluation_report.json").exists()
+    assert (tmp_path / "models" / "recognition" / "evaluation_reports.json").exists()
+    registry = json.loads((tmp_path / "models" / "recognition" / "model_registry.json").read_text(encoding="utf-8"))
+    assert registry["active_version"] is None
     metrics = json.loads((tmp_path / "models" / "recognition" / "v001" / "metrics.json").read_text(encoding="utf-8"))
     assert metrics["f1"] == 1.0
 
@@ -304,7 +312,7 @@ def test_model_scoring_missing_sklearn_returns_dependency_error(client: TestClie
 def test_model_scoring_does_not_mutate_project_artifacts(client: TestClient, tmp_path: Path, monkeypatch) -> None:
     _install_fake_sklearn(monkeypatch)
     _write_curated_samples(tmp_path, _sufficient_rows())
-    train_response = client.post("/api/local-lab/models/recognition/train-baseline")
+    train_response = client.post("/api/local-lab/models/recognition/train-baseline?activate=true")
     assert train_response.status_code == 200
     before = _write_tracking_project(tmp_path, "score-project")
 
@@ -317,3 +325,75 @@ def test_model_scoring_does_not_mutate_project_artifacts(client: TestClient, tmp
     after = (tmp_path / "score-project" / "tracking.json").read_bytes()
     assert after == before
     assert not (tmp_path / "score-project" / "tracking_cleaned.json").exists()
+
+
+
+def test_training_creates_incrementing_immutable_versions_without_auto_activation(client: TestClient, tmp_path: Path, monkeypatch) -> None:
+    _install_fake_sklearn(monkeypatch)
+    _write_curated_samples(tmp_path, _sufficient_rows())
+
+    first = client.post("/api/local-lab/models/recognition/train-baseline")
+    second = client.post("/api/local-lab/models/recognition/train-baseline")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["version"] == "v001"
+    assert second.json()["version"] == "v002"
+    assert first.json()["active"] is False
+    assert second.json()["active"] is False
+    assert (tmp_path / "models" / "recognition" / "v001" / "model.pkl").exists()
+    assert (tmp_path / "models" / "recognition" / "v002" / "model.pkl").exists()
+    registry = client.get("/api/local-lab/models/recognition").json()
+    assert registry["active_version"] is None
+    assert [model["version"] for model in registry["models"]] == ["v001", "v002"]
+
+
+def test_activation_and_rollback_workflow_controls_active_model(client: TestClient, tmp_path: Path, monkeypatch) -> None:
+    _install_fake_sklearn(monkeypatch)
+    _write_curated_samples(tmp_path, _sufficient_rows())
+    assert client.post("/api/local-lab/models/recognition/train-baseline?activate=true").status_code == 200
+    assert client.post("/api/local-lab/models/recognition/train-baseline").status_code == 200
+
+    registry = client.get("/api/local-lab/models/recognition").json()
+    assert registry["active_version"] == "v001"
+
+    activate_v2 = client.post("/api/local-lab/models/recognition/v002/activate", json={"activate": True, "reason": "candidate passed review"})
+    assert activate_v2.status_code == 200
+    assert activate_v2.json()["previous_active_version"] == "v001"
+    assert activate_v2.json()["active_version"] == "v002"
+
+    rollback = client.post("/api/local-lab/models/recognition/v001/activate", json={"activate": True, "reason": "rollback"})
+    assert rollback.status_code == 200
+    assert rollback.json()["previous_active_version"] == "v002"
+    assert rollback.json()["active_version"] == "v001"
+
+
+def test_model_comparison_and_evaluation_report_registry(client: TestClient, tmp_path: Path, monkeypatch) -> None:
+    _install_fake_sklearn(monkeypatch)
+    _write_curated_samples(tmp_path, _sufficient_rows())
+    assert client.post("/api/local-lab/models/recognition/train-baseline?activate=true").status_code == 200
+    assert client.post("/api/local-lab/models/recognition/train-baseline").status_code == 200
+
+    comparison = client.get("/api/local-lab/models/recognition/compare?base_version=v001&candidate_version=v002")
+    assert comparison.status_code == 200
+    assert comparison.json()["base_version"] == "v001"
+    assert comparison.json()["candidate_version"] == "v002"
+    assert "f1" in comparison.json()["metric_deltas"]
+
+    reports = client.get("/api/local-lab/models/recognition/evaluation-reports")
+    assert reports.status_code == 200
+    assert [report["model_version"] for report in reports.json()["reports"]] == ["v001", "v002"]
+    assert all(report["dataset_fingerprint"] for report in reports.json()["reports"])
+
+
+def test_scoring_uses_active_model_not_latest_model(client: TestClient, tmp_path: Path, monkeypatch) -> None:
+    _install_fake_sklearn(monkeypatch)
+    _write_curated_samples(tmp_path, _sufficient_rows())
+    assert client.post("/api/local-lab/models/recognition/train-baseline?activate=true").status_code == 200
+    assert client.post("/api/local-lab/models/recognition/train-baseline").status_code == 200
+    _write_tracking_project(tmp_path, "score-project")
+
+    response = client.post("/api/local-lab/models/recognition/score-project/score-project")
+
+    assert response.status_code == 200
+    assert response.json()["model_version"] == "v001"
