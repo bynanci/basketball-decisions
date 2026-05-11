@@ -767,6 +767,42 @@ export interface PlayerValueBuildResponse {
   warnings: string[]
 }
 
+
+export type ReviewQueueItemType =
+  | 'RECOGNITION_TRACK'
+  | 'RECOGNITION_DETECTION'
+  | 'DECISION_PROMPT'
+  | 'DECISION_ATTEMPT'
+  | 'PLAYER_VALUE_ATTRIBUTION'
+  | 'RULE_DRAFT'
+
+export type ReviewQueuePriority = 'LOW' | 'MEDIUM' | 'HIGH'
+export type ReviewQueueStatus = 'OPEN' | 'RESOLVED' | 'DISMISSED'
+
+export interface ReviewQueueItem {
+  item_id: string
+  item_type: ReviewQueueItemType
+  priority: ReviewQueuePriority
+  project_id?: string | null
+  prompt_id?: string | null
+  attempt_id?: string | null
+  track_id?: string | null
+  player_key?: string | null
+  reason: string
+  recommended_action: string
+  status: ReviewQueueStatus
+  created_at: string
+  resolved_at?: string | null
+}
+
+export interface ReviewQueueGenerateResponse {
+  items: ReviewQueueItem[]
+  generated_count: number
+  open_count: number
+  resolved_count: number
+  dismissed_count: number
+}
+
 export interface RoleBreakdownItem {
   court_role?: string | null
   event_count: number
@@ -1041,6 +1077,10 @@ export const apiClient = {
   getPlayerValueEvidence: (projectId: string, playerKey: string) =>
     request<PlayerValueEvidenceResponse>(`/local-lab/player-value/${encodeURIComponent(projectId)}/${encodeURIComponent(playerKey)}/evidence`),
   getDecisionDiagnostics: () => request<DecisionDiagnosticsReport>('/local-lab/decision-diagnostics'),
+  generateReviewQueue: () => request<ReviewQueueGenerateResponse>('/review-queue/generate', { method: 'POST' }),
+  listReviewQueue: () => request<ReviewQueueItem[]>('/review-queue'),
+  updateReviewQueueItem: (itemId: string, status: ReviewQueueStatus) =>
+    request<ReviewQueueItem>(`/review-queue/${encodeURIComponent(itemId)}`, { method: 'PUT', body: JSON.stringify({ status }) }),
   getRecognitionModelRegistry: () => request<RecognitionModelRegistry>('/local-lab/models/recognition'),
   trainRecognitionBaseline: () => request<RecognitionModelInfo>('/local-lab/models/recognition/train-baseline', { method: 'POST' }),
   scoreRecognitionQuality: (projectId: string) =>
