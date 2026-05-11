@@ -611,6 +611,7 @@ onMounted(refreshLocalLab)
             <th>Review</th>
             <th>Cleaned</th>
             <th>Projected</th>
+            <th>Aliases</th>
             <th>Prompts</th>
             <th>Attempts</th>
             <th>Updated</th>
@@ -633,12 +634,13 @@ onMounted(refreshLocalLab)
             <td>{{ boolLabel(project.has_tracking_review) }}</td>
             <td>{{ boolLabel(project.has_cleaned_tracking) }}</td>
             <td>{{ boolLabel(project.has_projected_tracks) }}</td>
+            <td>{{ project.player_alias_count }}</td>
             <td>{{ project.quiz_prompt_count }}</td>
             <td>{{ project.quiz_attempt_count }}</td>
             <td>{{ formatDate(project.updated_at) }}</td>
           </tr>
           <tr v-if="projects.length === 0">
-            <td colspan="15">No local projects found yet.</td>
+            <td colspan="16">No local projects found yet.</td>
           </tr>
         </tbody>
       </table>

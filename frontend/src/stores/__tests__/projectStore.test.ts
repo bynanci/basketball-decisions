@@ -79,6 +79,10 @@ function bundle(overrides: Partial<ProjectBundleResponse> = {}): ProjectBundleRe
       projected_tracks: [{ track_id: 'track-1', points: [], metadata: {} }],
       storage_paths: {}
     },
+    player_aliases: {
+      project_id: 'project-1',
+      aliases: [{ player_key: 'P1', project_id: 'project-1', track_ids: ['track-1'], team_side: 'HOME', confidence: 1, source: 'MANUAL' }]
+    },
     tracking_review: {
       project_id: 'project-1',
       tracking: { project_id: 'project-1', detections: [], tracks: [] },
@@ -114,6 +118,7 @@ describe('projectStore.hydrateProjectFromBundle', () => {
     expect(project?.trackingPipelineOutput?.detector_mode).toBe('hydrated-detector')
     expect(project?.trackingDebugMetadata?.detector).toEqual({ mode: 'hydrated-debug-detector' })
     expect(project?.trackingReview?.review_patch.excluded_track_ids).toEqual(['track-2'])
+    expect(project?.playerAliases?.aliases[0].player_key).toBe('P1')
   })
 
   it('preserves an existing browser-only video preview URL', () => {

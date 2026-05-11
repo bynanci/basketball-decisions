@@ -23,6 +23,9 @@ const errorHint = ref('')
 const hasCalibration = computed(() => !!project.value?.calibration)
 const hasTracking = computed(() => !!project.value && (project.value.detections.length > 0 || project.value.tracks.length > 0 || project.value.projectedTracks.length > 0))
 const hasProjectedTracks = computed(() => (project.value?.projectedTracks.length ?? 0) > 0)
+const aliasCount = computed(() => project.value?.playerAliases?.aliases.length ?? 0)
+const aliasedTrackCount = computed(() => new Set(project.value?.playerAliases?.aliases.flatMap((alias) => alias.track_ids) ?? []).size)
+const unaliasedTrackCount = computed(() => Math.max((project.value?.tracks.length ?? 0) - aliasedTrackCount.value, 0))
 const quizPrompts = ref<QuizPrompt[]>([])
 const decisionDiagnostics = ref<DecisionDiagnosticsReport | null>(null)
 const isLoadingQuizPrompts = ref(false)
@@ -263,7 +266,20 @@ async function saveSourceGovernance() {
       <span><strong>{{ hasCalibration ? 'Saved' : 'Missing' }}</strong> calibration</span>
       <span><strong>{{ hasTracking ? 'Saved' : 'Missing' }}</strong> tracking</span>
       <span><strong>{{ hasProjectedTracks ? project?.projectedTracks.length : 0 }}</strong> projected tracks</span>
+      <span><strong>{{ aliasCount }}</strong> player aliases</span>
     </div>
+  </section>
+
+
+  <section class="card">
+    <h2>Player Alias summary</h2>
+    <div class="stats-grid">
+      <span><strong>{{ aliasCount }}</strong> aliases</span>
+      <span><strong>{{ aliasedTrackCount }}</strong> aliased tracks</span>
+      <span><strong>{{ unaliasedTrackCount }}</strong> unaliased tracks</span>
+    </div>
+    <p class="muted">Aliases are manual, local, project-scoped mappings for future Player Value work; raw tracking is not modified.</p>
+    <RouterLink v-if="hasTracking" class="button small" :to="`/projects/${projectId}/tracking-review`">Assign aliases in Tracking Review</RouterLink>
   </section>
 
   <section class="card">

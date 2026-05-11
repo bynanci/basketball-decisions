@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from .base import ProjectArtifact
 from .calibration import Calibration
+from .player_identity import PlayerAliasListResponse
 from .source import VideoSourceRecord
 from .tracking import ProjectTracksResponse, RunTrackingResponse, TrackReviewResponse
 from .video import ExtractFramesResponse, VideoAsset
@@ -47,3 +48,4 @@ class ProjectBundleResponse(BaseModel):
     tracking: RunTrackingResponse | None = None
     projected_tracks: ProjectTracksResponse | None = None
     tracking_review: TrackReviewResponse | None = None
+    player_aliases: PlayerAliasListResponse | None = None

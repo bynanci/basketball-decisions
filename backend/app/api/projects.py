@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ValidationError
 
 from app.api.common import DATA_DIR, api_error, project_dir, read_json, require_project_dir, write_json_model
+from app.api.player_identity import read_player_aliases
 from app.models.base import utc_now
 from app.models import (
     Calibration,
@@ -111,6 +112,7 @@ def get_project_bundle(project_id: str) -> ProjectBundleResponse:
         tracking=_read_optional_artifact(directory, "tracking.json", RunTrackingResponse),
         projected_tracks=_read_optional_artifact(directory, "projected_tracks.json", ProjectTracksResponse),
         tracking_review=_read_tracking_review_artifact(directory, project_id),
+        player_aliases=read_player_aliases(directory, project_id),
     )
 
 

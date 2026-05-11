@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
-import type { Detection, DetectionRecognitionScore, PlayerTrack, TrackRecognitionScore, TrackReviewPatch, TrackReviewResponse } from '../api/client'
+import type { Detection, DetectionRecognitionScore, PlayerAlias, PlayerTrack, TeamSide, TrackRecognitionScore, TrackReviewPatch, TrackReviewResponse } from '../api/client'
 import { useProjectHydration } from '../composables/useProjectHydration'
 import { useProjectStore } from '../stores/projectStore'
 
@@ -33,6 +33,11 @@ const detectionScores = ref<DetectionRecognitionScore[]>([])
 const trackScores = ref<TrackRecognitionScore[]>([])
 const modelDetectionScores = ref<DetectionRecognitionScore[]>([])
 const modelTrackScores = ref<TrackRecognitionScore[]>([])
+const aliases = ref<PlayerAlias[]>([])
+const selectedAliasKey = ref('')
+const showExcludedAliasTracks = ref(false)
+const isSavingAliases = ref(false)
+const aliasMessage = ref('')
 
 const rawTracking = computed(() => review.value?.tracking ?? null)
 const detections = computed(() => rawTracking.value?.detections ?? project.value?.detections ?? [])
@@ -54,6 +59,10 @@ const trackScoreById = computed(() => new Map(trackScores.value.map((score) => [
 const modelDetectionScoreById = computed(() => new Map(modelDetectionScores.value.map((score) => [score.detection_id, score])))
 const modelTrackScoreById = computed(() => new Map(modelTrackScores.value.map((score) => [score.track_id, score])))
 
+const assignedTrackIds = computed(() => new Set(aliases.value.flatMap((alias) => alias.track_ids)))
+const unaliasedTrackCount = computed(() => tracks.value.filter((track) => !assignedTrackIds.value.has(track.track_id)).length)
+const aliasableTrackSummaries = computed(() => trackSummaries.value.filter((summary) => showExcludedAliasTracks.value || !summary.excluded))
+
 const trackSummaries = computed(() =>
   tracks.value
     .map((track) => ({
@@ -61,7 +70,9 @@ const trackSummaries = computed(() =>
       detectionCount: detections.value.filter((detection) => detection.track_id === track.track_id).length,
       pointCount: track.points.length,
       score: trackScoreById.value.get(track.track_id) ?? null,
-      modelScore: modelTrackScoreById.value.get(track.track_id) ?? null
+      modelScore: modelTrackScoreById.value.get(track.track_id) ?? null,
+      playerKey: playerKeyForTrack(track.track_id),
+      excluded: excludedTrackIds.value.has(track.track_id)
     }))
     .sort((a, b) => b.pointCount - a.pointCount || a.track.track_id.localeCompare(b.track.track_id))
 )
@@ -73,6 +84,7 @@ watch(frameOptions, (options) => {
 onMounted(async () => {
   await ensureProjectHydrated(props.projectId, { force: true }).catch(() => undefined)
   await loadReview()
+  await loadAliases()
 })
 
 function showError(error: unknown, fallbackMessage: string) {
@@ -110,12 +122,109 @@ async function loadReview() {
   }
 }
 
+function hydrateAliases(payload?: { aliases?: PlayerAlias[] } | null) {
+  aliases.value = (payload?.aliases ?? []).map((alias) => ({ ...alias, track_ids: [...alias.track_ids] }))
+  if (!selectedAliasKey.value && aliases.value.length > 0) selectedAliasKey.value = aliases.value[0].player_key
+}
+
+async function loadAliases() {
+  aliasMessage.value = ''
+  try {
+    if (project.value?.playerAliases) {
+      hydrateAliases(project.value.playerAliases)
+      return
+    }
+    const response = await apiClient.getPlayerAliases(props.projectId)
+    projectStore.setPlayerAliases(props.projectId, response)
+    hydrateAliases(response)
+  } catch (error) {
+    showError(error, 'Could not load player aliases.')
+  }
+}
+
+function nextPlayerKey() {
+  const used = new Set(aliases.value.map((alias) => alias.player_key))
+  let index = 1
+  while (used.has(`P${index}`)) index += 1
+  return `P${index}`
+}
+
+function createAlias() {
+  const playerKey = nextPlayerKey()
+  aliases.value = [
+    ...aliases.value,
+    {
+      player_key: playerKey,
+      project_id: props.projectId,
+      track_ids: [],
+      display_name: null,
+      team_side: 'UNKNOWN',
+      role_hint: null,
+      confidence: 1,
+      source: 'MANUAL',
+      notes: null
+    }
+  ]
+  selectedAliasKey.value = playerKey
+}
+
+function playerKeyForTrack(trackId: string) {
+  return aliases.value.find((alias) => alias.track_ids.includes(trackId))?.player_key ?? ''
+}
+
+function setAliasTeam(alias: PlayerAlias, teamSide: string) {
+  alias.team_side = teamSide as TeamSide
+}
+
+function toggleTrackAlias(trackId: string, playerKey: string, checked: boolean) {
+  if (!playerKey) return
+  aliases.value = aliases.value.map((alias) => {
+    const trackIds = alias.track_ids.filter((id) => id !== trackId)
+    if (checked && alias.player_key === playerKey) trackIds.push(trackId)
+    return { ...alias, track_ids: Array.from(new Set(trackIds)).sort() }
+  })
+}
+
+async function saveAliases() {
+  if (isSavingAliases.value) return
+  isSavingAliases.value = true
+  aliasMessage.value = ''
+  errorMessage.value = ''
+  errorCode.value = ''
+  errorHint.value = ''
+  try {
+    const response = await apiClient.savePlayerAliases(props.projectId, {
+      project_id: props.projectId,
+      aliases: aliases.value.map((alias) => ({
+        ...alias,
+        project_id: props.projectId,
+        display_name: alias.display_name?.trim() || null,
+        role_hint: alias.role_hint?.trim() || null,
+        notes: alias.notes?.trim() || null,
+        source: 'MANUAL' as const,
+        confidence: alias.confidence ?? 1
+      })).filter((alias) => alias.player_key.trim() && alias.track_ids.length > 0)
+    })
+    projectStore.setPlayerAliases(props.projectId, response)
+    hydrateAliases(response)
+    aliasMessage.value = `Saved ${response.aliases.length} aliases covering ${response.aliases.flatMap((alias) => alias.track_ids).length} tracks.`
+  } catch (error) {
+    showError(error, 'Could not save player aliases.')
+  } finally {
+    isSavingAliases.value = false
+  }
+}
+
 function isDetectionExcluded(detection: Detection) {
   return excludedDetectionIds.value.has(detection.detection_id) || (detection.track_id ? excludedTrackIds.value.has(detection.track_id) : false)
 }
 
 function checkedFromEvent(event: Event) {
   return (event.target as HTMLInputElement).checked
+}
+
+function valueFromEvent(event: Event) {
+  return (event.target as HTMLSelectElement).value
 }
 
 function toggleDetection(detectionId: string, checked: boolean) {
@@ -282,6 +391,71 @@ async function saveReview() {
       <p v-if="saveMessage" class="success">{{ saveMessage }}</p>
       <p class="muted">Raw tracking remains available; saved review output is stored separately as cleaned tracking and cleaned projected tracks.</p>
     </section>
+
+    <section class="card alias-card">
+      <div class="alias-header">
+        <div>
+          <p class="eyebrow">Player Identity</p>
+          <h2>Player Alias Assignment</h2>
+          <p class="muted">Manually group track IDs under stable local player_key values. No jersey recognition or automatic identity is used.</p>
+        </div>
+        <button type="button" @click="createAlias">Create alias {{ nextPlayerKey() }}</button>
+      </div>
+
+      <p v-if="unaliasedTrackCount > 0" class="warning"><strong>{{ unaliasedTrackCount }}</strong> tracks remain unaliased.</p>
+      <p v-if="aliasMessage" class="success">{{ aliasMessage }}</p>
+
+      <div class="alias-layout">
+        <div class="alias-list">
+          <label v-for="alias in aliases" :key="alias.player_key" class="alias-editor" :class="{ active: selectedAliasKey === alias.player_key }">
+            <input v-model="selectedAliasKey" type="radio" :value="alias.player_key" />
+            <strong>{{ alias.player_key }}</strong>
+            <small>{{ alias.track_ids.length }} tracks</small>
+            <input v-model="alias.display_name" type="text" placeholder="Display name (optional)" />
+            <select :value="alias.team_side" @change="setAliasTeam(alias, valueFromEvent($event))">
+              <option value="UNKNOWN">Unknown team</option>
+              <option value="HOME">Home</option>
+              <option value="AWAY">Away</option>
+            </select>
+            <input v-model="alias.role_hint" type="text" placeholder="Role hint (optional)" />
+            <textarea v-model="alias.notes" rows="2" placeholder="Alias notes" />
+          </label>
+          <p v-if="aliases.length === 0" class="muted">Create P1/P2/P3 aliases, then assign tracks below.</p>
+        </div>
+
+        <div class="alias-track-list">
+          <label class="inline-toggle">
+            <input v-model="showExcludedAliasTracks" type="checkbox" />
+            Show excluded tracks for aliasing
+          </label>
+          <label v-for="summary in aliasableTrackSummaries" :key="summary.track.track_id" class="track-row" :class="{ excluded: summary.excluded }">
+            <input
+              type="checkbox"
+              :disabled="!selectedAliasKey || (!!summary.playerKey && summary.playerKey !== selectedAliasKey)"
+              :checked="summary.playerKey === selectedAliasKey"
+              @change="toggleTrackAlias(summary.track.track_id, selectedAliasKey, checkedFromEvent($event))"
+            />
+            <span>
+              <strong>{{ summary.track.track_id }}</strong>
+              <small>{{ summary.pointCount }} points · {{ summary.detectionCount }} detections</small>
+              <small v-if="summary.excluded">Excluded by review</small>
+              <small v-if="summary.playerKey">Assigned to {{ summary.playerKey }}</small>
+              <span v-if="summary.score" class="risk-detail">
+                <span class="risk-badge" :class="riskClass(summary.score.recommended_label)">{{ summary.score.recommended_label }}</span>
+                <small>{{ formatRisk(summary.score) }}</small>
+              </span>
+              <span v-if="summary.modelScore" class="risk-detail model-risk-detail">
+                <span class="risk-badge" :class="riskClass(summary.modelScore.recommended_label)">Model {{ summary.modelScore.recommended_label }}</span>
+                <small>{{ formatRisk(summary.modelScore) }}</small>
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <button type="button" :disabled="isSavingAliases" @click="saveAliases">{{ isSavingAliases ? 'Saving aliases…' : 'Save player aliases' }}</button>
+    </section>
+
 
     <section class="grid review-grid">
       <div class="card stage-card">
@@ -476,7 +650,9 @@ async function saveReview() {
 
 .detection-list,
 .track-list,
-.side-panel {
+.side-panel,
+.alias-list,
+.alias-track-list {
   display: grid;
   gap: 0.75rem;
 }
@@ -494,6 +670,46 @@ async function saveReview() {
 .qc-row code {
   color: #475569;
   margin-left: auto;
+}
+
+.alias-header,
+.alias-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.alias-header {
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.alias-layout {
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, 1.2fr);
+}
+
+.alias-editor {
+  border: 1px solid #dde3ee;
+  border-radius: 12px;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.alias-editor.active {
+  border-color: #1f6feb;
+  box-shadow: 0 0 0 2px rgb(31 111 235 / 0.12);
+}
+
+.inline-toggle {
+  align-items: center;
+  display: flex;
+  font-weight: 800;
+  gap: 0.5rem;
+}
+
+.warning {
+  color: #b45309;
+  font-weight: 800;
 }
 
 .model-risk-detail {
@@ -552,6 +768,7 @@ async function saveReview() {
   gap: 0.35rem;
 }
 
+input[type='text'],
 textarea,
 select {
   border: 1px solid #cbd5e1;
@@ -566,7 +783,9 @@ select {
     display: grid;
   }
 
-  .review-grid {
+  .review-grid,
+  .alias-layout,
+  .alias-header {
     grid-template-columns: 1fr;
   }
 }
