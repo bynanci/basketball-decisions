@@ -43,8 +43,12 @@ from .player_identity import PlayerAlias, PlayerAliasListResponse, PlayerAliasSo
 from .player_value import (
     PlayerValueBuildResponse,
     PlayerValueComponent,
+    PlayerValueEvidenceEvent,
+    PlayerValueEvidenceResponse,
     PlayerValueSummary,
     PlayerValueTrace,
+    RoleBreakdownItem,
+    SituationBreakdownItem,
 )
 from .source import LeagueTag, SourceLicenseType, SourceType, UsageScope, VideoSourceRecord
 from .reference_video import (
@@ -164,8 +168,12 @@ __all__ = [
     "ImagePoint",
     "PlayerValueBuildResponse",
     "PlayerValueComponent",
+    "PlayerValueEvidenceEvent",
+    "PlayerValueEvidenceResponse",
     "PlayerValueSummary",
     "PlayerValueTrace",
+    "RoleBreakdownItem",
+    "SituationBreakdownItem",
     "PlayerAlias",
     "PlayerAliasListResponse",
     "PlayerAliasSource",

@@ -57,3 +57,26 @@ describe('source governance UI wiring', () => {
     expect(localLabPage).toContain('severity-badge')
   })
 })
+
+describe('player value evidence UI wiring', () => {
+  it('links Player Value rows to the detail evidence route', () => {
+    const playerValuePage = readPage('PlayerValuePage.vue')
+
+    expect(playerValuePage).toContain('View Evidence')
+    expect(playerValuePage).toContain("name: 'player-value-detail'")
+    expect(playerValuePage).toContain('projectId: summary.project_id')
+    expect(playerValuePage).toContain('playerKey: summary.player_key')
+  })
+
+  it('renders the evidence dashboard tables, warnings, and source/context track explanation', () => {
+    const detailPage = readPage('PlayerValueDetailPage.vue')
+
+    expect(detailPage).toContain('source_track_ids are identity-bearing. context_track_ids are frame context only.')
+    expect(detailPage).toContain('Role Breakdown')
+    expect(detailPage).toContain('Situation Breakdown')
+    expect(detailPage).toContain('Decision Event Evidence')
+    expect(detailPage).toContain('Evidence Warning Panel')
+    expect(detailPage).toContain('No decision event evidence was found for this summary.')
+    expect(detailPage).toContain('formatNumber(value?: number | null')
+  })
+})

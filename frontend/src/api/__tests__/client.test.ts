@@ -78,3 +78,28 @@ describe('apiClient.getDatasetHealth', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/local-lab/datasets/health', { headers: expect.any(Headers) })
   })
 })
+
+
+describe('apiClient.getPlayerValueEvidence', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('requests the backend player value evidence endpoint with encoded params', async () => {
+    const payload = {
+      summary: { project_id: 'project 1', player_key: 'P/1' },
+      events: [],
+      role_breakdown: [],
+      situation_breakdown: [],
+      warning_summary: [],
+      generated_at: '2026-01-01T00:00:00Z'
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiClient.getPlayerValueEvidence('project 1', 'P/1')).resolves.toEqual(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/local-lab/player-value/project%201/P%2F1/evidence', { headers: expect.any(Headers) })
+  })
+})

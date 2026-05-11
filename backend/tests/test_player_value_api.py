@@ -269,3 +269,116 @@ def test_low_confidence_when_insufficient_decision_events(client: TestClient, tm
     assert summary["decision_event_count"] == 1
     assert summary["confidence"] < 0.7
     assert any("fewer than 5" in warning for warning in summary["warnings"])
+
+
+def test_evidence_endpoint_returns_summary_and_linked_events(client: TestClient, tmp_path: Path) -> None:
+    directory = tmp_path / "project-1"
+    _write_project(directory)
+    _write_prompt_with_track(directory)
+    write_json_model(
+        directory / "player_aliases.json",
+        PlayerAliasListResponse(
+            project_id="project-1",
+            aliases=[PlayerAlias(project_id="project-1", player_key="P1", track_ids=["track-1"], display_name="Local P1", team_side="HOME")],
+        ),
+    )
+    _write_events(tmp_path, [_event(source_track_ids=["track-1"], opportunity_cost=0.25)])
+    client.post("/api/local-lab/player-value/build")
+
+    response = client.get("/api/local-lab/player-value/project-1/P1/evidence")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["player_key"] == "P1"
+    assert payload["events"][0]["prompt_question"] == "What is the read?"
+    assert payload["events"][0]["selected_option_label"] == "Pass"
+    assert payload["events"][0]["correct_option_label"] == "Drive"
+    assert payload["events"][0]["source_track_ids"] == ["track-1"]
+    assert payload["events"][0]["alias_player_key"] == "P1"
+
+
+def test_evidence_missing_summary_returns_404(client: TestClient) -> None:
+    response = client.get("/api/local-lab/player-value/project-1/P1/evidence")
+
+    assert response.status_code == 404
+    payload = response.json()
+    assert payload["code"] == "PLAYER_VALUE_SUMMARY_NOT_FOUND"
+    assert "Run POST /api/local-lab/player-value/build first" in payload["debug_hint"]
+
+
+def test_evidence_missing_prompt_adds_warning_without_crashing(client: TestClient, tmp_path: Path) -> None:
+    directory = tmp_path / "project-1"
+    _write_project(directory)
+    _write_events(tmp_path, [_event(source_track_ids=["track-1"])])
+    client.post("/api/local-lab/player-value/build")
+
+    response = client.get("/api/local-lab/player-value/project-1/UNKNOWN/evidence")
+
+    assert response.status_code == 200
+    event = response.json()["events"][0]
+    assert event["prompt_question"] is None
+    assert any("Prompt evidence is missing" in warning for warning in event["evidence_warnings"])
+
+
+def test_evidence_context_tracks_are_not_used_as_alias_evidence(client: TestClient, tmp_path: Path) -> None:
+    directory = tmp_path / "project-1"
+    _write_project(directory)
+    write_json_model(
+        directory / "player_aliases.json",
+        PlayerAliasListResponse(
+            project_id="project-1",
+            aliases=[PlayerAlias(project_id="project-1", player_key="P1", track_ids=["track-1"], display_name="Local P1")],
+        ),
+    )
+    _write_events(tmp_path, [_event(context_track_ids=["track-1"], source_track_ids=[])])
+    client.post("/api/local-lab/player-value/build")
+
+    response = client.get("/api/local-lab/player-value/project-1/UNKNOWN/evidence")
+
+    assert response.status_code == 200
+    event = response.json()["events"][0]
+    assert event["context_track_ids"] == ["track-1"]
+    assert event["source_track_ids"] == []
+    assert event["alias_player_key"] is None
+    assert any("context_track_ids are frame context only" in warning for warning in event["evidence_warnings"])
+
+
+def test_evidence_missing_trace_event_adds_warning(client: TestClient, tmp_path: Path) -> None:
+    directory = tmp_path / "project-1"
+    _write_project(directory)
+    _write_events(tmp_path, [_event()])
+    client.post("/api/local-lab/player-value/build")
+    summary_path = tmp_path / "datasets" / "player_value" / "player_value_summary.json"
+    payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    payload["summaries"][0]["trace"]["decision_event_ids"].append("project-1:prompt-1:missing-attempt")
+    summary_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    response = client.get("/api/local-lab/player-value/project-1/UNKNOWN/evidence")
+
+    assert response.status_code == 200
+    assert any("missing from player_decision_events.jsonl" in warning for warning in response.json()["warning_summary"])
+
+
+def test_evidence_role_and_situation_breakdowns_compute_averages(client: TestClient, tmp_path: Path) -> None:
+    directory = tmp_path / "project-1"
+    _write_project(directory)
+    _write_events(
+        tmp_path,
+        [
+            _event(attempt_id="a1", score=80, opportunity_cost=0.2, is_correct=False, timed_out=False),
+            _event(attempt_id="a2", score=100, opportunity_cost=0.0, is_correct=True, timed_out=True),
+        ],
+    )
+    client.post("/api/local-lab/player-value/build")
+
+    response = client.get("/api/local-lab/player-value/project-1/UNKNOWN/evidence")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["role_breakdown"][0]["court_role"] == "BALL_HANDLER"
+    assert payload["role_breakdown"][0]["event_count"] == 2
+    assert math.isclose(payload["role_breakdown"][0]["avg_role_adjusted_score"], 90.0)
+    assert math.isclose(payload["role_breakdown"][0]["avg_opportunity_cost"], 0.1)
+    assert math.isclose(payload["role_breakdown"][0]["correct_rate"], 0.5)
+    assert math.isclose(payload["role_breakdown"][0]["timeout_rate"], 0.5)
+    assert payload["situation_breakdown"][0]["situation_type"] == "PICK_AND_ROLL"

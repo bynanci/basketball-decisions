@@ -767,6 +767,64 @@ export interface PlayerValueBuildResponse {
   warnings: string[]
 }
 
+export interface RoleBreakdownItem {
+  court_role?: string | null
+  event_count: number
+  avg_role_adjusted_score: number
+  avg_opportunity_cost?: number | null
+  correct_rate: number
+  timeout_rate: number
+}
+
+export interface SituationBreakdownItem {
+  situation_type?: string | null
+  event_count: number
+  avg_role_adjusted_score: number
+  avg_opportunity_cost?: number | null
+  correct_rate: number
+  timeout_rate: number
+}
+
+export interface PlayerValueEvidenceEvent {
+  decision_event_id: string
+  project_id: string
+  prompt_id: string
+  attempt_id: string
+  frame_id?: string | null
+  frame_index?: number | null
+  user_role?: string | null
+  court_role_target?: string | null
+  situation_type?: string | null
+  question_mode?: string | null
+  selected_option_id?: string | null
+  correct_option_id?: string | null
+  is_correct: boolean
+  raw_score: number
+  role_adjusted_score: number
+  opportunity_cost?: number | null
+  response_time_ms?: number | null
+  timed_out: boolean
+  source_track_ids: string[]
+  context_track_ids: string[]
+  prompt_question?: string | null
+  prompt_explanation?: string | null
+  selected_option_label?: string | null
+  correct_option_label?: string | null
+  alias_player_key?: string | null
+  alias_display_name?: string | null
+  alias_team_side?: string | null
+  evidence_warnings: string[]
+}
+
+export interface PlayerValueEvidenceResponse {
+  summary: PlayerValueSummary
+  events: PlayerValueEvidenceEvent[]
+  role_breakdown: RoleBreakdownItem[]
+  situation_breakdown: SituationBreakdownItem[]
+  warning_summary: string[]
+  generated_at: string
+}
+
 export interface DecisionEventsBuildSummary {
   event_count: number
   avg_raw_score: number
@@ -925,6 +983,8 @@ export const apiClient = {
   buildDecisionDiagnostics: () => request<DecisionDiagnosticsReport>('/local-lab/decision-diagnostics/build', { method: 'POST' }),
   buildPlayerValue: () => request<PlayerValueBuildResponse>('/local-lab/player-value/build', { method: 'POST' }),
   getPlayerValue: () => request<PlayerValueBuildResponse>('/local-lab/player-value'),
+  getPlayerValueEvidence: (projectId: string, playerKey: string) =>
+    request<PlayerValueEvidenceResponse>(`/local-lab/player-value/${encodeURIComponent(projectId)}/${encodeURIComponent(playerKey)}/evidence`),
   getDecisionDiagnostics: () => request<DecisionDiagnosticsReport>('/local-lab/decision-diagnostics'),
   getRecognitionModelRegistry: () => request<RecognitionModelRegistry>('/local-lab/models/recognition'),
   trainRecognitionBaseline: () => request<RecognitionModelInfo>('/local-lab/models/recognition/train-baseline', { method: 'POST' }),
