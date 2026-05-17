@@ -1246,6 +1246,66 @@ export interface ReferenceVideoDraftSummary {
 }
 
 
+export type DrillPriority = 'LOW' | 'MEDIUM' | 'HIGH'
+export type DrillEvidenceSource = 'DECISION_DIAGNOSTICS' | 'PLAYER_VALUE' | 'PLAYER_VALUE_TRENDS' | 'TEACHING_CASE' | 'REVIEW_QUEUE'
+
+export interface DrillCatalogItem {
+  drill_id: string
+  title: string
+  role?: string | null
+  situation: string
+  description: string
+  coaching_cues: string[]
+  success_metrics: string[]
+  tags: string[]
+}
+
+export interface DrillCatalogResponse {
+  drills: DrillCatalogItem[]
+  generated_at: string
+}
+
+export interface DrillEvidenceRef {
+  source: DrillEvidenceSource
+  artifact: string
+  ref_id?: string | null
+  project_id?: string | null
+  player_key?: string | null
+  prompt_id?: string | null
+  detail: string
+}
+
+export interface DrillRecommendation {
+  recommendation_id: string
+  drill_id: string
+  title: string
+  priority: DrillPriority
+  confidence: number
+  role?: string | null
+  situation: string
+  reason: string
+  coaching_cues: string[]
+  success_metrics: string[]
+  evidence_refs: DrillEvidenceRef[]
+}
+
+export interface DrillRecommendationRequest {
+  project_id?: string | null
+  player_key?: string | null
+  max_recommendations?: number
+}
+
+export interface DrillRecommendationResponse {
+  schema_version: string
+  generated_at: string
+  project_id?: string | null
+  player_key?: string | null
+  recommendations: DrillRecommendation[]
+  warnings: string[]
+  catalog_path: string
+  latest_path: string
+}
+
 export type CoachReportSectionName =
   | 'Player Value'
   | 'Trends'
@@ -1254,6 +1314,7 @@ export type CoachReportSectionName =
   | 'Teaching Cases'
   | 'Review Findings'
   | 'Source Governance'
+  | 'Drill Recommendations'
   | 'Methodology & Limitations'
 
 export const COACH_REPORT_SECTIONS: CoachReportSectionName[] = [
@@ -1264,6 +1325,7 @@ export const COACH_REPORT_SECTIONS: CoachReportSectionName[] = [
   'Teaching Cases',
   'Review Findings',
   'Source Governance',
+  'Drill Recommendations',
   'Methodology & Limitations'
 ]
 
@@ -1373,6 +1435,10 @@ async function requestText(path: string, init: RequestInit = {}): Promise<string
 
 export const apiClient = {
   listProjects: () => request<ListProjectsResponse>('/projects'),
+  listDrillCatalog: () => request<DrillCatalogResponse>('/drills/catalog'),
+  buildDrillRecommendations: (payload: DrillRecommendationRequest) =>
+    request<DrillRecommendationResponse>('/drills/recommendations', { method: 'POST', body: JSON.stringify(payload) }),
+  getLatestDrillRecommendations: () => request<DrillRecommendationResponse>('/drills/recommendations/latest'),
   buildCoachReport: (payload: CoachReportBuildRequest) =>
     request<CoachReport>('/reports/coach', { method: 'POST', body: JSON.stringify(payload) }),
   listCoachReports: () => request<CoachReportListResponse>('/reports/coach'),

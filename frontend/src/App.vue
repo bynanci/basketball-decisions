@@ -10,6 +10,7 @@
         <RouterLink to="/local-lab">Local Lab</RouterLink>
         <RouterLink to="/player-value">Player Value</RouterLink>
         <RouterLink to="/reports/coach">Coach Reports</RouterLink>
+        <RouterLink to="/drills">Drills</RouterLink>
         <RouterLink to="/review-queue">Review Queue</RouterLink>
         <RouterLink to="/model-registry">Model Registry</RouterLink>
         <RouterLink to="/reference-videos">Reference Videos</RouterLink>

@@ -20,6 +20,7 @@ import PlayerValueTrendsPage from '../pages/PlayerValueTrendsPage.vue'
 import ReviewQueuePage from '../pages/ReviewQueuePage.vue'
 import ModelRegistryPage from '../pages/ModelRegistryPage.vue'
 import CoachReportsPage from '../pages/CoachReportsPage.vue'
+import DrillsPage from '../pages/DrillsPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -35,6 +36,7 @@ export const router = createRouter({
     { path: '/review-queue', name: 'review-queue', component: ReviewQueuePage },
     { path: '/model-registry', name: 'model-registry', component: ModelRegistryPage },
     { path: '/reports/coach', name: 'coach-reports', component: CoachReportsPage },
+    { path: '/drills', name: 'drills', component: DrillsPage },
     { path: '/reference-videos', name: 'reference-videos', component: ReferenceVideosPage },
     { path: '/reference-videos/:referenceId', name: 'reference-video-detail', component: ReferenceVideoDetailPage, props: true },
     { path: '/decision-rules', name: 'decision-rules', component: DecisionRulesPage },

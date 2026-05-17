@@ -17,6 +17,7 @@ CoachReportSectionName = Literal[
     "Teaching Cases",
     "Review Findings",
     "Source Governance",
+    "Drill Recommendations",
     "Methodology & Limitations",
 ]
 
@@ -28,6 +29,7 @@ COACH_REPORT_SECTIONS: tuple[CoachReportSectionName, ...] = (
     "Teaching Cases",
     "Review Findings",
     "Source Governance",
+    "Drill Recommendations",
     "Methodology & Limitations",
 )
 

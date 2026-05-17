@@ -20,6 +20,7 @@ from app.models import (
     CoachReportSection,
 )
 from app.models.base import utc_now
+from app.services.drill_recommendation_service import get_latest_drill_recommendations
 
 APP_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 PROJECTS_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "projects"
@@ -214,6 +215,38 @@ def _source_governance_section(_: CoachReportBuildRequest, warnings: list[str], 
     return CoachReportSection(name="Source Governance", heading="Source Governance", markdown="Source governance lists local source metadata and training/redistribution constraints where recorded.\n\n" + _bullet(bullets), data={"sources": records}, warnings=section_warnings)
 
 
+def _drill_recommendations_section(request: CoachReportBuildRequest, _: list[str], __: list[CoachReportArtifactStatus]) -> CoachReportSection:
+    latest = get_latest_drill_recommendations()
+    if latest is None:
+        return CoachReportSection(
+            name="Drill Recommendations",
+            heading="Drill Recommendations",
+            markdown="No saved drill recommendations are available yet. Build them from the Drills page or POST /api/drills/recommendations.",
+            data={"recommendations": []},
+            warnings=["No latest drill recommendations artifact was found."],
+        )
+    recommendations = latest.recommendations
+    if request.project_id:
+        recommendations = [rec for rec in recommendations if any(ref.project_id == request.project_id for ref in rec.evidence_refs)]
+    if request.player_key:
+        recommendations = [rec for rec in recommendations if any(ref.player_key == request.player_key for ref in rec.evidence_refs)]
+    bullets = [
+        f"{rec.priority} priority / {rec.title} ({rec.role or 'any role'}, {rec.situation}): confidence {_format_number(rec.confidence)} — {rec.reason}"
+        for rec in recommendations[:8]
+    ]
+    warnings = []
+    if not recommendations:
+        warnings.append("Latest drill recommendations exist, but none matched the selected report filters.")
+    markdown = "Drill recommendations are deterministic selections from a human-authored local drill catalog; no LLM-generated coaching advice is included.\n\n" + _bullet(bullets)
+    return CoachReportSection(
+        name="Drill Recommendations",
+        heading="Drill Recommendations",
+        markdown=markdown,
+        data={"recommendations": [rec.model_dump(mode="json") for rec in recommendations]},
+        warnings=warnings,
+    )
+
+
 def _methodology_section(request: CoachReportBuildRequest, all_warnings: list[str], statuses: list[CoachReportArtifactStatus]) -> CoachReportSection:
     available = sum(1 for status in statuses if status.available)
     missing = sum(1 for status in statuses if not status.available)
@@ -236,6 +269,7 @@ _SECTION_BUILDERS = {
     "Teaching Cases": _teaching_cases_section,
     "Review Findings": _review_findings_section,
     "Source Governance": _source_governance_section,
+    "Drill Recommendations": _drill_recommendations_section,
 }
 
 
