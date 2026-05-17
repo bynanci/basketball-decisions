@@ -308,6 +308,8 @@ def load_recognition_registry(models_dir: Path) -> RecognitionModelRegistry:
         if lineage_path.exists():
             model.dataset_lineage = RecognitionDatasetLineage.model_validate(json.loads(lineage_path.read_text(encoding="utf-8")))
             model.dataset_fingerprint = model.dataset_lineage.dataset_fingerprint
+    for model in registry.models:
+        model.active = bool(active_version and model.version == active_version)
     registry.active_model = next((model for model in registry.models if model.version == active_version), None)
     return registry
 
