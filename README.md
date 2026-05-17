@@ -261,7 +261,26 @@ GET /api/practice-plans/{plan_id}/json
 
 `POST /api/practice-plans` accepts `total_duration_minutes`, optional `project_id`, optional `player_key`, optional extra `player_keys`, `max_drill_blocks`, and builder `notes`. It builds fresh deterministic drill recommendations, allocates warmup, drill, scrimmage, and review / recap blocks, and copies target roles, target situations, player keys, coaching cues, success metrics, evidence references, and warnings into the saved plan.
 
-The `/practice-plans` frontend page builds plans, lists saved plans, previews block timing, notes, targets, and block warnings, and links directly to Markdown and JSON exports. The feature intentionally does not add calendar integration, PDF/DOCX exports, medical or injury advice, LLM-generated coaching advice, or full season planning.
+The `/practice-plans` frontend page builds plans, lists saved plans, previews block timing, notes, targets, and block warnings, links directly to Markdown and JSON exports, and can start a local execution session. The feature intentionally does not add calendar integration, PDF/DOCX exports, medical or injury advice, LLM-generated coaching advice, or full season planning.
+
+## Practice Execution & Feedback Loop
+
+M24 adds local practice execution sessions created from existing practice plans. Executions are saved under `backend/app/data/practice_executions/` with one execution block initialized for every source plan block. Updating an execution captures coach notes, player notes, metric results, outcome ratings, actual durations, and block statuses (`COMPLETED`, `SKIPPED`, `MODIFIED`, or `INCOMPLETE`) without mutating the original practice plan.
+
+API endpoints:
+
+```http
+POST /api/practice-executions
+GET /api/practice-executions
+GET /api/practice-executions/{execution_id}
+PUT /api/practice-executions/{execution_id}
+GET /api/practice-executions/{execution_id}/feedback-summary
+GET /api/practice-executions/signals
+```
+
+Feedback summaries are deterministic from captured execution data and include completion rate, average block rating, met/missed metrics, skipped and modified counts, actual duration, recommended next actions, and feedback signals (`REPEAT_DRILL`, `PROGRESS_DRILL`, `SIMPLIFY_DRILL`, `SHORTEN_PLAN`, `REBUILD_DATASETS`, and `REVIEW_ALIAS_ATTRIBUTION`). The feature does not add calendar integration, attendance management, medical or injury advice, LLM-generated feedback, or automatic live-practice video measurement.
+
+The `/practice-executions` frontend page lists saved sessions and global signals. The `/practice-executions/:executionId` page edits execution feedback and shows the feedback summary. The `/practice-plans` page includes a **Start Execution** button for the selected plan.
 
 ## Decision Arrow Quiz MVP
 
