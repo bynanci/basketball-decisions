@@ -1245,6 +1245,86 @@ export interface ReferenceVideoDraftSummary {
   decision_rule_draft_count: number
 }
 
+
+export type CoachReportSectionName =
+  | 'Player Value'
+  | 'Trends'
+  | 'Decision Diagnostics'
+  | 'Rule Contributions'
+  | 'Teaching Cases'
+  | 'Review Findings'
+  | 'Source Governance'
+  | 'Methodology & Limitations'
+
+export const COACH_REPORT_SECTIONS: CoachReportSectionName[] = [
+  'Player Value',
+  'Trends',
+  'Decision Diagnostics',
+  'Rule Contributions',
+  'Teaching Cases',
+  'Review Findings',
+  'Source Governance',
+  'Methodology & Limitations'
+]
+
+export interface CoachReportBuildRequest {
+  title?: string
+  project_id?: string | null
+  player_key?: string | null
+  sections?: CoachReportSectionName[]
+  created_by?: string | null
+  notes?: string | null
+}
+
+export interface CoachReportArtifactStatus {
+  artifact: string
+  path: string
+  available: boolean
+  warning?: string | null
+}
+
+export interface CoachReportSection {
+  name: CoachReportSectionName
+  heading: string
+  markdown: string
+  data: Record<string, unknown>
+  warnings: string[]
+}
+
+export interface CoachReport {
+  schema_version: string
+  report_id: string
+  title: string
+  created_at: string
+  created_by?: string | null
+  project_id?: string | null
+  player_key?: string | null
+  sections: CoachReportSection[]
+  warnings: string[]
+  artifact_status: CoachReportArtifactStatus[]
+  markdown: string
+  json_path: string
+  markdown_path: string
+}
+
+export interface CoachReportListItem {
+  report_id: string
+  title: string
+  created_at: string
+  created_by?: string | null
+  project_id?: string | null
+  player_key?: string | null
+  section_names: string[]
+  warning_count: number
+  json_path: string
+  markdown_path: string
+}
+
+export interface CoachReportListResponse {
+  reports: CoachReportListItem[]
+  updated_at: string
+}
+
 export function normalizeApiErrorPayload(status: number, payload?: Partial<ApiErrorResponse> | null): ApiErrorResponse {
   return {
     code: payload?.code ?? 'HTTP_ERROR',
@@ -1275,8 +1355,32 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T
 }
 
+async function requestText(path: string, init: RequestInit = {}): Promise<string> {
+  const headers = new Headers(init.headers)
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
+  if (!response.ok) {
+    let payload: ApiErrorResponse | undefined
+    try {
+      payload = (await response.json()) as ApiErrorResponse
+    } catch {
+      payload = undefined
+    }
+    const normalizedPayload = normalizeApiErrorPayload(response.status, payload)
+    throw new ApiClientError(response.status, normalizedPayload)
+  }
+  return response.text()
+}
+
 export const apiClient = {
   listProjects: () => request<ListProjectsResponse>('/projects'),
+  buildCoachReport: (payload: CoachReportBuildRequest) =>
+    request<CoachReport>('/reports/coach', { method: 'POST', body: JSON.stringify(payload) }),
+  listCoachReports: () => request<CoachReportListResponse>('/reports/coach'),
+  getCoachReport: (reportId: string) => request<CoachReport>(`/reports/coach/${encodeURIComponent(reportId)}`),
+  getCoachReportJson: (reportId: string) => request<CoachReport>(`/reports/coach/${encodeURIComponent(reportId)}/json`),
+  getCoachReportMarkdown: (reportId: string) => requestText(`/reports/coach/${encodeURIComponent(reportId)}/markdown`),
+  coachReportMarkdownUrl: (reportId: string) => `${API_BASE_URL}/reports/coach/${encodeURIComponent(reportId)}/markdown`,
+  coachReportJsonUrl: (reportId: string) => `${API_BASE_URL}/reports/coach/${encodeURIComponent(reportId)}/json`,
   listLocalLabProjects: () => request<LocalLabProjectsResponse>('/local-lab/projects'),
   listSources: () => request<SourceRegistryResponse>('/sources'),
   seedCandidateSources: () => request<SourceRegistryResponse>('/sources/seed-candidates', { method: 'POST' }),

@@ -45,6 +45,16 @@ from .calibration import (
     SaveCalibrationRequest,
     SaveCalibrationResponse,
 )
+from .coach_report import (
+    COACH_REPORT_SECTIONS,
+    CoachReport,
+    CoachReportArtifactStatus,
+    CoachReportBuildRequest,
+    CoachReportListItem,
+    CoachReportListResponse,
+    CoachReportSection,
+    CoachReportSectionName,
+)
 from .errors import ApiErrorResponse
 from .project import Project, ProjectBundleResponse, ProjectCreateRequest, ProjectCreateResponse
 from .player_identity import PlayerAlias, PlayerAliasListResponse, PlayerAliasSource, TeamSide
@@ -154,6 +164,14 @@ from .video import (
 )
 
 __all__ = [
+    "COACH_REPORT_SECTIONS",
+    "CoachReport",
+    "CoachReportArtifactStatus",
+    "CoachReportBuildRequest",
+    "CoachReportListItem",
+    "CoachReportListResponse",
+    "CoachReportSection",
+    "CoachReportSectionName",
     "ApproveDecisionRuleDraftRequest",
     "CreateDecisionRuleSetRequest",
     "DecisionRule",
