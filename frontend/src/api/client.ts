@@ -1384,6 +1384,126 @@ export interface PracticePlanListResponse {
   updated_at: string
 }
 
+
+export type PracticeExecutionBlockStatus = 'PLANNED' | 'COMPLETED' | 'SKIPPED' | 'MODIFIED' | 'INCOMPLETE'
+export type PracticeFeedbackSignalType =
+  | 'REPEAT_DRILL'
+  | 'PROGRESS_DRILL'
+  | 'SIMPLIFY_DRILL'
+  | 'SHORTEN_PLAN'
+  | 'REBUILD_DATASETS'
+  | 'REVIEW_ALIAS_ATTRIBUTION'
+
+export interface PracticeMetricResult {
+  metric: string
+  result?: string | null
+  met: boolean
+  notes?: string | null
+}
+
+export interface PracticeExecutionBlock {
+  block_id: string
+  plan_block_id: string
+  block_type: PracticePlanBlockType
+  title: string
+  planned_start_minute: number
+  planned_end_minute: number
+  planned_duration_minutes: number
+  drill_id?: string | null
+  recommendation_id?: string | null
+  success_metrics: string[]
+  status: PracticeExecutionBlockStatus
+  coach_notes?: string | null
+  player_notes?: string | null
+  metric_results: PracticeMetricResult[]
+  outcome_rating?: number | null
+  actual_duration_minutes?: number | null
+  modified_title?: string | null
+  modified_notes?: string | null
+}
+
+export interface PracticeExecutionCreateRequest {
+  plan_id: string
+  started_by?: string | null
+  notes?: string | null
+}
+
+export interface PracticeExecutionUpdateRequest {
+  started_by?: string | null
+  notes?: string | null
+  completed_at?: string | null
+  blocks?: PracticeExecutionBlock[] | null
+}
+
+export interface PracticeExecution {
+  schema_version: string
+  execution_id: string
+  plan_id: string
+  plan_title: string
+  created_at: string
+  updated_at: string
+  started_by?: string | null
+  notes?: string | null
+  completed_at?: string | null
+  project_id?: string | null
+  player_key?: string | null
+  player_keys: string[]
+  planned_duration_minutes: PracticePlanDuration
+  blocks: PracticeExecutionBlock[]
+  source_plan_json_path: string
+  json_path: string
+}
+
+export interface PracticeExecutionListItem {
+  execution_id: string
+  plan_id: string
+  plan_title: string
+  created_at: string
+  updated_at: string
+  started_by?: string | null
+  completed_at?: string | null
+  planned_duration_minutes: PracticePlanDuration
+  completion_rate: number
+  skipped_count: number
+  modified_count: number
+  json_path: string
+}
+
+export interface PracticeExecutionListResponse {
+  executions: PracticeExecutionListItem[]
+  updated_at: string
+}
+
+export interface PracticeFeedbackSignal {
+  signal_type: PracticeFeedbackSignalType
+  execution_id: string
+  block_id?: string | null
+  drill_id?: string | null
+  recommendation_id?: string | null
+  reason: string
+  severity: 'info' | 'warning' | 'action'
+}
+
+export interface PracticeFeedbackSummary {
+  execution_id: string
+  plan_id: string
+  completion_rate: number
+  average_block_rating?: number | null
+  met_metrics: string[]
+  missed_metrics: string[]
+  skipped_count: number
+  modified_count: number
+  actual_duration_minutes: number
+  planned_duration_minutes: number
+  recommended_next_actions: string[]
+  signals: PracticeFeedbackSignal[]
+}
+
+export interface PracticeFeedbackSignalsResponse {
+  signals: PracticeFeedbackSignal[]
+  updated_at: string
+}
+
 export type CoachReportSectionName =
   | 'Player Value'
   | 'Trends'
@@ -1523,6 +1643,14 @@ export const apiClient = {
   getPracticePlan: (planId: string) => request<PracticePlan>(`/practice-plans/${encodeURIComponent(planId)}`),
   getPracticePlanJson: (planId: string) => request<PracticePlan>(`/practice-plans/${encodeURIComponent(planId)}/json`),
   getPracticePlanMarkdown: (planId: string) => requestText(`/practice-plans/${encodeURIComponent(planId)}/markdown`),
+  createPracticeExecution: (payload: PracticeExecutionCreateRequest) =>
+    request<PracticeExecution>('/practice-executions', { method: 'POST', body: JSON.stringify(payload) }),
+  listPracticeExecutions: () => request<PracticeExecutionListResponse>('/practice-executions'),
+  getPracticeExecution: (executionId: string) => request<PracticeExecution>(`/practice-executions/${encodeURIComponent(executionId)}`),
+  updatePracticeExecution: (executionId: string, payload: PracticeExecutionUpdateRequest) =>
+    request<PracticeExecution>(`/practice-executions/${encodeURIComponent(executionId)}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  getPracticeFeedbackSummary: (executionId: string) => request<PracticeFeedbackSummary>(`/practice-executions/${encodeURIComponent(executionId)}/feedback-summary`),
+  listPracticeFeedbackSignals: () => request<PracticeFeedbackSignalsResponse>('/practice-executions/signals'),
   practicePlanMarkdownUrl: (planId: string) => `${API_BASE_URL}/practice-plans/${encodeURIComponent(planId)}/markdown`,
   practicePlanJsonUrl: (planId: string) => `${API_BASE_URL}/practice-plans/${encodeURIComponent(planId)}/json`,
   buildCoachReport: (payload: CoachReportBuildRequest) =>

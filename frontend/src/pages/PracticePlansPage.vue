@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { apiClient, type PracticePlan, type PracticePlanDuration, type PracticePlanListItem } from '../api/client'
 
+const router = useRouter()
 const plans = ref<PracticePlanListItem[]>([])
 const selectedPlan = ref<PracticePlan | null>(null)
 const title = ref('Practice Plan')
@@ -14,6 +16,7 @@ const createdBy = ref('')
 const notes = ref('')
 const isLoading = ref(false)
 const isBuilding = ref(false)
+const isStartingExecution = ref(false)
 const errorMessage = ref('')
 const statusMessage = ref('')
 
@@ -52,6 +55,26 @@ async function refresh() {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to load practice plans.'
   } finally {
     isLoading.value = false
+  }
+}
+
+async function startExecution() {
+  if (!selectedPlan.value) return
+  isStartingExecution.value = true
+  errorMessage.value = ''
+  statusMessage.value = ''
+  try {
+    const execution = await apiClient.createPracticeExecution({
+      plan_id: selectedPlan.value.plan_id,
+      started_by: createdBy.value.trim() || null,
+      notes: 'Started from Practice Plans page.'
+    })
+    statusMessage.value = `Started execution ${execution.execution_id}.`
+    router.push(`/practice-executions/${execution.execution_id}`)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to start practice execution.'
+  } finally {
+    isStartingExecution.value = false
   }
 }
 
@@ -150,6 +173,7 @@ onMounted(refresh)
         <div class="button-row">
           <a class="button secondary-button" :href="apiClient.practicePlanMarkdownUrl(selectedPlan.plan_id)" target="_blank" rel="noreferrer">Markdown</a>
           <a class="button secondary-button" :href="apiClient.practicePlanJsonUrl(selectedPlan.plan_id)" target="_blank" rel="noreferrer">JSON</a>
+          <button class="primary" :disabled="isStartingExecution" @click="startExecution">{{ isStartingExecution ? 'Starting…' : 'Start Execution' }}</button>
         </div>
       </div>
       <p v-if="selectedPlan.notes" class="note-box"><strong>Notes:</strong> {{ selectedPlan.notes }}</p>
