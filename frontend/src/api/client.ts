@@ -1346,6 +1346,7 @@ export interface PracticePlan {
   title: string
   created_at: string
   created_by?: string | null
+  notes?: string | null
   project_id?: string | null
   player_key?: string | null
   total_duration_minutes: PracticePlanDuration
@@ -1366,6 +1367,7 @@ export interface PracticePlanListItem {
   title: string
   created_at: string
   created_by?: string | null
+  notes?: string | null
   project_id?: string | null
   player_key?: string | null
   total_duration_minutes: PracticePlanDuration

@@ -56,6 +56,7 @@ class PracticePlan(BaseModel):
     title: str
     created_at: datetime = Field(default_factory=utc_now)
     created_by: str | None = None
+    notes: str | None = None
     project_id: str | None = None
     player_key: str | None = None
     total_duration_minutes: PracticePlanDuration
@@ -78,6 +79,7 @@ class PracticePlanListItem(BaseModel):
     title: str
     created_at: datetime
     created_by: str | None = None
+    notes: str | None = None
     project_id: str | None = None
     player_key: str | None = None
     total_duration_minutes: PracticePlanDuration
