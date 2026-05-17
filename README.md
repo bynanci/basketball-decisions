@@ -608,6 +608,30 @@ Quiz prompts separate frame context from player identity links:
 
 Player Value v1 is not a learned Player Value model and is not scouting-grade. It is a local analytics summary intended to make decision-event quality, recognition reliability, trend, and participation assumptions inspectable before any future model work.
 
+### Player Value Trends and Build Snapshots
+
+M19 adds immutable build snapshots and project-scoped trend comparison without changing the Player Value v1 formula. Every `POST /api/local-lab/player-value/build` now writes:
+
+- the latest summary at `backend/app/data/datasets/player_value/player_value_summary.json`;
+- an immutable snapshot under `backend/app/data/datasets/player_value/builds/{build_id}.json`;
+- `backend/app/data/datasets/player_value/player_value_build_index.json`, which indexes each build ID, timestamp, summary count, formula version, recognition baseline version, decision rule-set version, dataset fingerprint, and build warnings.
+
+Trend and comparison APIs are available at:
+
+```bash
+curl http://localhost:8000/api/local-lab/player-value/trends
+curl http://localhost:8000/api/local-lab/player-value/trends/P1
+curl -X POST http://localhost:8000/api/local-lab/player-value/compare \
+  -H 'Content-Type: application/json' \
+  -d '{"player_keys":["P1","P2"]}'
+curl http://localhost:8000/api/local-lab/player-value/builds
+curl http://localhost:8000/api/local-lab/player-value/builds/{build_id}
+```
+
+The frontend trend workspace is available at `/player-value/trends`. It lists all project-scoped trend series and includes a comparison form for 2–4 `player_key` values. The UI and APIs keep `(project_id, player_key)` series separate, so matching `player_key` strings in different projects are **not** merged automatically.
+
+Each trend point includes the score plus its confidence, warnings, `player_value_formula_version`, `recognition_model_version`, `decision_rule_set_version`, and `dataset_fingerprint`. If a series spans multiple formula versions, recognition baselines, rule-set versions, or dataset fingerprints, the trend service emits explicit mixed-baseline warnings. These warnings are intentionally visible so comparisons are not mistaken for same-baseline score changes.
+
 ## Player Value Evidence Dashboard
 
 M14 adds a per-player evidence dashboard for inspecting the local trace behind each Player Value summary. From the `/player-value` table, choose **View Evidence** for a row, or open the route directly:

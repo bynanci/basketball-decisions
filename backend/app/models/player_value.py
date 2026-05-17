@@ -129,3 +129,92 @@ class PlayerValueBuildResponse(BaseModel):
     summaries: list[PlayerValueSummary] = Field(default_factory=list)
     generated_at: datetime = Field(default_factory=utc_now)
     warnings: list[str] = Field(default_factory=list)
+
+
+class PlayerValueBuildMetadata(BaseModel):
+    """Immutable baseline metadata captured with a Player Value build."""
+
+    player_value_formula_version: str = "v1"
+    recognition_model_version: str | None = None
+    decision_rule_set_version: str | None = None
+    dataset_fingerprint: str
+
+
+class PlayerValueBuildIndexEntry(PlayerValueBuildMetadata):
+    """Index row for one immutable Player Value build snapshot."""
+
+    build_id: str
+    generated_at: datetime
+    summary_count: int
+    snapshot_path: str
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PlayerValueBuildIndexResponse(BaseModel):
+    """Player Value build snapshot index."""
+
+    builds: list[PlayerValueBuildIndexEntry] = Field(default_factory=list)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PlayerValueBuildSnapshot(BaseModel):
+    """Immutable Player Value build snapshot payload."""
+
+    build_id: str
+    metadata: PlayerValueBuildMetadata
+    build: PlayerValueBuildResponse
+
+
+class PlayerValueTrendPoint(PlayerValueBuildMetadata):
+    """One point in a project-scoped Player Value trend."""
+
+    build_id: str
+    generated_at: datetime
+    project_id: str
+    player_key: str
+    player_value_score: float
+    confidence: float
+    warnings: list[str] = Field(default_factory=list)
+    decision_event_count: int
+
+
+class PlayerValueTrendSeries(BaseModel):
+    """Trend series for one project-scoped player_key."""
+
+    project_id: str
+    player_key: str
+    display_name: str | None = None
+    points: list[PlayerValueTrendPoint] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PlayerValueTrendsResponse(BaseModel):
+    """All Player Value trend series."""
+
+    trends: list[PlayerValueTrendSeries] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=utc_now)
+
+
+class PlayerValueTrendResponse(BaseModel):
+    """Trend lookup for a player_key without cross-project alias merging."""
+
+    player_key: str
+    trends: list[PlayerValueTrendSeries] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=utc_now)
+
+
+class PlayerValueCompareRequest(BaseModel):
+    """Compare two to four local player_keys without merging aliases."""
+
+    player_keys: list[str] = Field(min_length=2, max_length=4)
+
+
+class PlayerValueCompareResponse(BaseModel):
+    """Comparison response for selected player_keys."""
+
+    player_keys: list[str]
+    trends: list[PlayerValueTrendSeries] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=utc_now)

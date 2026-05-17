@@ -382,3 +382,56 @@ def test_evidence_role_and_situation_breakdowns_compute_averages(client: TestCli
     assert math.isclose(payload["role_breakdown"][0]["correct_rate"], 0.5)
     assert math.isclose(payload["role_breakdown"][0]["timeout_rate"], 0.5)
     assert payload["situation_breakdown"][0]["situation_type"] == "PICK_AND_ROLL"
+
+def test_player_value_build_writes_snapshot_index_and_build_lookup(client: TestClient, tmp_path: Path) -> None:
+    directory = tmp_path / "project-1"
+    _write_project(directory)
+    _write_prompt_with_track(directory)
+    write_json_model(
+        directory / "player_aliases.json",
+        PlayerAliasListResponse(project_id="project-1", aliases=[PlayerAlias(project_id="project-1", player_key="P1", track_ids=["track-1"])]),
+    )
+    _write_events(tmp_path, [_event(source_track_ids=["track-1"])])
+
+    build_response = client.post("/api/local-lab/player-value/build")
+    assert build_response.status_code == 200
+
+    index_response = client.get("/api/local-lab/player-value/builds")
+    assert index_response.status_code == 200
+    index_payload = index_response.json()
+    assert len(index_payload["builds"]) == 1
+    entry = index_payload["builds"][0]
+    assert entry["player_value_formula_version"] == "v1"
+    assert entry["dataset_fingerprint"]
+
+    snapshot_response = client.get(f"/api/local-lab/player-value/builds/{entry['build_id']}")
+    assert snapshot_response.status_code == 200
+    snapshot = snapshot_response.json()
+    assert snapshot["build_id"] == entry["build_id"]
+    assert snapshot["build"]["summaries"][0]["player_key"] == "P1"
+
+
+def test_player_value_trends_and_compare_warn_on_mixed_baselines(client: TestClient, tmp_path: Path) -> None:
+    directory = tmp_path / "project-1"
+    _write_project(directory)
+    _write_prompt_with_track(directory)
+    write_json_model(
+        directory / "player_aliases.json",
+        PlayerAliasListResponse(project_id="project-1", aliases=[PlayerAlias(project_id="project-1", player_key="P1", track_ids=["track-1"])]),
+    )
+    _write_events(tmp_path, [_event(source_track_ids=["track-1"], score=70)])
+    assert client.post("/api/local-lab/player-value/build").status_code == 200
+    _write_events(tmp_path, [_event(source_track_ids=["track-1"], score=90)])
+    assert client.post("/api/local-lab/player-value/build").status_code == 200
+
+    trends_response = client.get("/api/local-lab/player-value/trends/P1")
+    assert trends_response.status_code == 200
+    trends_payload = trends_response.json()
+    series = trends_payload["trends"][0]
+    assert len(series["points"]) == 2
+    assert {"confidence", "warnings", "player_value_formula_version", "recognition_model_version", "decision_rule_set_version", "dataset_fingerprint"}.issubset(series["points"][0])
+    assert any("Mixed baseline warning" in warning for warning in series["warnings"])
+
+    compare_response = client.post("/api/local-lab/player-value/compare", json={"player_keys": ["P1", "UNKNOWN"]})
+    assert compare_response.status_code == 200
+    assert any("No Player Value trend snapshots found" in warning for warning in compare_response.json()["warnings"])
