@@ -84,6 +84,7 @@ onMounted(loadPlayerValue)
           Explainable alias-based summaries from local decision events, tracking, and recognition quality signals.
         </p>
       </div>
+      <RouterLink class="button-link" to="/player-value/trends">View trends</RouterLink>
       <button class="primary" :disabled="isBuilding" @click="buildPlayerValue">
         {{ isBuilding ? 'Building…' : 'Build Player Value' }}
       </button>

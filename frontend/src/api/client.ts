@@ -818,6 +818,71 @@ export interface PlayerValueBuildResponse {
   warnings: string[]
 }
 
+export interface PlayerValueBuildMetadata {
+  player_value_formula_version: string
+  recognition_model_version?: string | null
+  decision_rule_set_version?: string | null
+  dataset_fingerprint: string
+}
+
+export interface PlayerValueBuildIndexEntry extends PlayerValueBuildMetadata {
+  build_id: string
+  generated_at: string
+  summary_count: number
+  snapshot_path: string
+  warnings: string[]
+}
+
+export interface PlayerValueBuildIndexResponse {
+  builds: PlayerValueBuildIndexEntry[]
+  updated_at: string
+}
+
+export interface PlayerValueBuildSnapshot {
+  build_id: string
+  metadata: PlayerValueBuildMetadata
+  build: PlayerValueBuildResponse
+}
+
+export interface PlayerValueTrendPoint extends PlayerValueBuildMetadata {
+  build_id: string
+  generated_at: string
+  project_id: string
+  player_key: string
+  player_value_score: number
+  confidence: number
+  warnings: string[]
+  decision_event_count: number
+}
+
+export interface PlayerValueTrendSeries {
+  project_id: string
+  player_key: string
+  display_name?: string | null
+  points: PlayerValueTrendPoint[]
+  warnings: string[]
+}
+
+export interface PlayerValueTrendsResponse {
+  trends: PlayerValueTrendSeries[]
+  warnings: string[]
+  generated_at: string
+}
+
+export interface PlayerValueTrendResponse {
+  player_key: string
+  trends: PlayerValueTrendSeries[]
+  warnings: string[]
+  generated_at: string
+}
+
+export interface PlayerValueCompareResponse {
+  player_keys: string[]
+  trends: PlayerValueTrendSeries[]
+  warnings: string[]
+  generated_at: string
+}
+
 
 export type ReviewQueueItemType =
   | 'RECOGNITION_TRACK'
@@ -1173,6 +1238,12 @@ export const apiClient = {
   getPlayerValue: () => request<PlayerValueBuildResponse>('/local-lab/player-value'),
   getPlayerValueEvidence: (projectId: string, playerKey: string) =>
     request<PlayerValueEvidenceResponse>(`/local-lab/player-value/${encodeURIComponent(projectId)}/${encodeURIComponent(playerKey)}/evidence`),
+  getPlayerValueTrends: () => request<PlayerValueTrendsResponse>('/local-lab/player-value/trends'),
+  getPlayerValueTrend: (playerKey: string) => request<PlayerValueTrendResponse>(`/local-lab/player-value/trends/${encodeURIComponent(playerKey)}`),
+  comparePlayerValue: (playerKeys: string[]) =>
+    request<PlayerValueCompareResponse>('/local-lab/player-value/compare', { method: 'POST', body: JSON.stringify({ player_keys: playerKeys }) }),
+  listPlayerValueBuilds: () => request<PlayerValueBuildIndexResponse>('/local-lab/player-value/builds'),
+  getPlayerValueBuild: (buildId: string) => request<PlayerValueBuildSnapshot>(`/local-lab/player-value/builds/${encodeURIComponent(buildId)}`),
   getDecisionDiagnostics: () => request<DecisionDiagnosticsReport>('/local-lab/decision-diagnostics'),
   generateReviewQueue: () => request<ReviewQueueGenerateResponse>('/review-queue/generate', { method: 'POST' }),
   listReviewQueue: () => request<ReviewQueueItem[]>('/review-queue'),

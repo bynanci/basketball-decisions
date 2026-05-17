@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,12 +30,22 @@ from app.models import (
     LocalLabProjectArtifact,
     LocalLabProjectsResponse,
     PlayerAliasListResponse,
+    PlayerValueBuildIndexEntry,
+    PlayerValueBuildIndexResponse,
+    PlayerValueBuildMetadata,
     PlayerValueBuildResponse,
+    PlayerValueBuildSnapshot,
+    PlayerValueCompareRequest,
+    PlayerValueCompareResponse,
     PlayerValueComponent,
     PlayerValueEvidenceEvent,
     PlayerValueEvidenceResponse,
     PlayerValueSummary,
     PlayerValueTrace,
+    PlayerValueTrendPoint,
+    PlayerValueTrendResponse,
+    PlayerValueTrendSeries,
+    PlayerValueTrendsResponse,
     RoleBreakdownItem,
     SituationBreakdownItem,
     Calibration,
@@ -64,6 +75,7 @@ from app.services.decision_engine import evaluate_attempt
 from app.services.decision_diagnostics import build_decision_diagnostics
 from app.services.dataset_health import dataset_health_response
 from app.services.recognition_training import activate_model, compare_models, get_model_version, load_evaluation_report_registry, load_recognition_registry, score_project_with_model, train_baseline
+from app.services.player_value_trends import mixed_baseline_warnings
 
 router = APIRouter(prefix="/local-lab", tags=["local-lab"])
 
@@ -1021,6 +1033,171 @@ def _decision_events_path() -> Path:
     return DATASETS_DIR / "player_value" / "player_decision_events.jsonl"
 
 
+PLAYER_VALUE_FORMULA_VERSION = "v1"
+
+
+def _player_value_builds_dir() -> Path:
+    return DATASETS_DIR / "player_value" / "builds"
+
+
+def _player_value_build_index_path() -> Path:
+    return DATASETS_DIR / "player_value" / "player_value_build_index.json"
+
+
+def _file_sha256_or_empty(path: Path) -> str:
+    if not path.exists():
+        return "missing"
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _player_value_dataset_fingerprint() -> str:
+    digest = hashlib.sha256()
+    for path in (_decision_events_path(), DATASETS_DIR / "player_value" / "dataset_manifest.json"):
+        digest.update(path.name.encode("utf-8"))
+        digest.update(_file_sha256_or_empty(path).encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _active_recognition_model_version() -> str | None:
+    try:
+        return load_recognition_registry(RECOGNITION_MODELS_DIR).active_version
+    except Exception:
+        return None
+
+
+def _active_decision_rule_set_version() -> str | None:
+    path = DATA_DIR / "decision_rules" / "active_rule_set.json"
+    if not path.exists():
+        return None
+    try:
+        payload = read_json(path)
+    except (json.JSONDecodeError, ValidationError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    rule_set_id = payload.get("rule_set_id")
+    version = payload.get("version")
+    if rule_set_id is None and version is None:
+        return None
+    if rule_set_id is None:
+        return f"v{version}"
+    if version is None:
+        return str(rule_set_id)
+    return f"{rule_set_id}:v{version}"
+
+
+def _player_value_build_metadata() -> PlayerValueBuildMetadata:
+    return PlayerValueBuildMetadata(
+        player_value_formula_version=PLAYER_VALUE_FORMULA_VERSION,
+        recognition_model_version=_active_recognition_model_version(),
+        decision_rule_set_version=_active_decision_rule_set_version(),
+        dataset_fingerprint=_player_value_dataset_fingerprint(),
+    )
+
+
+def _build_id_for(generated_at: datetime) -> str:
+    base = generated_at.strftime("%Y%m%dT%H%M%S%fZ")
+    build_id = base
+    counter = 2
+    while (_player_value_builds_dir() / f"{build_id}.json").exists():
+        build_id = f"{base}-{counter}"
+        counter += 1
+    return build_id
+
+
+def _read_player_value_build_index() -> PlayerValueBuildIndexResponse:
+    path = _player_value_build_index_path()
+    if not path.exists():
+        return PlayerValueBuildIndexResponse(builds=[])
+    return PlayerValueBuildIndexResponse.model_validate(read_json(path))
+
+
+def _write_player_value_snapshot(response: PlayerValueBuildResponse) -> PlayerValueBuildSnapshot:
+    metadata = _player_value_build_metadata()
+    build_id = _build_id_for(response.generated_at)
+    snapshot = PlayerValueBuildSnapshot(build_id=build_id, metadata=metadata, build=response)
+    builds_dir = _player_value_builds_dir()
+    builds_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_path = builds_dir / f"{build_id}.json"
+    write_json_model(snapshot_path, snapshot)
+
+    index = _read_player_value_build_index()
+    entry = PlayerValueBuildIndexEntry(
+        build_id=build_id,
+        generated_at=response.generated_at,
+        summary_count=len(response.summaries),
+        snapshot_path=str(snapshot_path.relative_to(DATASETS_DIR / "player_value")),
+        warnings=response.warnings,
+        **metadata.model_dump(),
+    )
+    index.builds.append(entry)
+    index.builds.sort(key=lambda item: item.generated_at)
+    index.updated_at = utc_now()
+    write_json_model(_player_value_build_index_path(), index)
+    return snapshot
+
+
+def _load_player_value_snapshots() -> list[PlayerValueBuildSnapshot]:
+    snapshots: list[PlayerValueBuildSnapshot] = []
+    for entry in _read_player_value_build_index().builds:
+        path = _player_value_builds_dir() / f"{entry.build_id}.json"
+        if not path.exists():
+            continue
+        try:
+            snapshots.append(PlayerValueBuildSnapshot.model_validate(read_json(path)))
+        except (json.JSONDecodeError, ValidationError):
+            continue
+    return sorted(snapshots, key=lambda snapshot: snapshot.build.generated_at)
+
+
+def _trend_series_from_snapshots(player_keys: set[str] | None = None) -> tuple[list[PlayerValueTrendSeries], list[str]]:
+    grouped: dict[tuple[str, str], PlayerValueTrendSeries] = {}
+    warnings: list[str] = []
+    for snapshot in _load_player_value_snapshots():
+        metadata = snapshot.metadata
+        for summary in snapshot.build.summaries:
+            if player_keys is not None and summary.player_key not in player_keys:
+                continue
+            key = (summary.project_id, summary.player_key)
+            series = grouped.setdefault(
+                key,
+                PlayerValueTrendSeries(project_id=summary.project_id, player_key=summary.player_key, display_name=summary.display_name),
+            )
+            if series.display_name is None and summary.display_name is not None:
+                series.display_name = summary.display_name
+            series.points.append(
+                PlayerValueTrendPoint(
+                    build_id=snapshot.build_id,
+                    generated_at=snapshot.build.generated_at,
+                    project_id=summary.project_id,
+                    player_key=summary.player_key,
+                    player_value_score=summary.player_value_score,
+                    confidence=summary.confidence,
+                    warnings=summary.warnings,
+                    decision_event_count=summary.decision_event_count,
+                    player_value_formula_version=metadata.player_value_formula_version,
+                    recognition_model_version=metadata.recognition_model_version,
+                    decision_rule_set_version=metadata.decision_rule_set_version,
+                    dataset_fingerprint=metadata.dataset_fingerprint,
+                )
+            )
+    for series in grouped.values():
+        series.points.sort(key=lambda point: point.generated_at)
+        series.warnings = list(dict.fromkeys(series.warnings + mixed_baseline_warnings(series.points)))
+        if len({point.project_id for point in series.points}) > 1:
+            series.warnings.append("Player keys are not merged across projects; inspect each project-scoped series separately.")
+    if player_keys:
+        found = {series.player_key for series in grouped.values()}
+        missing = sorted(player_keys - found)
+        for player_key in missing:
+            warnings.append(f"No Player Value trend snapshots found for player_key {player_key}.")
+    return sorted(grouped.values(), key=lambda series: (series.player_key, series.project_id)), warnings
+
+
 def _read_decision_event_rows(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
@@ -1383,6 +1560,7 @@ def _build_player_value_response() -> PlayerValueBuildResponse:
 
     response = PlayerValueBuildResponse(summaries=summaries, generated_at=generated_at, warnings=list(dict.fromkeys(global_warnings)))
     write_json_model(_player_value_summary_path(), response)
+    _write_player_value_snapshot(response)
     return response
 
 
@@ -1578,6 +1756,63 @@ def build_player_value_evidence(project_id: str, player_key: str) -> PlayerValue
 @router.post("/player-value/build", response_model=PlayerValueBuildResponse)
 def build_player_value() -> PlayerValueBuildResponse:
     return _build_player_value_response()
+
+
+@router.get("/player-value/trends", response_model=PlayerValueTrendsResponse)
+def get_player_value_trends() -> PlayerValueTrendsResponse:
+    trends, warnings = _trend_series_from_snapshots()
+    return PlayerValueTrendsResponse(trends=trends, warnings=warnings)
+
+
+@router.get("/player-value/trends/{player_key}", response_model=PlayerValueTrendResponse)
+def get_player_value_trend(player_key: str) -> PlayerValueTrendResponse:
+    trends, warnings = _trend_series_from_snapshots({player_key})
+    project_ids = {series.project_id for series in trends}
+    if len(project_ids) > 1:
+        warnings.append(
+            f"player_key {player_key} appears in multiple projects ({', '.join(sorted(project_ids))}); aliases are not merged automatically across projects."
+        )
+    return PlayerValueTrendResponse(player_key=player_key, trends=trends, warnings=list(dict.fromkeys(warnings)))
+
+
+@router.post("/player-value/compare", response_model=PlayerValueCompareResponse)
+def compare_player_value_trends(request: PlayerValueCompareRequest) -> PlayerValueCompareResponse:
+    player_keys = list(dict.fromkeys(key.strip() for key in request.player_keys if key.strip()))
+    if len(player_keys) < 2 or len(player_keys) > 4:
+        raise api_error(
+            422,
+            "INVALID_PLAYER_VALUE_COMPARE_KEYS",
+            "Player Value comparison requires 2 to 4 non-empty player_keys.",
+            {"player_keys": request.player_keys},
+            "Submit 2 to 4 local player_keys; aliases are not merged across projects.",
+        )
+    trends, warnings = _trend_series_from_snapshots(set(player_keys))
+    for player_key in player_keys:
+        project_ids = {series.project_id for series in trends if series.player_key == player_key}
+        if len(project_ids) > 1:
+            warnings.append(
+                f"player_key {player_key} appears in multiple projects ({', '.join(sorted(project_ids))}); comparison keeps project-scoped series separate and does not merge aliases."
+            )
+    return PlayerValueCompareResponse(player_keys=player_keys, trends=trends, warnings=list(dict.fromkeys(warnings)))
+
+
+@router.get("/player-value/builds", response_model=PlayerValueBuildIndexResponse)
+def list_player_value_builds() -> PlayerValueBuildIndexResponse:
+    return _read_player_value_build_index()
+
+
+@router.get("/player-value/builds/{build_id}", response_model=PlayerValueBuildSnapshot)
+def get_player_value_build_snapshot(build_id: str) -> PlayerValueBuildSnapshot:
+    path = _player_value_builds_dir() / f"{build_id}.json"
+    if not path.exists():
+        raise api_error(
+            404,
+            "PLAYER_VALUE_BUILD_NOT_FOUND",
+            "Player Value build snapshot was not found.",
+            {"build_id": build_id, "path": str(path)},
+            "Choose a build_id from GET /api/local-lab/player-value/builds.",
+        )
+    return PlayerValueBuildSnapshot.model_validate(read_json(path))
 
 
 @router.get("/player-value/{project_id}/{player_key}/evidence", response_model=PlayerValueEvidenceResponse)

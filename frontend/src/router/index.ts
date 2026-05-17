@@ -16,6 +16,7 @@ import ReferenceVideoDetailPage from '../pages/ReferenceVideoDetailPage.vue'
 import DecisionRulesPage from '../pages/DecisionRulesPage.vue'
 import PlayerValuePage from '../pages/PlayerValuePage.vue'
 import PlayerValueDetailPage from '../pages/PlayerValueDetailPage.vue'
+import PlayerValueTrendsPage from '../pages/PlayerValueTrendsPage.vue'
 import ReviewQueuePage from '../pages/ReviewQueuePage.vue'
 import ModelRegistryPage from '../pages/ModelRegistryPage.vue'
 
@@ -28,6 +29,7 @@ export const router = createRouter({
     { path: '/situations', name: 'situation-preview', component: SituationPreviewPage },
     { path: '/local-lab', name: 'local-lab', component: LocalLabPage },
     { path: '/player-value', name: 'player-value', component: PlayerValuePage },
+    { path: '/player-value/trends', name: 'player-value-trends', component: PlayerValueTrendsPage },
     { path: '/player-value/:projectId/:playerKey', name: 'player-value-detail', component: PlayerValueDetailPage, props: true },
     { path: '/review-queue', name: 'review-queue', component: ReviewQueuePage },
     { path: '/model-registry', name: 'model-registry', component: ModelRegistryPage },
