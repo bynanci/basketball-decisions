@@ -71,7 +71,7 @@ from app.models.base import utc_now
 from app.models.tracking import Detection, PlayerTrack
 from app.pipeline.recognition_quality import score_project_recognition
 from app.models.quiz import normalize_track_id_list
-from app.services.decision_engine import evaluate_attempt
+from app.services.decision_engine import evaluate_attempt, load_active_rule_set
 from app.services.decision_diagnostics import build_decision_diagnostics
 from app.services.dataset_health import dataset_health_response
 from app.services.recognition_training import activate_model, compare_models, get_model_version, load_evaluation_report_registry, load_recognition_registry, score_project_with_model, train_baseline
@@ -972,9 +972,10 @@ def export_decision_dataset() -> DatasetManifest:
 
 
 @router.post("/decision-events/build", response_model=DecisionEventsBuildSummary)
-def build_decision_events() -> DecisionEventsBuildSummary:
+def build_decision_events(use_active_rules: bool = True) -> DecisionEventsBuildSummary:
     _ensure_dataset_dirs()
     events: list[DecisionEvent] = []
+    active_rule_set = load_active_rule_set() if use_active_rules else None
 
     for directory in _project_dirs():
         prompts = _read_json_list(directory / "quiz_prompts.json", _PROMPTS_ADAPTER)
@@ -985,17 +986,26 @@ def build_decision_events() -> DecisionEventsBuildSummary:
             prompt = prompt_by_id.get(attempt.prompt_id)
             if prompt is None:
                 continue
-            events.append(evaluate_attempt(prompt, attempt))
+            events.append(evaluate_attempt(prompt, attempt, active_rule_set=active_rule_set, use_active_rules=use_active_rules))
 
     output_path = DATASETS_DIR / "player_value" / "player_decision_events.jsonl"
     _write_jsonl(output_path, events)
 
     opportunity_costs = [event.opportunity_cost for event in events if event.opportunity_cost is not None]
+    rule_applications = [event.rule_application for event in events]
     return DecisionEventsBuildSummary(
         event_count=len(events),
         avg_raw_score=_average([event.raw_score for event in events]),
         avg_role_adjusted_score=_average([event.role_adjusted_score for event in events]),
         opportunity_cost_avg=_average(opportunity_costs),
+        use_active_rules=use_active_rules,
+        active_rule_set_id=active_rule_set.rule_set_id if active_rule_set is not None else None,
+        active_rule_set_version=active_rule_set.version if active_rule_set is not None else None,
+        rule_evaluated_count=sum(application.evaluated_rule_count for application in rule_applications),
+        rule_matched_count=sum(application.matched_rule_count for application in rule_applications),
+        rule_missed_count=sum(application.missed_rule_count for application in rule_applications),
+        avg_rule_score_delta=_average([event.rule_score_delta for event in events]),
+        score_capped_count=sum(1 for event in events if event.score_capped),
     )
 
 
@@ -1727,6 +1737,14 @@ def build_player_value_evidence(project_id: str, player_key: str) -> PlayerValue
                 is_correct=event.is_correct,
                 raw_score=float(event.raw_score),
                 role_adjusted_score=float(event.role_adjusted_score),
+                decision_engine_version=event.decision_engine_version,
+                active_rule_set_id=event.active_rule_set_id,
+                active_rule_set_version=event.active_rule_set_version,
+                base_score=float(event.base_score) if event.base_score is not None else None,
+                rule_score_delta=float(event.rule_score_delta),
+                final_score=float(event.final_score) if event.final_score is not None else None,
+                score_capped=event.score_capped,
+                rule_application=event.rule_application.model_dump(mode="json"),
                 opportunity_cost=float(event.opportunity_cost) if event.opportunity_cost is not None else None,
                 response_time_ms=event.response_time_ms,
                 timed_out=event.timed_out,

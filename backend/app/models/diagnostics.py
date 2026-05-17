@@ -28,6 +28,11 @@ class DecisionPromptDiagnostics(BaseModel):
     most_selected_wrong_option_id: str | None = None
     difficulty: DecisionPromptDifficulty
     suspected_label_issue: bool = False
+    rule_evaluated_count: int = Field(default=0, ge=0)
+    rule_matched_count: int = Field(default=0, ge=0)
+    rule_missed_count: int = Field(default=0, ge=0)
+    avg_rule_score_delta: FiniteFloat = 0.0
+    score_capped_count: int = Field(default=0, ge=0)
     reasons: list[str] = Field(default_factory=list)
 
 
@@ -60,6 +65,11 @@ class DecisionDiagnosticsGlobalSummary(BaseModel):
     suspected_label_issue_count: int = Field(ge=0)
     high_cost_prompt_count: int = Field(ge=0)
     time_pressure_prompt_count: int = Field(ge=0)
+    rule_evaluated_count: int = Field(default=0, ge=0)
+    rule_matched_count: int = Field(default=0, ge=0)
+    rule_missed_count: int = Field(default=0, ge=0)
+    avg_rule_score_delta: FiniteFloat = 0.0
+    score_capped_count: int = Field(default=0, ge=0)
     analytics_only: bool = True
 
 

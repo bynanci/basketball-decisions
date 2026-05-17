@@ -582,6 +582,11 @@ export interface DecisionPromptDiagnostics {
   most_selected_wrong_option_id?: string | null
   difficulty: DecisionPromptDifficulty
   suspected_label_issue: boolean
+  rule_evaluated_count: number
+  rule_matched_count: number
+  rule_missed_count: number
+  avg_rule_score_delta: number
+  score_capped_count: number
   reasons: string[]
 }
 
@@ -614,6 +619,11 @@ export interface DecisionDiagnosticsGlobalSummary {
   suspected_label_issue_count: number
   high_cost_prompt_count: number
   time_pressure_prompt_count: number
+  rule_evaluated_count: number
+  rule_matched_count: number
+  rule_missed_count: number
+  avg_rule_score_delta: number
+  score_capped_count: number
   analytics_only: boolean
 }
 
@@ -983,6 +993,33 @@ export interface SituationBreakdownItem {
   timeout_rate: number
 }
 
+export interface RuleEvaluationResult {
+  rule_id: string
+  court_role: CourtRoleTarget
+  situation_type: SituationType
+  matched: boolean
+  score_delta: number
+  weight: number
+  condition_text: string
+  positive_cue: string
+  negative_cue: string
+  explanation: string
+  reason: string
+}
+
+export interface DecisionRuleApplicationSummary {
+  enabled: boolean
+  rule_set_id?: string | null
+  rule_set_version?: number | null
+  evaluated_rule_count: number
+  matched_rule_count: number
+  missed_rule_count: number
+  total_delta: number
+  delta_bounded: boolean
+  results: RuleEvaluationResult[]
+  notes: string[]
+}
+
 export interface PlayerValueEvidenceEvent {
   decision_event_id: string
   project_id: string
@@ -999,6 +1036,14 @@ export interface PlayerValueEvidenceEvent {
   is_correct: boolean
   raw_score: number
   role_adjusted_score: number
+  decision_engine_version: string
+  active_rule_set_id?: string | null
+  active_rule_set_version?: number | null
+  base_score?: number | null
+  rule_score_delta: number
+  final_score?: number | null
+  score_capped: boolean
+  rule_application: DecisionRuleApplicationSummary
   opportunity_cost?: number | null
   response_time_ms?: number | null
   timed_out: boolean
@@ -1028,6 +1073,15 @@ export interface DecisionEventsBuildSummary {
   avg_raw_score: number
   avg_role_adjusted_score: number
   opportunity_cost_avg: number
+  decision_engine_version: string
+  use_active_rules: boolean
+  active_rule_set_id?: string | null
+  active_rule_set_version?: number | null
+  rule_evaluated_count: number
+  rule_matched_count: number
+  rule_missed_count: number
+  avg_rule_score_delta: number
+  score_capped_count: number
 }
 
 export type BreakdownConfidence = 'LOW' | 'MEDIUM' | 'HIGH'
@@ -1232,7 +1286,7 @@ export const apiClient = {
   exportDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/export', { method: 'POST' }),
   curateRecognitionDataset: () => request<DatasetManifest>('/local-lab/datasets/recognition/curate', { method: 'POST' }),
   curateDecisionDataset: () => request<DatasetManifest>('/local-lab/datasets/decision/curate', { method: 'POST' }),
-  buildDecisionEvents: () => request<DecisionEventsBuildSummary>('/local-lab/decision-events/build', { method: 'POST' }),
+  buildDecisionEvents: (useActiveRules = true) => request<DecisionEventsBuildSummary>(`/local-lab/decision-events/build?use_active_rules=${useActiveRules}`, { method: 'POST' }),
   buildDecisionDiagnostics: () => request<DecisionDiagnosticsReport>('/local-lab/decision-diagnostics/build', { method: 'POST' }),
   buildPlayerValue: () => request<PlayerValueBuildResponse>('/local-lab/player-value/build', { method: 'POST' }),
   getPlayerValue: () => request<PlayerValueBuildResponse>('/local-lab/player-value'),

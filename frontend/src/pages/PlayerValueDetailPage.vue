@@ -32,6 +32,12 @@ function optionPair(selected?: string | null, correct?: string | null) {
   return `${selected || '—'} / ${correct || '—'}`
 }
 
+function matchedRuleLabels(event: PlayerValueEvidenceResponse['events'][number]) {
+  return event.rule_application.results
+    .filter((result) => result.matched)
+    .map((result) => `${result.rule_id} (${formatNumber(result.score_delta)})`)
+}
+
 async function loadEvidence() {
   isLoading.value = true
   errorMessage.value = ''
@@ -190,7 +196,8 @@ onMounted(loadEvidence)
               <th>Role</th>
               <th>Situation</th>
               <th>Selected / Correct</th>
-              <th>Score</th>
+              <th>Base / Rule / Final</th>
+              <th>Matched rules</th>
               <th>Opp. cost</th>
               <th>source_track_ids</th>
               <th>context_track_ids</th>
@@ -209,7 +216,15 @@ onMounted(loadEvidence)
               <td>{{ event.court_role_target ?? 'UNKNOWN' }}</td>
               <td>{{ event.situation_type ?? 'UNKNOWN' }}</td>
               <td>{{ optionPair(event.selected_option_id, event.correct_option_id) }}</td>
-              <td>{{ formatNumber(event.role_adjusted_score) }}</td>
+              <td>
+                {{ formatNumber(event.base_score ?? event.raw_score) }} / {{ formatNumber(event.rule_score_delta) }} / {{ formatNumber(event.final_score ?? event.role_adjusted_score) }}
+                <div v-if="event.score_capped" class="muted">Clipped to 0..100</div>
+              </td>
+              <td>
+                <span v-if="matchedRuleLabels(event).length">{{ formatList(matchedRuleLabels(event)) }}</span>
+                <span v-else class="muted">No matched rules</span>
+                <div class="muted">{{ event.rule_application.matched_rule_count }} hits · {{ event.rule_application.missed_rule_count }} misses</div>
+              </td>
               <td>{{ formatNumber(event.opportunity_cost) }}</td>
               <td><code>{{ formatList(event.source_track_ids) }}</code></td>
               <td><code>{{ formatList(event.context_track_ids) }}</code></td>
@@ -220,7 +235,7 @@ onMounted(loadEvidence)
                 <RouterLink :to="{ name: 'quiz-play', params: { projectId: event.project_id, promptId: event.prompt_id } }">Prompt</RouterLink>
               </td>
             </tr>
-            <tr v-if="!hasEvents"><td colspan="11">No decision event evidence was found for this summary.</td></tr>
+            <tr v-if="!hasEvents"><td colspan="12">No decision event evidence was found for this summary.</td></tr>
           </tbody>
         </table>
       </section>

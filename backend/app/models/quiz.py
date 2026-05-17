@@ -321,8 +321,39 @@ class QuizAttemptRecord(QuizAttemptResponse):
     attempted_at: datetime = Field(default_factory=utc_now)
 
 
+class RuleEvaluationResult(BaseModel):
+    """Transparent result for one active Decision Engine v2 rule."""
+
+    rule_id: str
+    court_role: CourtRoleTarget
+    situation_type: SituationType
+    matched: bool = False
+    score_delta: FiniteFloat = 0.0
+    weight: FiniteFloat = 0.0
+    condition_text: str
+    positive_cue: str
+    negative_cue: str
+    explanation: str
+    reason: str
+
+
+class DecisionRuleApplicationSummary(BaseModel):
+    """Summary of active rule application for one evaluated attempt."""
+
+    enabled: bool = True
+    rule_set_id: str | None = None
+    rule_set_version: int | None = None
+    evaluated_rule_count: int = Field(default=0, ge=0)
+    matched_rule_count: int = Field(default=0, ge=0)
+    missed_rule_count: int = Field(default=0, ge=0)
+    total_delta: FiniteFloat = Field(default=0.0, ge=-10, le=10)
+    delta_bounded: bool = False
+    results: list[RuleEvaluationResult] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
 class DecisionEvent(BaseModel):
-    """Explainable Decision Engine v1 event generated from a quiz attempt."""
+    """Explainable Decision Engine event generated from a quiz attempt."""
 
     project_id: str
     prompt_id: str
@@ -341,6 +372,14 @@ class DecisionEvent(BaseModel):
     opportunity_cost: FiniteFloat | None = None
     raw_score: int = Field(ge=0, le=100)
     role_adjusted_score: int = Field(ge=0, le=100)
+    decision_engine_version: str = "v1"
+    active_rule_set_id: str | None = None
+    active_rule_set_version: int | None = None
+    rule_application: DecisionRuleApplicationSummary = Field(default_factory=DecisionRuleApplicationSummary)
+    base_score: FiniteFloat | None = Field(default=None, ge=0, le=100)
+    rule_score_delta: FiniteFloat = Field(default=0.0, ge=-10, le=10)
+    final_score: FiniteFloat | None = Field(default=None, ge=0, le=100)
+    score_capped: bool = False
     response_time_ms: int | None = Field(default=None, ge=0)
     timed_out: bool = False
     evaluation_source: DecisionEvaluationSource
@@ -365,6 +404,14 @@ class DecisionEvent(BaseModel):
         if not stripped:
             raise ValueError("must not be blank")
         return stripped
+
+    @model_validator(mode="after")
+    def hydrate_score_components(self) -> "DecisionEvent":
+        if self.base_score is None:
+            self.base_score = float(self.role_adjusted_score)
+        if self.final_score is None:
+            self.final_score = float(self.role_adjusted_score)
+        return self
 
     @field_validator("source_track_ids", "context_track_ids")
     @classmethod

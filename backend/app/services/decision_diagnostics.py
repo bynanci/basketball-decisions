@@ -174,6 +174,7 @@ def build_decision_diagnostics(project_dirs: list[Path], events_path: Path) -> D
             for attempt, event in zip(prompt_attempts, attempt_events)
         ]
         numeric_costs = [cost for cost in opportunity_costs if cost is not None]
+        hydrated_events = [event for event in attempt_events if event is not None]
         selections = Counter(attempt.selected_option_id for attempt in prompt_attempts if attempt.selected_option_id is not None)
         correct_option = next(option for option in prompt.options if option.is_correct)
         wrong_selections = Counter(
@@ -206,6 +207,11 @@ def build_decision_diagnostics(project_dirs: list[Path], events_path: Path) -> D
                 most_selected_wrong_option_id=most_selected_wrong_option_id,
                 difficulty=_difficulty(attempt_count, correct_rate),
                 suspected_label_issue=suspected_label_issue,
+                rule_evaluated_count=sum(event.rule_application.evaluated_rule_count for event in hydrated_events),
+                rule_matched_count=sum(event.rule_application.matched_rule_count for event in hydrated_events),
+                rule_missed_count=sum(event.rule_application.missed_rule_count for event in hydrated_events),
+                avg_rule_score_delta=_average([float(event.rule_score_delta) for event in hydrated_events]),
+                score_capped_count=sum(1 for event in hydrated_events if event.score_capped),
                 reasons=reasons,
             )
         )
@@ -254,5 +260,10 @@ def build_decision_diagnostics(project_dirs: list[Path], events_path: Path) -> D
             suspected_label_issue_count=sum(1 for diag in prompt_diagnostics if diag.suspected_label_issue),
             high_cost_prompt_count=sum(1 for diag in prompt_diagnostics if diag.avg_opportunity_cost > 0.3),
             time_pressure_prompt_count=sum(1 for diag in prompt_diagnostics if diag.timeout_rate > 0.4),
+            rule_evaluated_count=sum(diag.rule_evaluated_count for diag in prompt_diagnostics),
+            rule_matched_count=sum(diag.rule_matched_count for diag in prompt_diagnostics),
+            rule_missed_count=sum(diag.rule_missed_count for diag in prompt_diagnostics),
+            avg_rule_score_delta=_weighted_prompt_average(prompt_diagnostics, "avg_rule_score_delta"),
+            score_capped_count=sum(diag.score_capped_count for diag in prompt_diagnostics),
         ),
     )

@@ -350,21 +350,23 @@ Decision health reports prompt, option, attempt, sample, and label counts; posit
 - no more than 50% of option samples should be missing expected values;
 - timeout rate above 50% is surfaced as a low-severity quality warning.
 
-## Decision Engine v1
+## Decision Engine v2
 
-Decision Engine v1 turns saved quiz attempts into explainable, local JSONL decision events for downstream player-value experiments. It is deterministic and intentionally does **not** train or call a learned EPV model yet.
+Decision Engine v2 turns saved quiz attempts into explainable, local JSONL decision events for downstream player-value experiments. It is deterministic and intentionally does **not** train a decision model, replace manual expected-value scoring, auto-approve rules, or call a learned/black-box EPV model.
 
 The engine evaluates each `quiz_attempts.json` record against its matching prompt in `quiz_prompts.json`:
 
 - **Manual expected values first:** when every quiz option has an `expected_value`, the engine uses the selected option value, the best option value, and the opportunity cost to compute the raw score as `max(0, round(100 - opportunity_cost * 200))`.
 - **Rule-based fallback:** when expected values are incomplete or absent, the engine falls back to correctness-only scoring (`100` for correct, `0` for incorrect).
-- **Role-adjusted score:** the event adds deterministic adjustments for timeouts, `ROLE_READ` correctness, fast responses, and near-optimal incorrect answers with low opportunity cost.
-- **Explainability:** every event includes an `explanations` array describing whether manual expected value or rule-based scoring was used and which role/time adjustments were applied.
+- **Role-adjusted base score:** the event adds deterministic adjustments for timeouts, `ROLE_READ` correctness, fast responses, and near-optimal incorrect answers with low opportunity cost. This becomes `base_score` before rule deltas.
+- **Active rule application:** when `use_active_rules=true` (the default), the build loads the active human-approved rule set and evaluates only `ACTIVE` rules whose `court_role` and `situation_type` match the prompt. The selected option's label, action type, explanation, and role feedback form the option context used for positive/negative cue matching.
+- **Bounded rule delta:** matched rules produce transparent signed deltas from rule weights, with the total `rule_score_delta` bounded to `-10..+10`. `final_score` is clipped to `0..100`, and `score_capped` records clipping. Manual expected-value scoring remains the primary score source.
+- **Explainability:** every event includes an `explanations` array plus `decision_engine_version`, `active_rule_set_id`, `active_rule_set_version`, `rule_application`, `base_score`, `rule_score_delta`, `final_score`, and `score_capped`.
 
 Build local decision events from the API:
 
 ```bash
-curl -X POST "http://localhost:8000/api/local-lab/decision-events/build"
+curl -X POST "http://localhost:8000/api/local-lab/decision-events/build?use_active_rules=true"
 ```
 
 The endpoint iterates all local projects, reads quiz prompts and attempts, writes JSONL to:
@@ -373,7 +375,7 @@ The endpoint iterates all local projects, reads quiz prompts and attempts, write
 backend/app/data/datasets/player_value/player_decision_events.jsonl
 ```
 
-and returns a summary with `event_count`, `avg_raw_score`, `avg_role_adjusted_score`, and `opportunity_cost_avg`. The Local Lab page also includes a **Build Decision Events** button and summary card for these values.
+and returns a summary with score averages plus active rule-set metadata, rule evaluated/matched/missed counts, average rule delta, and capped-score counts. The Local Lab page also includes a **Use active decision rules** option, **Build Decision Events** button, and summary card for these values.
 
 ## Data Source Governance
 
@@ -436,7 +438,7 @@ PUT /api/decision-rules/rules/{rule_id}
 
 Drafts can also be rejected, which marks the draft reviewed without creating a rule. When a draft is approved, the backend creates a `DecisionRule`, copies `court_role`, `situation_type`, `condition_text`, `positive_cue`, `negative_cue`, and `explanation`, maps `suggested_weight` to `weight`, marks the rule `ACTIVE`, records approval metadata, and adds it to the selected rule set or the active/default rule set. Rules can later be marked `DISABLED` without deleting their audit trail. Rule sets can be created and activated, but only one rule set is active at a time.
 
-These active rules are deterministic local JSON configuration, not ML training data and not a learned model. Approving a rule from a reference-only breakdown does **not** export the original video, note, draft, or rule as a training sample. The rule set is intended to inform a future Decision Engine v2 rule layer while preserving the current source-governance boundary.
+These active rules are deterministic local JSON configuration, not ML training data and not a learned model. Approving a rule from a reference-only breakdown does **not** export the original video, note, draft, or rule as a training sample. Decision Engine v2 can consume the active rule set during decision-event builds, but rule approval remains explicit and human-governed.
 
 ## Recognition Model Registry Governance
 
@@ -520,7 +522,8 @@ Decision Diagnostics are explainable, JSON-only analytics for Decision Engine qu
 - high opportunity-cost misses,
 - time-pressure warnings,
 - role and situation coverage gaps,
-- suspected label issues where the authored correct answer is rarely selected while one wrong option dominates.
+- suspected label issues where the authored correct answer is rarely selected while one wrong option dominates,
+- Decision Engine v2 rule hit/miss counts, average rule score delta, and capped-score counts.
 
 Build diagnostics with:
 
@@ -557,7 +560,7 @@ curl http://localhost:8000/api/local-lab/player-value
 
 The build reads local JSON artifacts only:
 
-- `backend/app/data/datasets/player_value/player_decision_events.jsonl` from Decision Engine v1;
+- `backend/app/data/datasets/player_value/player_decision_events.jsonl` from Decision Engine v2;
 - per-project `player_aliases.json` from Player Identity & Track Alias;
 - `tracking_cleaned.json` or `tracking.json` for participation scoring;
 - `tracking_review_patch.json` and local recognition quality scoring signals for reliability checks;
@@ -653,7 +656,7 @@ The evidence page shows:
 - header metrics such as `player_key`, display name if present, team side, role hint, score, confidence, and warnings;
 - the unchanged Player Value component breakdown;
 - role and situation breakdown tables with event count, average role-adjusted score, average opportunity cost, correct rate, and timeout rate;
-- a decision-event evidence table showing prompt/frame context, selected and correct options, scores, `source_track_ids`, `context_track_ids`, warnings, and links back to the project or prompt route when available;
+- a decision-event evidence table showing prompt/frame context, selected and correct options, base score, bounded rule delta, final score, matched rules, `source_track_ids`, `context_track_ids`, warnings, and links back to the project or prompt route when available;
 - an evidence warning panel for missing prompts, missing events, UNKNOWN attribution, absent `source_track_ids`, ambiguous alias fallback, and low confidence.
 
 Track-link semantics remain strict:
