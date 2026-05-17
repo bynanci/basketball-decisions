@@ -644,7 +644,7 @@ Player Value remains a local, explainable aggregation over saved JSON artifacts.
 
 The Review Queue (`/review-queue`) is an explicit local workflow for resolving active-learning items surfaced from recognition scoring, decision diagnostics, Player Value evidence, and rule draft governance. Generating the queue only surfaces candidates; it does not auto-mutate source artifacts.
 
-Reviewers can apply queue actions through `POST /api/review-queue/{item_id}/actions`. Each action is explicit, validated against the item type, and persisted to `backend/app/data/review_queue/review_action_log.json` so artifact changes and no-op follow-ups remain traceable. The action log can be queried with `GET /api/review-queue/actions` and optional `item_id`, `project_id`, or `action_type` filters.
+Reviewers can apply queue actions through `POST /api/review-queue/{item_id}/actions`. Each action is explicit, validated against the item type, and persisted alongside the queue in `backend/app/data/review_queue/review_action_log.json` (with queue state in `backend/app/data/review_queue/review_queue.json`) so artifact changes and no-op follow-ups remain traceable. The action log can be queried with `GET /api/review-queue/actions` and optional `item_id`, `project_id`, or `action_type` filters.
 
 Action handlers intentionally mutate only local review artifacts:
 
