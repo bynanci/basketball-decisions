@@ -683,3 +683,27 @@ Action handlers intentionally mutate only local review artifacts:
 - Accepting UNKNOWN Player Value attribution records the decision without inventing a fake player identity.
 
 Player identity remains manual and local: reviewers must choose when to connect tracks to a local alias, and the queue never creates real-world identity claims or trains a model from these actions.
+
+## Coach Report Export (M21)
+
+The Coach Report export builds deterministic Markdown and structured JSON from local analytics artifacts. It is available in the frontend at `/reports/coach` and through these backend endpoints:
+
+```http
+POST /api/reports/coach
+GET /api/reports/coach
+GET /api/reports/coach/{report_id}
+GET /api/reports/coach/{report_id}/markdown
+GET /api/reports/coach/{report_id}/json
+```
+
+Generated reports are stored locally under `backend/app/data/reports/coach/`. The report builder supports these sections in a fixed order: Player Value, Trends, Decision Diagnostics, Rule Contributions, Teaching Cases, Review Findings, Source Governance, and Methodology & Limitations.
+
+Missing or malformed source artifacts produce warnings in the report instead of crashing the build. Reports intentionally do **not** implement PDF, DOCX, email delivery, LLM-generated coach advice, official scouting grades, or real player identity claims beyond local project aliases.
+
+Example request:
+
+```bash
+curl -X POST "http://localhost:8000/api/reports/coach" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Coach Report","project_id":"project-1","player_key":"P1"}'
+```
