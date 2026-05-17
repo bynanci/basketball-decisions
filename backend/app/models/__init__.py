@@ -65,6 +65,15 @@ from .drill_recommendation import (
     DrillRecommendationRequest,
     DrillRecommendationResponse,
 )
+from .practice_plan import (
+    PracticePlan,
+    PracticePlanBlock,
+    PracticePlanBlockType,
+    PracticePlanBuildRequest,
+    PracticePlanDuration,
+    PracticePlanListItem,
+    PracticePlanListResponse,
+)
 from .errors import ApiErrorResponse
 from .project import Project, ProjectBundleResponse, ProjectCreateRequest, ProjectCreateResponse
 from .player_identity import PlayerAlias, PlayerAliasListResponse, PlayerAliasSource, TeamSide
@@ -196,6 +205,13 @@ __all__ = [
     "DrillRecommendation",
     "DrillRecommendationRequest",
     "DrillRecommendationResponse",
+    "PracticePlan",
+    "PracticePlanBlock",
+    "PracticePlanBlockType",
+    "PracticePlanBuildRequest",
+    "PracticePlanDuration",
+    "PracticePlanListItem",
+    "PracticePlanListResponse",
     "ApiErrorResponse",
     "DatasetHealthResponse",
     "DatasetHealthWarning",

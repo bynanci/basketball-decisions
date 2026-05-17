@@ -1306,6 +1306,82 @@ export interface DrillRecommendationResponse {
   latest_path: string
 }
 
+
+export type PracticePlanDuration = 60 | 75 | 90 | 120
+export type PracticePlanBlockType = 'warmup' | 'drill' | 'scrimmage' | 'review'
+
+export interface PracticePlanBuildRequest {
+  title?: string
+  total_duration_minutes?: PracticePlanDuration
+  project_id?: string | null
+  player_key?: string | null
+  player_keys?: string[]
+  max_drill_blocks?: number
+  created_by?: string | null
+  notes?: string | null
+}
+
+export interface PracticePlanBlock {
+  block_id: string
+  block_type: PracticePlanBlockType
+  title: string
+  start_minute: number
+  end_minute: number
+  duration_minutes: number
+  drill_id?: string | null
+  recommendation_id?: string | null
+  priority?: string | null
+  target_roles: string[]
+  target_situations: string[]
+  player_keys: string[]
+  coaching_cues: string[]
+  success_metrics: string[]
+  evidence_refs: DrillEvidenceRef[]
+  warnings: string[]
+}
+
+export interface PracticePlan {
+  schema_version: string
+  plan_id: string
+  title: string
+  created_at: string
+  created_by?: string | null
+  project_id?: string | null
+  player_key?: string | null
+  total_duration_minutes: PracticePlanDuration
+  target_roles: string[]
+  target_situations: string[]
+  player_keys: string[]
+  source_recommendation_ids: string[]
+  blocks: PracticePlanBlock[]
+  warnings: string[]
+  evidence_refs: DrillEvidenceRef[]
+  markdown: string
+  json_path: string
+  markdown_path: string
+}
+
+export interface PracticePlanListItem {
+  plan_id: string
+  title: string
+  created_at: string
+  created_by?: string | null
+  project_id?: string | null
+  player_key?: string | null
+  total_duration_minutes: PracticePlanDuration
+  target_roles: string[]
+  target_situations: string[]
+  player_keys: string[]
+  warning_count: number
+  json_path: string
+  markdown_path: string
+}
+
+export interface PracticePlanListResponse {
+  plans: PracticePlanListItem[]
+  updated_at: string
+}
+
 export type CoachReportSectionName =
   | 'Player Value'
   | 'Trends'
@@ -1439,6 +1515,14 @@ export const apiClient = {
   buildDrillRecommendations: (payload: DrillRecommendationRequest) =>
     request<DrillRecommendationResponse>('/drills/recommendations', { method: 'POST', body: JSON.stringify(payload) }),
   getLatestDrillRecommendations: () => request<DrillRecommendationResponse>('/drills/recommendations/latest'),
+  buildPracticePlan: (payload: PracticePlanBuildRequest) =>
+    request<PracticePlan>('/practice-plans', { method: 'POST', body: JSON.stringify(payload) }),
+  listPracticePlans: () => request<PracticePlanListResponse>('/practice-plans'),
+  getPracticePlan: (planId: string) => request<PracticePlan>(`/practice-plans/${encodeURIComponent(planId)}`),
+  getPracticePlanJson: (planId: string) => request<PracticePlan>(`/practice-plans/${encodeURIComponent(planId)}/json`),
+  getPracticePlanMarkdown: (planId: string) => requestText(`/practice-plans/${encodeURIComponent(planId)}/markdown`),
+  practicePlanMarkdownUrl: (planId: string) => `${API_BASE_URL}/practice-plans/${encodeURIComponent(planId)}/markdown`,
+  practicePlanJsonUrl: (planId: string) => `${API_BASE_URL}/practice-plans/${encodeURIComponent(planId)}/json`,
   buildCoachReport: (payload: CoachReportBuildRequest) =>
     request<CoachReport>('/reports/coach', { method: 'POST', body: JSON.stringify(payload) }),
   listCoachReports: () => request<CoachReportListResponse>('/reports/coach'),

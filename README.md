@@ -245,6 +245,24 @@ GET /api/drills/recommendations/latest
 
 The `/drills` frontend page shows recommendation cards with priority, confidence, role, situation, reason, coaching cues, success metrics, and evidence references. Coach Reports include a Drill Recommendations section when latest recommendations are available.
 
+## Practice Plan Builder
+
+M23 adds a deterministic practice plan builder that turns local drill recommendations into time-boxed practice blocks. Plans are saved under `backend/app/data/practice_plans/` as JSON and Markdown exports, with an `index.json` used by the list API. The builder supports only 60, 75, 90, and 120 minute plans.
+
+API endpoints:
+
+```http
+POST /api/practice-plans
+GET /api/practice-plans
+GET /api/practice-plans/{plan_id}
+GET /api/practice-plans/{plan_id}/markdown
+GET /api/practice-plans/{plan_id}/json
+```
+
+`POST /api/practice-plans` accepts `total_duration_minutes`, optional `project_id`, optional `player_key`, optional extra `player_keys`, and `max_drill_blocks`. It builds fresh deterministic drill recommendations, allocates warmup, drill, scrimmage, and review / recap blocks, and copies target roles, target situations, player keys, coaching cues, success metrics, evidence references, and warnings into the saved plan.
+
+The `/practice-plans` frontend page builds plans, lists saved plans, previews block timing and targets, and links directly to Markdown and JSON exports. The feature intentionally does not add calendar integration, PDF/DOCX exports, medical or injury advice, LLM-generated coaching advice, or full season planning.
+
 ## Decision Arrow Quiz MVP
 
 Decision Arrow Quiz is a small still-image MVP for authoring and playing one decision prompt at a time. It uses extracted frame images rather than video playback.
