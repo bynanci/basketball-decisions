@@ -40,8 +40,9 @@ router = APIRouter(prefix="/review-queue", tags=["review-queue"])
 
 APP_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 DATASETS_DIR = APP_DATA_DIR / "datasets"
-REVIEW_QUEUE_PATH = APP_DATA_DIR / "review_queue.json"
-REVIEW_ACTION_LOG_PATH = APP_DATA_DIR / "review_queue" / "review_action_log.json"
+REVIEW_QUEUE_DIR = APP_DATA_DIR / "review_queue"
+REVIEW_QUEUE_PATH = REVIEW_QUEUE_DIR / "review_queue.json"
+REVIEW_ACTION_LOG_PATH = REVIEW_QUEUE_DIR / "review_action_log.json"
 DECISION_RULE_DRAFTS_PATH = APP_DATA_DIR / "reference_videos" / "decision_rule_drafts.json"
 _QUEUE_ADAPTER = TypeAdapter(list[ReviewQueueItem])
 _ACTION_LOG_ADAPTER = TypeAdapter(list[ReviewActionLog])
