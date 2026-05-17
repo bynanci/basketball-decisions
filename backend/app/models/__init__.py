@@ -55,6 +55,16 @@ from .coach_report import (
     CoachReportSection,
     CoachReportSectionName,
 )
+from .drill_recommendation import (
+    DrillCatalogItem,
+    DrillCatalogResponse,
+    DrillEvidenceRef,
+    DrillEvidenceSource,
+    DrillPriority,
+    DrillRecommendation,
+    DrillRecommendationRequest,
+    DrillRecommendationResponse,
+)
 from .errors import ApiErrorResponse
 from .project import Project, ProjectBundleResponse, ProjectCreateRequest, ProjectCreateResponse
 from .player_identity import PlayerAlias, PlayerAliasListResponse, PlayerAliasSource, TeamSide
@@ -178,6 +188,14 @@ __all__ = [
     "DecisionRuleSet",
     "DecisionRuleSetListResponse",
     "UpdateDecisionRuleRequest",
+    "DrillCatalogItem",
+    "DrillCatalogResponse",
+    "DrillEvidenceRef",
+    "DrillEvidenceSource",
+    "DrillPriority",
+    "DrillRecommendation",
+    "DrillRecommendationRequest",
+    "DrillRecommendationResponse",
     "ApiErrorResponse",
     "DatasetHealthResponse",
     "DatasetHealthWarning",

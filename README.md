@@ -229,6 +229,22 @@ Tracking QC limitations:
 - Track aliases are supported by the backend patch schema, but this MVP does not provide an advanced merge/re-id workflow in the UI.
 - Cleaned projected tracks are only as accurate as the original detections/tracks and saved calibration homography.
 
+## Drill Recommendation Engine
+
+M22 adds a deterministic drill recommendation engine backed by a local, human-authored drill catalog. It does not use LLM-generated coaching advice, does not include medical or injury guidance, does not claim official coaching certification, and does not build a full practice calendar.
+
+API endpoints:
+
+```http
+GET /api/drills/catalog
+POST /api/drills/recommendations
+GET /api/drills/recommendations/latest
+```
+
+`POST /api/drills/recommendations` accepts optional `project_id`, `player_key`, and `max_recommendations` filters. The service reads local Decision Diagnostics, Player Value summaries, Player Value trend artifacts, teaching-case decision events, and review queue findings, then selects matching catalog drills and saves the latest response under local drill data.
+
+The `/drills` frontend page shows recommendation cards with priority, confidence, role, situation, reason, coaching cues, success metrics, and evidence references. Coach Reports include a Drill Recommendations section when latest recommendations are available.
+
 ## Decision Arrow Quiz MVP
 
 Decision Arrow Quiz is a small still-image MVP for authoring and playing one decision prompt at a time. It uses extracted frame images rather than video playback.

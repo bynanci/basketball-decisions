@@ -157,3 +157,50 @@ describe('review queue action client', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/review-queue/actions?item_id=rq-1&project_id=project-1&action_type=DISMISS_WITH_NOTE', { headers: expect.any(Headers) })
   })
 })
+
+describe('drill recommendation client', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('builds drill recommendations through the backend endpoint', async () => {
+    const payload = {
+      schema_version: '1.0',
+      generated_at: '2026-01-01T00:00:00Z',
+      project_id: 'project-1',
+      player_key: 'P1',
+      recommendations: [],
+      warnings: [],
+      catalog_path: 'catalog.json',
+      latest_path: 'latest.json'
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiClient.buildDrillRecommendations({ project_id: 'project-1', player_key: 'P1', max_recommendations: 4 })).resolves.toEqual(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/drills/recommendations', {
+      method: 'POST',
+      headers: expect.any(Headers),
+      body: JSON.stringify({ project_id: 'project-1', player_key: 'P1', max_recommendations: 4 })
+    })
+  })
+
+  it('loads the latest drill recommendations', async () => {
+    const payload = {
+      schema_version: '1.0',
+      generated_at: '2026-01-01T00:00:00Z',
+      recommendations: [],
+      warnings: [],
+      catalog_path: 'catalog.json',
+      latest_path: 'latest.json'
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiClient.getLatestDrillRecommendations()).resolves.toEqual(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/drills/recommendations/latest', { headers: expect.any(Headers) })
+  })
+})

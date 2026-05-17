@@ -1,0 +1,64 @@
+{
+  "drills": [
+    {
+      "drill_id": "advantage-read-kickout",
+      "title": "Advantage Read: Kickout or Finish",
+      "role": "BALL_HANDLER",
+      "situation": "ADVANTAGE",
+      "description": "Human-authored catalog drill for reading help defense after creating an advantage.",
+      "coaching_cues": ["See the low help before the second dribble.", "Deliver the pass on balance when the corner defender helps.", "Finish strong when the lane stays open."],
+      "success_metrics": ["Eight correct read calls in ten reps.", "Pass or shot decision made before the paint catch line.", "No more than two late pickups per set."],
+      "tags": ["decision", "advantage", "spacing", "passing"]
+    },
+    {
+      "drill_id": "pnr-two-read-pocket-skip",
+      "title": "Pick-and-Roll Two-Read: Pocket or Skip",
+      "role": "BALL_HANDLER",
+      "situation": "PICK_AND_ROLL",
+      "description": "Human-authored catalog drill for choosing between the roller pocket pass and weak-side skip.",
+      "coaching_cues": ["Use the screen shoulder-to-shoulder.", "Read the tag defender before leaving your feet.", "Keep the dribble alive until the passing window is clear."],
+      "success_metrics": ["Seven on-time passes in ten live reads.", "Turnover or deflection on fewer than two reps.", "Verbalize tag defender location after each rep."],
+      "tags": ["decision", "pick_and_roll", "passing"]
+    },
+    {
+      "drill_id": "transition-lane-advance",
+      "title": "Transition Lane Advance Read",
+      "role": "WING",
+      "situation": "TRANSITION",
+      "description": "Human-authored catalog drill for early advance passes and lane-fill decisions.",
+      "coaching_cues": ["Sprint wide before looking back to the ball.", "Advance the ball when a teammate is ahead with a clean lane.", "Flatten to the corner if the defense protects the rim."],
+      "success_metrics": ["Correct advance or flatten decision on eight of ten reps.", "First pass thrown before the ball crosses half court when open.", "Spacing lane maintained for the full rep."],
+      "tags": ["transition", "spacing", "passing"]
+    },
+    {
+      "drill_id": "closeout-contain-no-middle",
+      "title": "Closeout Contain: No Middle",
+      "role": "ON_BALL_DEFENDER",
+      "situation": "CLOSEOUT",
+      "description": "Human-authored catalog drill for controlled closeouts and containment angles.",
+      "coaching_cues": ["Chop steps before the catch.", "Show hands without leaving your feet.", "Influence the ball away from the middle."],
+      "success_metrics": ["Middle drive allowed on fewer than two of ten reps.", "Contest without fouling on eight of ten reps.", "Recover stance within one step after the first move."],
+      "tags": ["defense", "closeout", "containment"]
+    },
+    {
+      "drill_id": "help-tag-recover",
+      "title": "Help, Tag, and Recover",
+      "role": "HELP_DEFENDER",
+      "situation": "HELP_ROTATION",
+      "description": "Human-authored catalog drill for help positioning, roller tags, and recovery timing.",
+      "coaching_cues": ["Load to the nail or gap before the drive starts.", "Tag with body position, then see your matchup.", "Recover with high hands on the pass out."],
+      "success_metrics": ["Correct tag or stunt on eight of ten reps.", "Recovery catch-to-contest under two seconds.", "Communicate help call on every rep."],
+      "tags": ["defense", "rotation", "help"]
+    },
+    {
+      "drill_id": "spacing-drift-lift",
+      "title": "Spacing Read: Drift or Lift",
+      "role": "OFF_BALL",
+      "situation": "DRIVE_AND_KICK",
+      "description": "Human-authored catalog drill for off-ball relocation during baseline and slot drives.",
+      "coaching_cues": ["Move when the driver gets a shoulder past the defender.", "Drift on baseline drives and lift on middle drives.", "Be shot-ready before the pass arrives."],
+      "success_metrics": ["Correct relocation on eight of ten drive reads.", "Feet set before catch on seven of ten reps.", "No two players fill the same window."],
+      "tags": ["spacing", "off_ball", "drive_and_kick"]
+    }
+  ]
+}
