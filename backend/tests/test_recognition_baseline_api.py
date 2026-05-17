@@ -289,6 +289,60 @@ def test_training_writes_registry_and_metrics_when_data_sufficient(client: TestC
     assert metrics["f1"] == 1.0
 
 
+def test_registry_read_normalizes_active_flags(client: TestClient, tmp_path: Path) -> None:
+    model_root = tmp_path / "models" / "recognition"
+    for version in ("v001", "v002"):
+        version_dir = model_root / version
+        version_dir.mkdir(parents=True, exist_ok=True)
+        (version_dir / "metrics.json").write_text(
+            json.dumps(
+                {
+                    "accuracy": 1.0,
+                    "precision": 1.0,
+                    "recall": 1.0,
+                    "f1": 1.0,
+                    "confusion_matrix": [[1, 0], [0, 1]],
+                    "train_sample_count": 100,
+                    "test_sample_count": 20,
+                    "feature_importance": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+    (model_root / "model_registry.json").write_text(
+        json.dumps(
+            {
+                "active_version": "v002",
+                "models": [
+                    {
+                        "version": "v001",
+                        "active": True,
+                        "model_path": str(model_root / "v001" / "model.pkl"),
+                        "metrics_path": str(model_root / "v001" / "metrics.json"),
+                        "feature_schema_path": str(model_root / "v001" / "feature_schema.json"),
+                    },
+                    {
+                        "version": "v002",
+                        "active": False,
+                        "model_path": str(model_root / "v002" / "model.pkl"),
+                        "metrics_path": str(model_root / "v002" / "metrics.json"),
+                        "feature_schema_path": str(model_root / "v002" / "feature_schema.json"),
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    response = client.get("/api/local-lab/models/recognition")
+
+    assert response.status_code == 200
+    models = {model["version"]: model for model in response.json()["models"]}
+    assert models["v001"]["active"] is False
+    assert models["v002"]["active"] is True
+    assert response.json()["active_model"]["version"] == "v002"
+
+
 def test_scoring_without_active_model_returns_clear_error(client: TestClient, tmp_path: Path) -> None:
     _write_tracking_project(tmp_path, "score-project")
 
