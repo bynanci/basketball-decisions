@@ -125,6 +125,15 @@ class DecisionEventsBuildSummary(BaseModel):
     avg_raw_score: float = 0.0
     avg_role_adjusted_score: float = 0.0
     opportunity_cost_avg: float = 0.0
+    decision_engine_version: str = "v2"
+    use_active_rules: bool = True
+    active_rule_set_id: str | None = None
+    active_rule_set_version: int | None = None
+    rule_evaluated_count: int = 0
+    rule_matched_count: int = 0
+    rule_missed_count: int = 0
+    avg_rule_score_delta: float = 0.0
+    score_capped_count: int = 0
 
 
 class SkippedProject(BaseModel):

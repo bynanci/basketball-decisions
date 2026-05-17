@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.api import local_lab
+from app.services import decision_engine
 from app.api.common import write_json_model
 from app.models import Project, QuizAttemptRecord, QuizPrompt
 
@@ -85,12 +86,13 @@ def test_build_decision_events_writes_explainable_jsonl(
     response = client.post("/api/local-lab/decision-events/build")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "event_count": 1,
-        "avg_raw_score": 88.0,
-        "avg_role_adjusted_score": 88.0,
-        "opportunity_cost_avg": 0.06,
-    }
+    payload = response.json()
+    assert payload["event_count"] == 1
+    assert payload["avg_raw_score"] == 88.0
+    assert payload["avg_role_adjusted_score"] == 88.0
+    assert payload["opportunity_cost_avg"] == 0.06
+    assert payload["decision_engine_version"] == "v2"
+    assert payload["use_active_rules"] is True
     output_path = tmp_path / "datasets" / "player_value" / "player_decision_events.jsonl"
     rows = [json.loads(line) for line in output_path.read_text(encoding="utf-8").splitlines()]
     assert len(rows) == 1
@@ -154,3 +156,80 @@ def test_decision_events_use_rule_based_fallback_and_role_bonuses(
     assert event["raw_score"] == 100
     assert "ROLE_READ correct-answer bonus applied: +5, capped at 100." in event["explanations"]
     assert "Fast response bonus applied: +3 for answering faster than half the time limit, capped at 100." in event["explanations"]
+
+
+def _write_active_rule_set(path: Path, *, weight: float = 4.0) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "rule_set_id": "rules-playoff",
+                "name": "Playoff reads",
+                "version": 2,
+                "active": True,
+                "rules": [
+                    {
+                        "rule_id": "rule-pass",
+                        "court_role": "BALL_HANDLER",
+                        "situation_type": "PICK_AND_ROLL",
+                        "condition_text": "hit the pass",
+                        "positive_cue": "Option A",
+                        "negative_cue": "forced shot",
+                        "weight": weight,
+                        "explanation": "Reward the selected pass read.",
+                        "status": "ACTIVE",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_decision_events_apply_active_rules_with_bounded_delta(client: TestClient, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(local_lab, "DATASETS_DIR", tmp_path / "datasets")
+    active_rule_path = tmp_path / "decision_rules" / "active_rule_set.json"
+    _write_active_rule_set(active_rule_path, weight=12.0)
+    monkeypatch.setattr(decision_engine, "ACTIVE_RULE_SET_PATH", active_rule_path)
+    monkeypatch.setattr(decision_engine, "RULE_SETS_PATH", tmp_path / "decision_rules" / "rule_sets.json")
+
+    prompt = _prompt()
+    attempt = _attempt()
+    _write_project_with_quiz(tmp_path / "project-1", prompt=prompt, attempts=[attempt])
+
+    response = client.post("/api/local-lab/decision-events/build")
+
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["active_rule_set_id"] == "rules-playoff"
+    assert summary["rule_matched_count"] == 1
+    assert summary["avg_rule_score_delta"] == 10.0
+
+    output_path = tmp_path / "datasets" / "player_value" / "player_decision_events.jsonl"
+    event = json.loads(output_path.read_text(encoding="utf-8").strip())
+    assert event["decision_engine_version"] == "v2"
+    assert event["base_score"] == 88
+    assert event["rule_score_delta"] == 10.0
+    assert event["final_score"] == 98
+    assert event["rule_application"]["delta_bounded"] is True
+    assert event["rule_application"]["results"][0]["matched"] is True
+
+
+def test_decision_events_can_disable_active_rules(client: TestClient, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(local_lab, "DATASETS_DIR", tmp_path / "datasets")
+    active_rule_path = tmp_path / "decision_rules" / "active_rule_set.json"
+    _write_active_rule_set(active_rule_path)
+    monkeypatch.setattr(decision_engine, "ACTIVE_RULE_SET_PATH", active_rule_path)
+
+    prompt = _prompt()
+    attempt = _attempt()
+    _write_project_with_quiz(tmp_path / "project-1", prompt=prompt, attempts=[attempt])
+
+    response = client.post("/api/local-lab/decision-events/build?use_active_rules=false")
+
+    assert response.status_code == 200
+    assert response.json()["use_active_rules"] is False
+    event = json.loads((tmp_path / "datasets" / "player_value" / "player_decision_events.jsonl").read_text(encoding="utf-8").strip())
+    assert event["rule_score_delta"] == 0.0
+    assert event["final_score"] == 88
+    assert event["rule_application"]["enabled"] is False

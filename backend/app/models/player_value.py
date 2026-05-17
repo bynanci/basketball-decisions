@@ -97,6 +97,14 @@ class PlayerValueEvidenceEvent(BaseModel):
     is_correct: bool
     raw_score: float
     role_adjusted_score: float
+    decision_engine_version: str = "v1"
+    active_rule_set_id: str | None = None
+    active_rule_set_version: int | None = None
+    base_score: float | None = None
+    rule_score_delta: float = 0.0
+    final_score: float | None = None
+    score_capped: bool = False
+    rule_application: dict = Field(default_factory=dict)
     opportunity_cost: float | None = None
     response_time_ms: int | None = None
     timed_out: bool

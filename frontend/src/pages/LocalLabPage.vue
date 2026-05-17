@@ -31,6 +31,7 @@ const isCuratingRecognition = ref(false)
 const isCuratingDecision = ref(false)
 const isTrainingRecognition = ref(false)
 const decisionEventsSummary = ref<DecisionEventsBuildSummary | null>(null)
+const useActiveDecisionRules = ref(true)
 const decisionDiagnostics = ref<DecisionDiagnosticsReport | null>(null)
 const recognitionModelRegistry = ref<RecognitionModelRegistry | null>(null)
 const latestRecognitionModel = ref<RecognitionModelInfo | null>(null)
@@ -233,9 +234,9 @@ async function buildDecisionEvents() {
   statusMessage.value = ''
   errorMessage.value = ''
   try {
-    const summary = await apiClient.buildDecisionEvents()
+    const summary = await apiClient.buildDecisionEvents(useActiveDecisionRules.value)
     decisionEventsSummary.value = summary
-    statusMessage.value = `Built ${summary.event_count} explainable decision events.`
+    statusMessage.value = `Built ${summary.event_count} explainable Decision Engine ${summary.decision_engine_version} events with ${summary.rule_matched_count} matched rule hits.`
   } catch (error) {
     showError(error, 'Could not build decision events.')
   } finally {
@@ -299,6 +300,7 @@ onMounted(refreshLocalLab)
       <button type="button" :disabled="isTrainingRecognition" @click="trainRecognitionBaseline">
         {{ isTrainingRecognition ? 'Training…' : 'Train Recognition Baseline' }}
       </button>
+      <label class="inline-checkbox"><input v-model="useActiveDecisionRules" type="checkbox" /> Use active decision rules</label>
       <button type="button" :disabled="isBuildingDecisionEvents" @click="buildDecisionEvents">
         {{ isBuildingDecisionEvents ? 'Building…' : 'Build Decision Events' }}
       </button>
@@ -469,9 +471,9 @@ onMounted(refreshLocalLab)
 
   <section class="card decision-events-card">
     <div>
-      <p class="eyebrow">Decision Engine v1</p>
+      <p class="eyebrow">Decision Engine v2</p>
       <h2>Explainable decision events</h2>
-      <p>Build role-adjusted, rule-based events from saved quiz attempts and write them to the local player value dataset.</p>
+      <p>Build manual expected-value-first events from saved quiz attempts, optionally applying bounded active rule deltas before writing to the local player value dataset.</p>
     </div>
     <dl>
       <div>
@@ -489,6 +491,18 @@ onMounted(refreshLocalLab)
       <div>
         <dt>Avg opportunity cost</dt>
         <dd>{{ decisionEventsSummary ? formatNumber(decisionEventsSummary.opportunity_cost_avg) : '—' }}</dd>
+      </div>
+      <div>
+        <dt>Active rule set</dt>
+        <dd>{{ decisionEventsSummary?.active_rule_set_id ?? 'None' }}</dd>
+      </div>
+      <div>
+        <dt>Rule hits / misses</dt>
+        <dd>{{ decisionEventsSummary ? `${decisionEventsSummary.rule_matched_count} / ${decisionEventsSummary.rule_missed_count}` : '—' }}</dd>
+      </div>
+      <div>
+        <dt>Avg rule delta</dt>
+        <dd>{{ decisionEventsSummary ? formatNumber(decisionEventsSummary.avg_rule_score_delta) : '—' }}</dd>
       </div>
     </dl>
   </section>
@@ -515,6 +529,14 @@ onMounted(refreshLocalLab)
       <div>
         <dt>Suspected label issues</dt>
         <dd>{{ decisionDiagnostics?.global_summary.suspected_label_issue_count ?? '—' }}</dd>
+      </div>
+      <div>
+        <dt>Rule hits / misses</dt>
+        <dd>{{ decisionDiagnostics ? `${decisionDiagnostics.global_summary.rule_matched_count} / ${decisionDiagnostics.global_summary.rule_missed_count}` : '—' }}</dd>
+      </div>
+      <div>
+        <dt>Avg rule delta</dt>
+        <dd>{{ decisionDiagnostics ? formatNumber(decisionDiagnostics.global_summary.avg_rule_score_delta) : '—' }}</dd>
       </div>
     </dl>
     <ul v-if="decisionDiagnostics?.prompt_diagnostics.some((diagnostic) => diagnostic.suspected_label_issue)" class="warning-list">
