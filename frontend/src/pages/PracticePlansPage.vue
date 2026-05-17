@@ -152,6 +152,7 @@ onMounted(refresh)
           <a class="button secondary-button" :href="apiClient.practicePlanJsonUrl(selectedPlan.plan_id)" target="_blank" rel="noreferrer">JSON</a>
         </div>
       </div>
+      <p v-if="selectedPlan.notes" class="note-box"><strong>Notes:</strong> {{ selectedPlan.notes }}</p>
       <dl class="meta-grid">
         <div><dt>Roles</dt><dd>{{ formatList(selectedPlan.target_roles) }}</dd></div>
         <div><dt>Situations</dt><dd>{{ formatList(selectedPlan.target_situations) }}</dd></div>
@@ -187,6 +188,12 @@ onMounted(refresh)
             <h3>Success metrics</h3>
             <ul><li v-for="metric in block.success_metrics" :key="metric">{{ metric }}</li></ul>
           </div>
+        </div>
+        <div v-if="block.warnings.length">
+          <h3>Warnings</h3>
+          <ul class="evidence-list">
+            <li v-for="warning in block.warnings" :key="`${block.block_id}-${warning}`"><strong>Warning</strong><small>{{ warning }}</small></li>
+          </ul>
         </div>
         <h3>Evidence refs</h3>
         <ul class="evidence-list">

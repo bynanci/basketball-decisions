@@ -74,13 +74,17 @@ def _render_markdown(plan: PracticePlan) -> str:
         f"Plan ID: `{plan.plan_id}`",
         f"Generated: {plan.created_at.isoformat()}",
         f"Duration: {plan.total_duration_minutes} minutes",
+    ]
+    if plan.notes:
+        lines.extend(["", "## Builder Notes", "", plan.notes])
+    lines.extend([
         "",
         "## Safety Notes",
         "",
         "- Built deterministically from local drill recommendations and artifacts.",
         "- Drill coaching cues and success metrics are copied from the human-authored local drill catalog.",
         "- No medical or injury advice, calendar integration, PDF/DOCX export, or season planning is included.",
-    ]
+    ])
     if plan.project_id or plan.player_keys or plan.target_roles or plan.target_situations:
         lines.extend([
             "",
@@ -249,6 +253,7 @@ def build_practice_plan(request: PracticePlanBuildRequest) -> PracticePlan:
         title=request.title,
         created_at=created_at,
         created_by=request.created_by,
+        notes=request.notes,
         project_id=request.project_id,
         player_key=request.player_key,
         total_duration_minutes=request.total_duration_minutes,
@@ -275,6 +280,7 @@ def build_practice_plan(request: PracticePlanBuildRequest) -> PracticePlan:
             title=plan.title,
             created_at=plan.created_at,
             created_by=plan.created_by,
+            notes=plan.notes,
             project_id=plan.project_id,
             player_key=plan.player_key,
             total_duration_minutes=plan.total_duration_minutes,

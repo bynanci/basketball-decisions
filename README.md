@@ -259,9 +259,9 @@ GET /api/practice-plans/{plan_id}/markdown
 GET /api/practice-plans/{plan_id}/json
 ```
 
-`POST /api/practice-plans` accepts `total_duration_minutes`, optional `project_id`, optional `player_key`, optional extra `player_keys`, and `max_drill_blocks`. It builds fresh deterministic drill recommendations, allocates warmup, drill, scrimmage, and review / recap blocks, and copies target roles, target situations, player keys, coaching cues, success metrics, evidence references, and warnings into the saved plan.
+`POST /api/practice-plans` accepts `total_duration_minutes`, optional `project_id`, optional `player_key`, optional extra `player_keys`, `max_drill_blocks`, and builder `notes`. It builds fresh deterministic drill recommendations, allocates warmup, drill, scrimmage, and review / recap blocks, and copies target roles, target situations, player keys, coaching cues, success metrics, evidence references, and warnings into the saved plan.
 
-The `/practice-plans` frontend page builds plans, lists saved plans, previews block timing and targets, and links directly to Markdown and JSON exports. The feature intentionally does not add calendar integration, PDF/DOCX exports, medical or injury advice, LLM-generated coaching advice, or full season planning.
+The `/practice-plans` frontend page builds plans, lists saved plans, previews block timing, notes, targets, and block warnings, and links directly to Markdown and JSON exports. The feature intentionally does not add calendar integration, PDF/DOCX exports, medical or injury advice, LLM-generated coaching advice, or full season planning.
 
 ## Decision Arrow Quiz MVP
 

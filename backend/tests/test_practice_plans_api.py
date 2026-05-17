@@ -50,13 +50,14 @@ def test_build_practice_plan_creates_timeboxed_exports(client: TestClient, tmp_p
 
     response = client.post(
         "/api/practice-plans",
-        json={"title": "Guard reads", "total_duration_minutes": 75, "project_id": "project-1", "player_key": "P1", "player_keys": ["P2"], "max_drill_blocks": 2},
+        json={"title": "Guard reads", "total_duration_minutes": 75, "project_id": "project-1", "player_key": "P1", "player_keys": ["P2"], "max_drill_blocks": 2, "notes": "Keep groups small."},
     )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["plan_id"].startswith("practice-")
     assert payload["total_duration_minutes"] == 75
+    assert payload["notes"] == "Keep groups small."
     assert {block["block_type"] for block in payload["blocks"]} == {"warmup", "drill", "scrimmage", "review"}
     assert sum(block["duration_minutes"] for block in payload["blocks"]) == 75
     assert payload["blocks"][0]["start_minute"] == 0
@@ -69,6 +70,7 @@ def test_build_practice_plan_creates_timeboxed_exports(client: TestClient, tmp_p
     assert "P1" in payload["player_keys"]
     assert "P2" in payload["player_keys"]
     assert "No medical or injury advice" in payload["markdown"]
+    assert "Keep groups small." in payload["markdown"]
 
     markdown_response = client.get(f"/api/practice-plans/{payload['plan_id']}/markdown")
     assert markdown_response.status_code == 200
