@@ -87,7 +87,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <section class="page drills-page">
+  <section class="page drills-page" data-testid="drills-page">
     <header class="page-header">
       <div>
         <p class="eyebrow">M22 Recommendation Engine</p>

@@ -177,7 +177,7 @@ onMounted(loadQueue)
 </script>
 
 <template>
-  <section class="page review-queue-page">
+  <section class="page review-queue-page" data-testid="review-queue-page">
     <header class="page-header">
       <div>
         <p class="eyebrow">Active learning</p>

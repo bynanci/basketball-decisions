@@ -204,7 +204,7 @@ async function createYoutubeProject() {
     </article>
   </section>
 
-  <section class="card sample-project-card">
+  <section class="card sample-project-card" data-testid="sample-data-card">
     <div>
       <p class="eyebrow">Sample dataset</p>
       <h2>Load Sample Project <span v-if="sampleStatus?.installed" class="sample-badge">Sample installed</span></h2>
@@ -213,7 +213,7 @@ async function createYoutubeProject() {
       <p v-if="sampleMessage" class="success-message">{{ sampleMessage }}</p>
     </div>
     <div class="sample-actions">
-      <button type="button" :disabled="isLoadingSample || sampleStatus?.protected_existing_project" @click="loadSampleProject">
+      <button type="button" data-testid="seed-sample-data" :disabled="isLoadingSample || sampleStatus?.protected_existing_project" @click="loadSampleProject">
         {{ isLoadingSample ? 'Installing…' : sampleStatus?.installed ? 'Open / refresh sample project' : 'Load Sample Project' }}
       </button>
       <span v-if="sampleStatus?.protected_existing_project" class="error-text">A non-sample project already uses the sample id.</span>

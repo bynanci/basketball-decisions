@@ -52,7 +52,7 @@ onMounted(loadWorkflows)
 </script>
 
 <template>
-  <section class="page-stack">
+  <section class="page-stack" data-testid="workflows-page">
     <div class="hero-card">
       <p class="eyebrow">M27 Guided Workflow Orchestrator</p>
       <h1>Guided Workflows</h1>

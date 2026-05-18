@@ -30,7 +30,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <section class="page practice-executions-page">
+  <section class="page practice-executions-page" data-testid="practice-executions-page">
     <header class="page-header">
       <div>
         <p class="eyebrow">M24 Practice Execution & Feedback Loop</p>

@@ -7,18 +7,21 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node ./scripts/run-vitest.mjs"
+    "test": "node ./scripts/run-vitest.mjs",
+    "test:e2e": "node ./scripts/run-vitest.mjs src/e2e/s4Smoke.test.ts --runInBand"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "latest",
+    "pinia": "latest",
     "vite": "latest",
     "vue": "latest",
-    "vue-router": "latest",
-    "pinia": "latest"
+    "vue-router": "latest"
   },
   "devDependencies": {
+    "@vue/test-utils": "^2.4.10",
+    "happy-dom": "^20.9.0",
     "typescript": "latest",
-    "vue-tsc": "latest",
-    "vitest": "latest"
+    "vitest": "latest",
+    "vue-tsc": "latest"
   }
 }

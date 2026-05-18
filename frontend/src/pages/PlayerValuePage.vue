@@ -75,7 +75,7 @@ onMounted(loadPlayerValue)
 </script>
 
 <template>
-  <section class="page player-value-page">
+  <section class="page player-value-page" data-testid="player-value-page">
     <header class="page-header">
       <div>
         <p class="eyebrow">Local Lab</p>
@@ -84,7 +84,7 @@ onMounted(loadPlayerValue)
           Explainable alias-based summaries from local decision events, tracking, and recognition quality signals.
         </p>
       </div>
-      <RouterLink class="button-link" to="/player-value/trends">View trends</RouterLink>
+      <RouterLink class="button-link" data-testid="player-value-trends-link" to="/player-value/trends">View trends</RouterLink>
       <button class="primary" :disabled="isBuilding" @click="buildPlayerValue">
         {{ isBuilding ? 'Building…' : 'Build Player Value' }}
       </button>
@@ -132,7 +132,7 @@ onMounted(loadPlayerValue)
               <td>{{ summary.decision_event_count }}</td>
               <td class="warning-cell">{{ describeWarnings(summary) }}</td>
               <td>
-                <RouterLink class="button-link" :to="{ name: 'player-value-detail', params: { projectId: summary.project_id, playerKey: summary.player_key } }">
+                <RouterLink class="button-link" data-testid="player-value-evidence-link" :to="{ name: 'player-value-detail', params: { projectId: summary.project_id, playerKey: summary.player_key } }">
                   View Evidence
                 </RouterLink>
               </td>
