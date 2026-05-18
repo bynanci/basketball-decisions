@@ -67,7 +67,7 @@ onMounted(loadTrends)
 </script>
 
 <template>
-  <section class="page player-value-trends-page">
+  <section class="page player-value-trends-page" data-testid="player-value-trends-page">
     <header class="page-header">
       <div>
         <p class="eyebrow">Local Lab</p>

@@ -68,7 +68,7 @@ onMounted(loadDashboard)
 </script>
 
 <template>
-  <section class="page development-dashboard-page">
+  <section class="page development-dashboard-page" data-testid="development-dashboard-page">
     <header class="page-header">
       <div>
         <p class="eyebrow">M26 Dashboard</p>

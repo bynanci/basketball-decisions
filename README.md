@@ -107,6 +107,18 @@ curl -X POST http://localhost:8000/api/sample-data/seed
 curl -X DELETE http://localhost:8000/api/sample-data
 ```
 
+### S4 end-to-end smoke test
+
+Issue #83 adds a deterministic S4 smoke test that drives the frontend through the sample-data path and core product surfaces with mocked local API responses. It seeds the S1 sample data through the UI, opens Development Dashboard, Player Value, Player Value Trends, Drills, Practice Plans, Practice Executions, Review Queue, and Workflows, and asserts that the flow does not call YouTube, real video streaming, external media, model training, or the long tracking pipeline. It is intentionally not a visual regression test and does not require copyrighted media.
+
+Run it locally after installing frontend dependencies:
+
+```bash
+npm run test:e2e
+```
+
+The root command delegates to `frontend` and runs `src/e2e/s4Smoke.test.ts` with Vitest, Vue Test Utils, and Happy DOM.
+
 The seeded artifacts cover project/source/video/frame metadata, calibration, tracking, cleaned tracking, projected tracks, a tracking review patch, player aliases, quiz prompts and attempts, decision events, Player Value summary and build snapshot, drill recommendations, practice plan, practice execution, feedback signals, coach report, and workflow metadata.
 
 ## Refresh-safe hydration and deep links

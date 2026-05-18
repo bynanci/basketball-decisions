@@ -20,13 +20,13 @@ const groupedNavigationItems = computed(() =>
     <header class="topbar">
       <RouterLink to="/development-dashboard" class="brand">Basketball Decisions</RouterLink>
       <nav aria-label="Product navigation">
-        <RouterLink v-if="commandCenterLink" :to="commandCenterLink.path" class="command-center-link">
+        <RouterLink v-if="commandCenterLink" :to="commandCenterLink.path" class="command-center-link" data-testid="nav-development-dashboard">
           Command Center
         </RouterLink>
         <div class="nav-sections">
           <div v-for="(items, sectionName) in groupedNavigationItems" :key="sectionName" class="nav-section">
             <span class="nav-section-label">{{ sectionName }}</span>
-            <RouterLink v-for="item in items" :key="item.routeName" :to="item.path" :title="item.description">
+            <RouterLink v-for="item in items" :key="item.routeName" :to="item.path" :title="item.description" :data-testid="`nav-${item.routeName}`">
               {{ item.label }}
             </RouterLink>
           </div>

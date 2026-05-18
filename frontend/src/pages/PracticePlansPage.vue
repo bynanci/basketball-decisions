@@ -106,7 +106,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <section class="page practice-plans-page">
+  <section class="page practice-plans-page" data-testid="practice-plans-page">
     <header class="page-header">
       <div>
         <p class="eyebrow">M23 Practice Plan Builder</p>
