@@ -14,7 +14,7 @@ import type {
   VideoSourceRecord
 } from '../api/client'
 
-export type ProjectSource = 'upload' | 'youtube'
+export type ProjectSource = 'upload' | 'youtube' | 'sample'
 
 export interface ProjectRecord {
   id: string
@@ -139,7 +139,7 @@ export const useProjectStore = defineStore('projectStore', {
     hydrateProjectFromBundle(bundle: ProjectBundleResponse) {
       const projectId = bundle.project.project_id
       const existing = this.getProject(projectId)
-      const source = bundle.video?.source_type ?? existing?.source ?? 'upload'
+      const source = bundle.project.metadata?.is_sample_data ? 'sample' : (bundle.video?.source_type ?? existing?.source ?? 'upload')
       const project = existing ?? createEmptyProject({ id: projectId, name: bundle.project.name, source })
 
       project.id = projectId

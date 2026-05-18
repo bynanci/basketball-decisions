@@ -23,6 +23,7 @@ const errorHint = ref('')
 const hasCalibration = computed(() => !!project.value?.calibration)
 const hasTracking = computed(() => !!project.value && (project.value.detections.length > 0 || project.value.tracks.length > 0 || project.value.projectedTracks.length > 0))
 const hasProjectedTracks = computed(() => (project.value?.projectedTracks.length ?? 0) > 0)
+const isSampleProject = computed(() => project.value?.source === 'sample')
 const aliasCount = computed(() => project.value?.playerAliases?.aliases.length ?? 0)
 const aliasedTrackCount = computed(() => new Set(project.value?.playerAliases?.aliases.flatMap((alias) => alias.track_ids) ?? []).size)
 const unaliasedTrackCount = computed(() => Math.max((project.value?.tracks.length ?? 0) - aliasedTrackCount.value, 0))
@@ -165,7 +166,7 @@ async function saveSourceGovernance() {
 
 <template>
   <section class="card">
-    <h1>{{ project?.name ?? 'Project' }}</h1>
+    <h1>{{ project?.name ?? 'Project' }} <span v-if="isSampleProject" class="sample-badge">Sample</span></h1>
     <p>Project id: {{ projectId }}</p>
     <p>Source: {{ project?.source ?? 'unknown' }} <span v-if="project?.videoFileName">· {{ project.videoFileName }}</span></p>
     <RouterLink class="button" :to="`/projects/${projectId}/pipeline`">Open pipeline</RouterLink>
@@ -319,6 +320,19 @@ async function saveSourceGovernance() {
 </template>
 
 <style scoped>
+
+.sample-badge {
+  background: #dbeafe;
+  border: 1px solid #60a5fa;
+  border-radius: 999px;
+  color: #1d4ed8;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  text-transform: uppercase;
+}
 
 .source-governance-card {
   display: grid;

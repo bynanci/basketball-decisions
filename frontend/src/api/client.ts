@@ -117,6 +117,28 @@ export interface ListProjectsResponse {
   projects: Array<{ id: string; name: string; description?: string | null }>
 }
 
+export interface SampleDataArtifactStatus {
+  key: string
+  path: string
+  installed: boolean
+}
+
+export interface SampleDataStatusResponse {
+  project_id: string
+  project_name: string
+  installed: boolean
+  can_seed: boolean
+  protected_existing_project: boolean
+  artifact_count: number
+  artifacts: SampleDataArtifactStatus[]
+  quick_links: Array<{ label: string; href: string }>
+  message: string
+}
+
+export interface SampleDataMutationResponse extends SampleDataStatusResponse {
+  changed: boolean
+}
+
 export type VideoSourceType = 'upload' | 'youtube'
 
 export interface YouTubeVideoRequest {
@@ -1869,6 +1891,9 @@ export const apiClient = {
     request<Workflow>(`/workflows/${encodeURIComponent(workflowId)}/steps/${encodeURIComponent(stepId)}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getDevelopmentDashboard: () => request<DevelopmentDashboardResponse>('/development-dashboard'),
   listProjects: () => request<ListProjectsResponse>('/projects'),
+  getSampleDataStatus: () => request<SampleDataStatusResponse>('/sample-data/status'),
+  seedSampleData: () => request<SampleDataMutationResponse>('/sample-data/seed', { method: 'POST' }),
+  deleteSampleData: () => request<SampleDataMutationResponse>('/sample-data', { method: 'DELETE' }),
   listDrillCatalog: () => request<DrillCatalogResponse>('/drills/catalog'),
   buildDrillRecommendations: (payload: DrillRecommendationRequest) =>
     request<DrillRecommendationResponse>('/drills/recommendations', { method: 'POST', body: JSON.stringify(payload) }),

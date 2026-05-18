@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-from app.api import calibration, decision_rules, development_dashboard, drills, local_lab, player_identity, practice_executions, practice_plans, projects, quiz, reference_videos, reports, review_queue, sources, tracking, videos, workflows
+from app.api import calibration, decision_rules, development_dashboard, drills, local_lab, player_identity, practice_executions, practice_plans, projects, quiz, reference_videos, reports, review_queue, sample_data, sources, tracking, videos, workflows
 
 app = FastAPI(title="Basketball Decisions API")
 
@@ -17,6 +17,7 @@ app.add_middleware(
 )
 
 app.include_router(projects.router, prefix="/api")
+app.include_router(sample_data.router, prefix="/api")
 app.include_router(player_identity.router, prefix="/api")
 app.include_router(videos.router, prefix="/api")
 app.include_router(videos.frames_router, prefix="/api")
