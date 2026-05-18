@@ -1611,6 +1611,105 @@ export interface CoachReportListResponse {
   updated_at: string
 }
 
+
+export type DevelopmentDashboardSeverity = 'info' | 'warning' | 'action'
+
+export interface DevelopmentDashboardMetric {
+  key: string
+  label: string
+  value: number | string
+  detail?: string | null
+  severity: DevelopmentDashboardSeverity
+}
+
+export interface DevelopmentDashboardTeamSummary {
+  player_count: number
+  average_player_value_score?: number | null
+  average_confidence?: number | null
+  total_decision_events: number
+  trend_series_count: number
+  practice_plan_count: number
+  practice_execution_count: number
+  coach_report_count: number
+  notes: string[]
+}
+
+export interface DevelopmentDashboardPlayerSummary {
+  project_id: string
+  player_key: string
+  display_name?: string | null
+  team_side?: string | null
+  role_hint?: string | null
+  player_value_score?: number | null
+  confidence?: number | null
+  decision_event_count: number
+  trend_points: number
+  latest_trend_delta?: number | null
+  warnings: string[]
+}
+
+export interface DevelopmentDashboardAction {
+  action_id: string
+  title: string
+  detail: string
+  severity: DevelopmentDashboardSeverity
+  artifact?: string | null
+  href?: string | null
+}
+
+export interface DevelopmentDashboardDatasetHealthSummary {
+  available: boolean
+  recognition_sample_count: number
+  recognition_label_count: number
+  recognition_warning_count: number
+  decision_sample_count: number
+  decision_label_count: number
+  decision_warning_count: number
+  generated_at?: string | null
+}
+
+export interface DevelopmentDashboardModelRegistrySummary {
+  available: boolean
+  active_version?: string | null
+  model_count: number
+  latest_version?: string | null
+  updated_at?: string | null
+}
+
+export interface DevelopmentDashboardPracticeFeedbackSummary {
+  signal_count: number
+  action_signal_count: number
+  warning_signal_count: number
+  latest_signal_at?: string | null
+  completion_rate_average?: number | null
+  skipped_count: number
+  modified_count: number
+}
+
+export interface DevelopmentDashboardReviewQueueSummary {
+  item_count: number
+  open_count: number
+  high_priority_count: number
+  action_log_count: number
+}
+
+export interface DevelopmentDashboardResponse {
+  schema_version: string
+  generated_at: string
+  metrics: DevelopmentDashboardMetric[]
+  team_summary: DevelopmentDashboardTeamSummary
+  player_summaries: DevelopmentDashboardPlayerSummary[]
+  next_best_actions: DevelopmentDashboardAction[]
+  dataset_health_summary: DevelopmentDashboardDatasetHealthSummary
+  model_registry_summary: DevelopmentDashboardModelRegistrySummary
+  practice_feedback_summary: DevelopmentDashboardPracticeFeedbackSummary
+  review_queue_summary: DevelopmentDashboardReviewQueueSummary
+  warnings: string[]
+  artifact_counts: Record<string, number>
+  artifact_status: Record<string, boolean>
+  raw_artifact_refs: Record<string, unknown>
+}
+
 export function normalizeApiErrorPayload(status: number, payload?: Partial<ApiErrorResponse> | null): ApiErrorResponse {
   return {
     code: payload?.code ?? 'HTTP_ERROR',
@@ -1658,6 +1757,7 @@ async function requestText(path: string, init: RequestInit = {}): Promise<string
 }
 
 export const apiClient = {
+  getDevelopmentDashboard: () => request<DevelopmentDashboardResponse>('/development-dashboard'),
   listProjects: () => request<ListProjectsResponse>('/projects'),
   listDrillCatalog: () => request<DrillCatalogResponse>('/drills/catalog'),
   buildDrillRecommendations: (payload: DrillRecommendationRequest) =>
