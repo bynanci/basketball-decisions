@@ -214,6 +214,19 @@ onMounted(loadDashboard)
         </dl>
       </section>
 
+
+      <section class="card">
+        <h2>Artifact Health Summary</h2>
+        <dl class="trace-list">
+          <dt>Stale artifacts</dt><dd>{{ dashboard.artifact_health_summary?.stale_artifact_count ?? 0 }}</dd>
+          <dt>Missing artifacts</dt><dd>{{ dashboard.artifact_health_summary?.missing_artifact_count ?? 0 }}</dd>
+          <dt>Action items</dt><dd>{{ dashboard.artifact_health_summary?.action_artifact_count ?? 0 }}</dd>
+          <dt>Warnings</dt><dd>{{ dashboard.artifact_health_summary?.warning_artifact_count ?? 0 }}</dd>
+          <dt>Map generated</dt><dd>{{ formatDate(dashboard.artifact_health_summary?.generated_at) }}</dd>
+        </dl>
+        <RouterLink class="button-link" to="/local-lab">Open Artifact Map</RouterLink>
+      </section>
+
       <section class="card">
         <h2>Data / Model Health Summary</h2>
         <dl class="trace-list">

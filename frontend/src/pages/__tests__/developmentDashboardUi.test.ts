@@ -19,6 +19,7 @@ describe('development dashboard UI wiring', () => {
     expect(page).toContain('Player Development Table')
     expect(page).toContain('Practice Feedback Summary')
     expect(page).toContain('Data / Model Health Summary')
+    expect(page).toContain('Artifact Health Summary')
     expect(page).toContain('not an official scouting-grade evaluation')
   })
 

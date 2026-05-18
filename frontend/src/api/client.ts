@@ -1634,6 +1634,36 @@ export interface CoachReportListResponse {
 }
 
 
+
+export type ArtifactStatus = 'fresh' | 'stale' | 'missing' | 'unknown'
+export type ArtifactSeverity = 'info' | 'warning' | 'action'
+
+export interface ArtifactDependency {
+  key: string
+  label: string
+  category: string
+  path?: string | null
+  exists: boolean
+  status: ArtifactStatus
+  severity: ArtifactSeverity
+  updated_at?: string | null
+  stale_after?: string | null
+  depends_on: string[]
+  stale_reason?: string | null
+  detail?: string | null
+}
+
+export interface ArtifactMapResponse {
+  schema_version: string
+  generated_at: string
+  artifacts: ArtifactDependency[]
+  status_counts: Record<string, number>
+  severity_counts: Record<string, number>
+  stale_artifact_count: number
+  missing_artifact_count: number
+  warnings: string[]
+}
+
 export type DevelopmentDashboardSeverity = 'info' | 'warning' | 'action'
 
 export interface DevelopmentDashboardMetric {
@@ -1708,6 +1738,15 @@ export interface DevelopmentDashboardPracticeFeedbackSummary {
   modified_count: number
 }
 
+
+export interface DevelopmentDashboardArtifactHealthSummary {
+  stale_artifact_count: number
+  missing_artifact_count: number
+  action_artifact_count: number
+  warning_artifact_count: number
+  generated_at?: string | null
+}
+
 export interface DevelopmentDashboardReviewQueueSummary {
   item_count: number
   open_count: number
@@ -1726,6 +1765,7 @@ export interface DevelopmentDashboardResponse {
   model_registry_summary: DevelopmentDashboardModelRegistrySummary
   practice_feedback_summary: DevelopmentDashboardPracticeFeedbackSummary
   review_queue_summary: DevelopmentDashboardReviewQueueSummary
+  artifact_health_summary: DevelopmentDashboardArtifactHealthSummary
   warnings: string[]
   artifact_counts: Record<string, number>
   artifact_status: Record<string, boolean>
@@ -1890,6 +1930,7 @@ export const apiClient = {
   updateWorkflowStep: (workflowId: string, stepId: string, payload: WorkflowStepUpdateRequest) =>
     request<Workflow>(`/workflows/${encodeURIComponent(workflowId)}/steps/${encodeURIComponent(stepId)}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getDevelopmentDashboard: () => request<DevelopmentDashboardResponse>('/development-dashboard'),
+  getArtifactMap: () => request<ArtifactMapResponse>('/local-lab/artifact-map'),
   listProjects: () => request<ListProjectsResponse>('/projects'),
   getSampleDataStatus: () => request<SampleDataStatusResponse>('/sample-data/status'),
   seedSampleData: () => request<SampleDataMutationResponse>('/sample-data/seed', { method: 'POST' }),
