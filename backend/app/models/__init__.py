@@ -62,6 +62,8 @@ from .drill_recommendation import (
     DrillEvidenceSource,
     DrillPriority,
     DrillRecommendation,
+    RecommendationAdjustment,
+    RecommendationAdjustmentType,
     DrillRecommendationRequest,
     DrillRecommendationResponse,
 )
@@ -217,6 +219,8 @@ __all__ = [
     "DrillEvidenceSource",
     "DrillPriority",
     "DrillRecommendation",
+    "RecommendationAdjustment",
+    "RecommendationAdjustmentType",
     "DrillRecommendationRequest",
     "DrillRecommendationResponse",
     "PracticeExecution",

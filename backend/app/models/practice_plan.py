@@ -23,6 +23,8 @@ class PracticePlanBuildRequest(BaseModel):
     player_key: str | None = None
     player_keys: list[str] = Field(default_factory=list)
     max_drill_blocks: int = Field(default=5, ge=1, le=10)
+    include_practice_feedback: bool = False
+    feedback_lookback_limit: int = Field(default=25, ge=1, le=200)
     created_by: str | None = None
     notes: str | None = None
 

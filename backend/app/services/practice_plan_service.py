@@ -143,6 +143,8 @@ def build_practice_plan(request: PracticePlanBuildRequest) -> PracticePlan:
             project_id=request.project_id,
             player_key=request.player_key,
             max_recommendations=request.max_drill_blocks,
+            include_practice_feedback=request.include_practice_feedback,
+            feedback_lookback_limit=request.feedback_lookback_limit,
         )
     )
     recommendations = recommendation_response.recommendations[: request.max_drill_blocks]
@@ -195,6 +197,7 @@ def build_practice_plan(request: PracticePlanBuildRequest) -> PracticePlan:
                     coaching_cues=recommendation.coaching_cues,
                     success_metrics=recommendation.success_metrics,
                     evidence_refs=recommendation.evidence_refs,
+                    warnings=recommendation.adjustment_summary if recommendation.feedback_adjusted else [],
                 )
             )
             cursor += duration

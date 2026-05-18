@@ -147,3 +147,86 @@ def test_latest_drill_recommendations_returns_typed_error_before_build(client: T
 
     assert response.status_code == 404
     assert response.json()["code"] == "DRILL_RECOMMENDATIONS_NOT_FOUND"
+
+
+def test_drill_recommendations_apply_practice_feedback_adjustments(client: TestClient, tmp_path: Path) -> None:
+    _write_json(tmp_path / "datasets" / "decision" / "decision_diagnostics.json", {"prompt_diagnostics": [], "role_diagnostics": []})
+    _write_json(
+        tmp_path / "datasets" / "player_value" / "player_value_summary.json",
+        {
+            "summaries": [
+                {
+                    "project_id": "project-1",
+                    "player_key": "P1",
+                    "role_hint": "BALL_HANDLER",
+                    "avg_role_adjusted_score": 55,
+                    "correct_rate": 0.4,
+                    "timeout_rate": 0.2,
+                }
+            ]
+        },
+    )
+    _write_json(tmp_path / "datasets" / "player_value" / "player_value_build_index.json", {"builds": []})
+    (tmp_path / "datasets" / "player_value" / "player_decision_events.jsonl").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "datasets" / "player_value" / "player_decision_events.jsonl").write_text("", encoding="utf-8")
+    _write_json(tmp_path / "review_queue" / "review_queue.json", [])
+    signals_path = tmp_path / "practice_executions" / "practice_feedback_signals.jsonl"
+    signals_path.parent.mkdir(parents=True, exist_ok=True)
+    signals_path.write_text(
+        json.dumps(
+            {
+                "signal_id": "signal-repeat-1",
+                "signal_type": "REPEAT_DRILL",
+                "execution_id": "execution-1",
+                "block_id": "block-1",
+                "drill_id": "advantage-read-kickout",
+                "recommendation_id": None,
+                "project_id": "project-1",
+                "player_key": "P1",
+                "reason": "Advantage read was skipped in practice.",
+                "severity": "action",
+                "created_at": "2026-05-01T00:00:00Z",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    response = client.post(
+        "/api/drills/recommendations",
+        json={"project_id": "project-1", "player_key": "P1", "include_practice_feedback": True, "feedback_lookback_limit": 10},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["feedback_signal_count"] == 1
+    adjusted = [rec for rec in payload["recommendations"] if rec["feedback_adjusted"]]
+    assert adjusted
+    assert adjusted[0]["feedback_signal_ids"] == ["signal-repeat-1"]
+    assert adjusted[0]["adjustments"][0]["adjustment_type"] == "PRIORITY_UP"
+    assert "repeat" in adjusted[0]["adjustment_summary"][0].lower()
+
+
+def test_drills_feedback_signals_endpoint_reads_jsonl(client: TestClient, tmp_path: Path) -> None:
+    signals_path = tmp_path / "practice_executions" / "practice_feedback_signals.jsonl"
+    signals_path.parent.mkdir(parents=True, exist_ok=True)
+    signals_path.write_text(
+        json.dumps(
+            {
+                "signal_id": "signal-progress-1",
+                "signal_type": "PROGRESS_DRILL",
+                "execution_id": "execution-1",
+                "drill_id": "spacing-drift-lift",
+                "reason": "Spacing drill was completed with met metrics.",
+                "severity": "info",
+                "created_at": "2026-05-01T00:00:00Z",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    response = client.get("/api/drills/feedback-signals")
+
+    assert response.status_code == 200
+    assert response.json()["signals"][0]["signal_id"] == "signal-progress-1"

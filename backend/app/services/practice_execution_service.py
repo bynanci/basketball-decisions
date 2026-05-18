@@ -28,6 +28,7 @@ from app.models import (
 )
 from app.models.base import utc_now
 from app.services.practice_plan_service import get_practice_plan
+from app.services.practice_feedback_signal_service import write_practice_feedback_signals
 
 APP_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 PRACTICE_EXECUTIONS_DIR = APP_DATA_DIR / "practice_executions"
@@ -93,6 +94,7 @@ def _save_execution(execution: PracticeExecution) -> PracticeExecution:
     index.executions.sort(key=lambda item: item.updated_at, reverse=True)
     index.updated_at = utc_now()
     _write_json(PRACTICE_EXECUTION_INDEX_PATH, index.model_dump(mode="json"))
+    _sync_feedback_signal_jsonl()
     return execution
 
 
@@ -207,6 +209,10 @@ def generate_feedback_summary(execution: PracticeExecution) -> PracticeFeedbackS
         actions.append("Shorten the next plan or reduce block count to fit the intended time box.")
     if not actions:
         actions.append("Keep collecting coach notes, player notes, ratings, and metric results after practice.")
+    for signal in signals:
+        signal.project_id = signal.project_id or execution.project_id
+        signal.player_key = signal.player_key or execution.player_key
+
     return PracticeFeedbackSummary(
         execution_id=execution.execution_id,
         plan_id=execution.plan_id,
@@ -266,3 +272,12 @@ def list_feedback_signals() -> PracticeFeedbackSignalsResponse:
         if summary is not None:
             signals.extend(summary.signals)
     return PracticeFeedbackSignalsResponse(signals=signals, updated_at=utc_now())
+
+
+def _sync_feedback_signal_jsonl() -> None:
+    signals: list[PracticeFeedbackSignal] = []
+    for item in _read_index().executions:
+        execution = get_practice_execution(item.execution_id)
+        if execution is not None:
+            signals.extend(generate_feedback_summary(execution).signals)
+    write_practice_feedback_signals(signals)

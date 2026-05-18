@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { apiClient, isApiClientError, type DrillCatalogItem, type DrillRecommendationResponse } from '../api/client'
+import { apiClient, isApiClientError, type DrillCatalogItem, type DrillRecommendationResponse, type PracticeFeedbackSignal } from '../api/client'
 
 const catalog = ref<DrillCatalogItem[]>([])
 const latest = ref<DrillRecommendationResponse | null>(null)
+const feedbackSignals = ref<PracticeFeedbackSignal[]>([])
 const projectId = ref('')
 const playerKey = ref('')
 const maxRecommendations = ref(8)
+const includePracticeFeedback = ref(true)
+const feedbackLookbackLimit = ref(25)
 const isLoading = ref(false)
 const isBuilding = ref(false)
 const errorMessage = ref('')
 const statusMessage = ref('')
 
 const recommendations = computed(() => latest.value?.recommendations ?? [])
+const recentFeedbackSignals = computed(() => feedbackSignals.value.slice(0, 8))
 
 function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`
@@ -25,6 +29,11 @@ function priorityClass(priority: string) {
 async function loadCatalog() {
   const response = await apiClient.listDrillCatalog()
   catalog.value = response.drills
+}
+
+async function loadFeedbackSignals() {
+  const response = await apiClient.listDrillFeedbackSignals()
+  feedbackSignals.value = response.signals
 }
 
 async function loadLatest() {
@@ -45,6 +54,7 @@ async function refresh() {
   try {
     await loadCatalog()
     await loadLatest()
+    await loadFeedbackSignals()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to load drill recommendations.'
   } finally {
@@ -60,8 +70,11 @@ async function buildRecommendations() {
     latest.value = await apiClient.buildDrillRecommendations({
       project_id: projectId.value.trim() || null,
       player_key: playerKey.value.trim() || null,
-      max_recommendations: maxRecommendations.value
+      max_recommendations: maxRecommendations.value,
+      include_practice_feedback: includePracticeFeedback.value,
+      feedback_lookback_limit: feedbackLookbackLimit.value
     })
+    await loadFeedbackSignals()
     statusMessage.value = `Saved ${latest.value.recommendations.length} local drill recommendations.`
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to build drill recommendations.'
@@ -107,6 +120,14 @@ onMounted(refresh)
           Max cards
           <input v-model.number="maxRecommendations" type="number" min="1" max="24" />
         </label>
+        <label class="checkbox-label">
+          <input v-model="includePracticeFeedback" type="checkbox" />
+          Use practice feedback
+        </label>
+        <label>
+          Feedback lookback limit
+          <input v-model.number="feedbackLookbackLimit" type="number" min="1" max="200" />
+        </label>
       </div>
       <p class="muted">
         Coaching cues and success metrics are copied from the local catalog. The engine does not generate medical advice, injury advice, certification claims, or a practice calendar.
@@ -120,7 +141,10 @@ onMounted(refresh)
             <span :class="priorityClass(recommendation.priority)">{{ recommendation.priority }}</span>
             <h2>{{ recommendation.title }}</h2>
           </div>
-          <strong>{{ formatPercent(recommendation.confidence) }} confidence</strong>
+          <div class="badge-stack">
+            <strong>{{ formatPercent(recommendation.confidence) }} confidence</strong>
+            <span v-if="recommendation.feedback_adjusted" class="feedback-badge">Feedback adjusted</span>
+          </div>
         </div>
         <dl class="meta-grid">
           <div><dt>Role</dt><dd>{{ recommendation.role || 'Any role' }}</dd></div>
@@ -141,6 +165,12 @@ onMounted(refresh)
             </ul>
           </div>
         </div>
+        <div v-if="recommendation.adjustment_summary.length" class="adjustment-panel">
+          <h3>Practice feedback adjustments</h3>
+          <ul>
+            <li v-for="reason in recommendation.adjustment_summary" :key="reason">{{ reason }}</li>
+          </ul>
+        </div>
         <h3>Evidence refs</h3>
         <ul class="evidence-list">
           <li v-for="ref in recommendation.evidence_refs" :key="`${ref.source}-${ref.ref_id}-${ref.detail}`">
@@ -150,6 +180,22 @@ onMounted(refresh)
           </li>
         </ul>
       </article>
+    </section>
+
+    <section class="card">
+      <div class="section-header">
+        <h2>Recent feedback signals</h2>
+        <span class="muted">{{ latest?.feedback_signal_count ?? feedbackSignals.length }} considered</span>
+      </div>
+      <p v-if="latest?.adjustment_summary.length" class="muted">{{ latest.adjustment_summary.join(' ') }}</p>
+      <ul v-if="recentFeedbackSignals.length" class="evidence-list">
+        <li v-for="signal in recentFeedbackSignals" :key="signal.signal_id || `${signal.signal_type}-${signal.execution_id}-${signal.reason}`">
+          <strong>{{ signal.signal_type }}</strong>
+          <span>{{ signal.drill_id || signal.recommendation_id || signal.execution_id }}</span>
+          <small>{{ signal.reason }}</small>
+        </li>
+      </ul>
+      <p v-else class="muted">No practice feedback signals have been saved yet.</p>
     </section>
 
     <section v-if="latest && !recommendations.length" class="card empty-state">

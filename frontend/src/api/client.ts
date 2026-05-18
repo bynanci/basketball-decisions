@@ -1248,6 +1248,7 @@ export interface ReferenceVideoDraftSummary {
 
 export type DrillPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 export type DrillEvidenceSource = 'DECISION_DIAGNOSTICS' | 'PLAYER_VALUE' | 'PLAYER_VALUE_TRENDS' | 'TEACHING_CASE' | 'REVIEW_QUEUE'
+export type RecommendationAdjustmentType = 'PRIORITY_UP' | 'PRIORITY_DOWN' | 'CONFIDENCE_UP' | 'CONFIDENCE_DOWN' | 'REASON_HINT'
 
 export interface DrillCatalogItem {
   drill_id: string
@@ -1275,6 +1276,20 @@ export interface DrillEvidenceRef {
   detail: string
 }
 
+export interface RecommendationAdjustment {
+  adjustment_id: string
+  signal_id: string
+  signal_type: string
+  adjustment_type: RecommendationAdjustmentType
+  confidence_delta: number
+  priority_delta: number
+  reason: string
+  execution_id?: string | null
+  block_id?: string | null
+  drill_id?: string | null
+  recommendation_id?: string | null
+}
+
 export interface DrillRecommendation {
   recommendation_id: string
   drill_id: string
@@ -1287,12 +1302,18 @@ export interface DrillRecommendation {
   coaching_cues: string[]
   success_metrics: string[]
   evidence_refs: DrillEvidenceRef[]
+  feedback_adjusted: boolean
+  feedback_signal_ids: string[]
+  adjustment_summary: string[]
+  adjustments: RecommendationAdjustment[]
 }
 
 export interface DrillRecommendationRequest {
   project_id?: string | null
   player_key?: string | null
   max_recommendations?: number
+  include_practice_feedback?: boolean
+  feedback_lookback_limit?: number
 }
 
 export interface DrillRecommendationResponse {
@@ -1301,6 +1322,8 @@ export interface DrillRecommendationResponse {
   project_id?: string | null
   player_key?: string | null
   recommendations: DrillRecommendation[]
+  feedback_signal_count: number
+  adjustment_summary: string[]
   warnings: string[]
   catalog_path: string
   latest_path: string
@@ -1317,6 +1340,8 @@ export interface PracticePlanBuildRequest {
   player_key?: string | null
   player_keys?: string[]
   max_drill_blocks?: number
+  include_practice_feedback?: boolean
+  feedback_lookback_limit?: number
   created_by?: string | null
   notes?: string | null
 }
@@ -1475,6 +1500,7 @@ export interface PracticeExecutionListResponse {
 }
 
 export interface PracticeFeedbackSignal {
+  signal_id?: string | null
   signal_type: PracticeFeedbackSignalType
   execution_id: string
   block_id?: string | null
@@ -1651,6 +1677,7 @@ export const apiClient = {
     request<PracticeExecution>(`/practice-executions/${encodeURIComponent(executionId)}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getPracticeFeedbackSummary: (executionId: string) => request<PracticeFeedbackSummary>(`/practice-executions/${encodeURIComponent(executionId)}/feedback-summary`),
   listPracticeFeedbackSignals: () => request<PracticeFeedbackSignalsResponse>('/practice-executions/signals'),
+  listDrillFeedbackSignals: () => request<PracticeFeedbackSignalsResponse>('/drills/feedback-signals'),
   practicePlanMarkdownUrl: (planId: string) => `${API_BASE_URL}/practice-plans/${encodeURIComponent(planId)}/markdown`,
   practicePlanJsonUrl: (planId: string) => `${API_BASE_URL}/practice-plans/${encodeURIComponent(planId)}/json`,
   buildCoachReport: (payload: CoachReportBuildRequest) =>
