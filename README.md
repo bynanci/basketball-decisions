@@ -761,3 +761,27 @@ curl -X POST "http://localhost:8000/api/reports/coach" \
   -H "Content-Type: application/json" \
   -d '{"title":"Coach Report","project_id":"project-1","player_key":"P1"}'
 ```
+
+## Development Progress Dashboard (M26)
+
+The Development Progress Dashboard aggregates available local development artifacts into one read-only progress view. It is available in the frontend at `/development-dashboard` and through:
+
+```http
+GET /api/development-dashboard
+```
+
+The dashboard summarizes these existing artifacts when present:
+
+- Player Value summaries and trend snapshots;
+- latest drill recommendations;
+- practice plan and practice execution indexes;
+- deterministic practice feedback signals;
+- review queue and review action log;
+- dataset health or dataset manifest fallbacks;
+- recognition model registry;
+- decision diagnostics;
+- generated coach report index.
+
+The response includes `metrics`, `team_summary`, `player_summaries`, `next_best_actions`, `dataset_health_summary`, `model_registry_summary`, `practice_feedback_summary`, `review_queue_summary`, and `warnings`. Missing or malformed artifacts are converted into warnings and operational next-best-actions so the dashboard can still load in a fresh workspace.
+
+This dashboard does **not** add a new scoring formula, run live analytics, provide medical or injury advice, use LLM-generated coaching advice, or claim official scouting-grade evaluation. Player rows display existing Player Value v1 outputs and trend deltas only when those artifacts have already been generated.

@@ -55,6 +55,18 @@ from .coach_report import (
     CoachReportSection,
     CoachReportSectionName,
 )
+from .development_dashboard import (
+    DevelopmentDashboardAction,
+    DevelopmentDashboardDatasetHealthSummary,
+    DevelopmentDashboardMetric,
+    DevelopmentDashboardModelRegistrySummary,
+    DevelopmentDashboardPlayerSummary,
+    DevelopmentDashboardPracticeFeedbackSummary,
+    DevelopmentDashboardResponse,
+    DevelopmentDashboardReviewQueueSummary,
+    DevelopmentDashboardSeverity,
+    DevelopmentDashboardTeamSummary,
+)
 from .drill_recommendation import (
     DrillCatalogItem,
     DrillCatalogResponse,
@@ -199,6 +211,16 @@ from .video import (
 )
 
 __all__ = [
+    "DevelopmentDashboardAction",
+    "DevelopmentDashboardDatasetHealthSummary",
+    "DevelopmentDashboardMetric",
+    "DevelopmentDashboardModelRegistrySummary",
+    "DevelopmentDashboardPlayerSummary",
+    "DevelopmentDashboardPracticeFeedbackSummary",
+    "DevelopmentDashboardResponse",
+    "DevelopmentDashboardReviewQueueSummary",
+    "DevelopmentDashboardSeverity",
+    "DevelopmentDashboardTeamSummary",
     "COACH_REPORT_SECTIONS",
     "CoachReport",
     "CoachReportArtifactStatus",

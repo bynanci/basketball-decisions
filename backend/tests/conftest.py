@@ -9,7 +9,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api import common, decision_rules, local_lab, projects, reference_videos, review_queue, sources  # noqa: E402
-from app.services import coach_report_service, drill_recommendation_service, practice_execution_service, practice_feedback_signal_service, practice_plan_service  # noqa: E402
+from app.services import coach_report_service, development_dashboard_service, drill_recommendation_service, practice_execution_service, practice_feedback_signal_service, practice_plan_service  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -34,6 +34,15 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(coach_report_service, "SOURCE_GOVERNANCE_DIR", tmp_path / "reference_videos")
     monkeypatch.setattr(coach_report_service, "SOURCE_REGISTRY_PATH", tmp_path / "source_registry.json")
     monkeypatch.setattr(coach_report_service, "REPORT_INDEX_PATH", tmp_path / "reports" / "coach" / "index.json")
+    monkeypatch.setattr(development_dashboard_service, "APP_DATA_DIR", tmp_path)
+    monkeypatch.setattr(development_dashboard_service, "DATASETS_DIR", tmp_path / "datasets")
+    monkeypatch.setattr(development_dashboard_service, "DRILLS_DIR", tmp_path / "drills")
+    monkeypatch.setattr(development_dashboard_service, "PRACTICE_PLANS_DIR", tmp_path / "practice_plans")
+    monkeypatch.setattr(development_dashboard_service, "PRACTICE_EXECUTIONS_DIR", tmp_path / "practice_executions")
+    monkeypatch.setattr(development_dashboard_service, "REVIEW_QUEUE_DIR", tmp_path / "review_queue")
+    monkeypatch.setattr(development_dashboard_service, "RECOGNITION_MODELS_DIR", tmp_path / "models" / "recognition")
+    monkeypatch.setattr(development_dashboard_service, "REPORTS_DIR", tmp_path / "reports" / "coach")
+    monkeypatch.setattr(development_dashboard_service, "DECISION_RULES_DIR", tmp_path / "decision_rules")
     monkeypatch.setattr(drill_recommendation_service, "APP_DATA_DIR", tmp_path)
     monkeypatch.setattr(drill_recommendation_service, "DATASETS_DIR", tmp_path / "datasets")
     monkeypatch.setattr(drill_recommendation_service, "REVIEW_QUEUE_DIR", tmp_path / "review_queue")
