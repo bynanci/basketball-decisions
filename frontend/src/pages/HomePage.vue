@@ -23,6 +23,30 @@ const sampleMessage = ref('')
 
 const sampleQuickLinks = computed(() => sampleStatus.value?.quick_links ?? [])
 
+const journeyCards = [
+  {
+    title: 'Start as Coach',
+    eyebrow: 'Coach journey',
+    description: 'Review coach reports, choose drills, and turn evidence into practice plans.',
+    to: '/reports/coach',
+    cta: 'Open coach reports'
+  },
+  {
+    title: 'Start as Analyst',
+    eyebrow: 'Analyst journey',
+    description: 'Triage project health, review artifacts, and move video through the analysis pipeline.',
+    to: '/development-dashboard',
+    cta: 'Open command center'
+  },
+  {
+    title: 'Start as Player',
+    eyebrow: 'Player journey',
+    description: 'Pick a role, preview situations, and practice role-specific decision reads.',
+    to: '/start',
+    cta: 'Choose player role'
+  }
+]
+
 function isInternalLink(href: string) {
   return href.startsWith('/')
 }
@@ -171,6 +195,14 @@ async function createYoutubeProject() {
     </div>
   </section>
 
+  <section class="journey-card-grid" aria-label="Core user journey shortcuts">
+    <article v-for="journey in journeyCards" :key="journey.title" class="card journey-card">
+      <p class="eyebrow">{{ journey.eyebrow }}</p>
+      <h2>{{ journey.title }}</h2>
+      <p>{{ journey.description }}</p>
+      <RouterLink class="button" :to="journey.to">{{ journey.cta }}</RouterLink>
+    </article>
+  </section>
 
   <section class="card sample-project-card">
     <div>
@@ -243,6 +275,23 @@ async function createYoutubeProject() {
 </template>
 
 <style scoped>
+.journey-card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 1rem;
+}
+
+.journey-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.journey-card .button {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
 .sample-project-card {
   display: grid;
   gap: 1rem;
