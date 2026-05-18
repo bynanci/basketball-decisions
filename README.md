@@ -2,6 +2,18 @@
 
 A minimal runnable monorepo for basketball-video decision experiments. The repo has a Vite + Vue 3 + TypeScript frontend and a FastAPI backend with local JSON storage for projects, uploads, extracted frames, manual calibration, tracking, and projected 2D court paths.
 
+## Product navigation and information architecture
+
+The frontend now treats **Development Dashboard** (`/development-dashboard`) as the main command center. The topbar and dashboard product map group existing routes into five product areas without removing core routes or changing backend APIs:
+
+- **Analyze** — project workspace, calibration, pipeline, tracking, and coach reports.
+- **Review** — review queue, tracking review, and reference video review surfaces.
+- **Player Value** — Player Value summaries, trends, and evidence detail pages.
+- **Training** — role selection, training lobby, situations, quizzes, drills, practice plans, and executions.
+- **System / Lab** — dashboard command center, home/intake, workflows, local lab, model registry, and decision rules.
+
+See [Product Information Architecture](docs/product/information-architecture.md) for the route inventory and grouping rules. Dynamic routes remain available for deep links and contextual navigation.
+
 ## Repository-level npm scripts
 
 For convenience, root-level npm scripts delegate to the frontend package:

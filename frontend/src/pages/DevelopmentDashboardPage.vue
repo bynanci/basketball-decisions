@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient, type DevelopmentDashboardPlayerSummary, type DevelopmentDashboardResponse } from '../api/client'
+import { productNavigationSections } from '../navigation'
 
 const router = useRouter()
 const dashboard = ref<DevelopmentDashboardResponse | null>(null)
@@ -71,9 +72,9 @@ onMounted(loadDashboard)
     <header class="page-header">
       <div>
         <p class="eyebrow">M26 Dashboard</p>
-        <h1>Development Progress Dashboard</h1>
+        <h1>Development Dashboard Command Center</h1>
         <p class="lede">
-          Aggregates existing local artifacts into operational progress, health, and review summaries without changing scoring formulas, generating coaching advice, or claiming official scouting-grade evaluation; it is not an official scouting-grade evaluation.
+          The main command center for the product: grouped navigation, existing artifact health, and operational follow-ups without changing scoring formulas, generating coaching advice, or claiming official scouting-grade evaluation; it is not an official scouting-grade evaluation.
         </p>
       </div>
       <button class="primary" :disabled="isLoading" @click="loadDashboard">
@@ -84,6 +85,30 @@ onMounted(loadDashboard)
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     <p v-if="isLoading" class="muted">Loading development dashboard…</p>
     <p v-if="dashboard" class="muted">Generated {{ formatDate(dashboard.generated_at) }}</p>
+
+    <section class="card product-navigation-card" aria-labelledby="product-navigation-heading">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Product map</p>
+          <h2 id="product-navigation-heading">Navigate by job-to-be-done</h2>
+          <p class="lede">Routes are grouped into Analyze, Review, Player Value, Training, and System / Lab so the dashboard can act as the starting point while every existing URL remains available.</p>
+        </div>
+        <RouterLink class="button-link" to="/">Open Home / Intake</RouterLink>
+      </div>
+      <div class="navigation-section-grid">
+        <article v-for="section in productNavigationSections" :key="section.name" class="navigation-section-card">
+          <h3>{{ section.name }}</h3>
+          <p>{{ section.description }}</p>
+          <ul>
+            <li v-for="item in section.items" :key="item.routeName">
+              <RouterLink v-if="!item.path.includes(':')" :to="item.path">{{ item.label }}</RouterLink>
+              <span v-else>{{ item.label }}</span>
+              <small>{{ item.description }}</small>
+            </li>
+          </ul>
+        </article>
+      </div>
+    </section>
 
     <div v-if="dashboard?.warnings.length" class="warning-card">
       <strong>Artifact warnings</strong>
