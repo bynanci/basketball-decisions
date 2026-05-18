@@ -14,6 +14,8 @@ The frontend now treats **Development Dashboard** (`/development-dashboard`) as 
 
 See [Product Information Architecture](docs/product/information-architecture.md) for the route inventory and grouping rules. Dynamic routes remain available for deep links and contextual navigation.
 
+The S3 core user journeys are documented in [S3 Core User Journeys](docs/product/user-journeys.md). They define the Coach, Analyst, and Player paths from entry route through required artifacts, expected outputs, success criteria, common blockers, recovery paths, and a cross-journey route mapping table. The journeys use existing pages and route names; they do not introduce a full onboarding wizard or remove any current route.
+
 ## Repository-level npm scripts
 
 For convenience, root-level npm scripts delegate to the frontend package:
