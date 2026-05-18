@@ -25,6 +25,8 @@ import PracticePlansPage from '../pages/PracticePlansPage.vue'
 import PracticeExecutionsPage from '../pages/PracticeExecutionsPage.vue'
 import PracticeExecutionDetailPage from '../pages/PracticeExecutionDetailPage.vue'
 import DevelopmentDashboardPage from '../pages/DevelopmentDashboardPage.vue'
+import WorkflowsPage from '../pages/WorkflowsPage.vue'
+import WorkflowDetailPage from '../pages/WorkflowDetailPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -33,6 +35,8 @@ export const router = createRouter({
     { path: '/start', name: 'role-entry', component: RoleEntryPage },
     { path: '/training', name: 'training-lobby', component: TrainingLobbyPage },
     { path: '/development-dashboard', name: 'development-dashboard', component: DevelopmentDashboardPage },
+    { path: '/workflows', name: 'workflows', component: WorkflowsPage },
+    { path: '/workflows/:workflowId', name: 'workflow-detail', component: WorkflowDetailPage, props: true },
     { path: '/situations', name: 'situation-preview', component: SituationPreviewPage },
     { path: '/local-lab', name: 'local-lab', component: LocalLabPage },
     { path: '/player-value', name: 'player-value', component: PlayerValuePage },

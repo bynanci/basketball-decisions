@@ -1710,6 +1710,107 @@ export interface DevelopmentDashboardResponse {
   raw_artifact_refs: Record<string, unknown>
 }
 
+
+export type WorkflowTemplateKey = 'BUILD_PLAYER_VALUE' | 'IMPROVE_DATA_QUALITY' | 'TRAINING_RECOMMENDATION' | 'COACH_REPORT' | 'MODEL_GOVERNANCE'
+export type WorkflowStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'BLOCKED' | 'COMPLETED'
+export type WorkflowStepStatus = 'PENDING' | 'READY' | 'BLOCKED' | 'COMPLETED' | 'SKIPPED'
+export type WorkflowPrerequisiteKey =
+  | 'has_tracking'
+  | 'has_tracking_review'
+  | 'has_player_aliases'
+  | 'has_decision_events'
+  | 'has_player_value'
+  | 'has_dataset_health'
+  | 'has_active_recognition_model'
+  | 'has_drill_recommendations'
+  | 'has_practice_plan'
+  | 'has_practice_execution'
+  | 'has_coach_report'
+  | 'has_open_high_priority_review_items'
+
+export interface WorkflowStartRequest {
+  template_key: WorkflowTemplateKey
+  project_id?: string | null
+  player_key?: string | null
+  title?: string | null
+  source_action_id?: string | null
+  context?: Record<string, string | number | boolean | null>
+}
+
+export interface WorkflowFromActionRequest {
+  action_id: string
+  project_id?: string | null
+  player_key?: string | null
+  title?: string | null
+  context?: Record<string, string | number | boolean | null>
+}
+
+export interface WorkflowStepUpdateRequest {
+  status: WorkflowStepStatus
+  note?: string | null
+}
+
+export interface WorkflowPrerequisiteState {
+  key: WorkflowPrerequisiteKey
+  label: string
+  satisfied: boolean
+  detail: string
+  artifact_path?: string | null
+}
+
+export interface WorkflowStep {
+  step_id: string
+  title: string
+  description: string
+  action_label: string
+  href: string
+  status: WorkflowStepStatus
+  prerequisite_keys: WorkflowPrerequisiteKey[]
+  blocking_prerequisite_keys: WorkflowPrerequisiteKey[]
+  completion_prerequisite_key?: WorkflowPrerequisiteKey | null
+  notes: string[]
+  updated_at: string
+}
+
+export interface Workflow {
+  schema_version: string
+  workflow_id: string
+  template_key: WorkflowTemplateKey
+  title: string
+  description: string
+  status: WorkflowStatus
+  project_id?: string | null
+  player_key?: string | null
+  source_action_id?: string | null
+  context: Record<string, string | number | boolean | null>
+  created_at: string
+  updated_at: string
+  prerequisites: WorkflowPrerequisiteState[]
+  steps: WorkflowStep[]
+  warnings: string[]
+  storage_path?: string | null
+}
+
+export interface WorkflowListItem {
+  workflow_id: string
+  template_key: WorkflowTemplateKey
+  title: string
+  status: WorkflowStatus
+  project_id?: string | null
+  player_key?: string | null
+  source_action_id?: string | null
+  created_at: string
+  updated_at: string
+  completed_step_count: number
+  total_step_count: number
+  blocked_step_count: number
+}
+
+export interface WorkflowListResponse {
+  workflows: WorkflowListItem[]
+  updated_at: string
+}
+
 export function normalizeApiErrorPayload(status: number, payload?: Partial<ApiErrorResponse> | null): ApiErrorResponse {
   return {
     code: payload?.code ?? 'HTTP_ERROR',
@@ -1757,6 +1858,15 @@ async function requestText(path: string, init: RequestInit = {}): Promise<string
 }
 
 export const apiClient = {
+  createWorkflow: (payload: WorkflowStartRequest) =>
+    request<Workflow>('/workflows', { method: 'POST', body: JSON.stringify(payload) }),
+  createWorkflowFromAction: (payload: WorkflowFromActionRequest) =>
+    request<Workflow>('/workflows/from-action', { method: 'POST', body: JSON.stringify(payload) }),
+  listWorkflows: () => request<WorkflowListResponse>('/workflows'),
+  getWorkflow: (workflowId: string) => request<Workflow>(`/workflows/${encodeURIComponent(workflowId)}`),
+  refreshWorkflow: (workflowId: string) => request<Workflow>(`/workflows/${encodeURIComponent(workflowId)}/refresh`, { method: 'PUT' }),
+  updateWorkflowStep: (workflowId: string, stepId: string, payload: WorkflowStepUpdateRequest) =>
+    request<Workflow>(`/workflows/${encodeURIComponent(workflowId)}/steps/${encodeURIComponent(stepId)}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getDevelopmentDashboard: () => request<DevelopmentDashboardResponse>('/development-dashboard'),
   listProjects: () => request<ListProjectsResponse>('/projects'),
   listDrillCatalog: () => request<DrillCatalogResponse>('/drills/catalog'),

@@ -7,6 +7,7 @@
         <RouterLink to="/start">Choose training role</RouterLink>
         <RouterLink to="/training">Training</RouterLink>
         <RouterLink to="/development-dashboard">Development Dashboard</RouterLink>
+        <RouterLink to="/workflows">Workflows</RouterLink>
         <RouterLink to="/situations">Situations</RouterLink>
         <RouterLink to="/local-lab">Local Lab</RouterLink>
         <RouterLink to="/player-value">Player Value</RouterLink>

@@ -785,3 +785,28 @@ The dashboard summarizes these existing artifacts when present:
 The response includes `metrics`, `team_summary`, `player_summaries`, `next_best_actions`, `dataset_health_summary`, `model_registry_summary`, `practice_feedback_summary`, `review_queue_summary`, and `warnings`. Missing or malformed artifacts are converted into warnings and operational next-best-actions so the dashboard can still load in a fresh workspace.
 
 This dashboard does **not** add a new scoring formula, run live analytics, provide medical or injury advice, use LLM-generated coaching advice, or claim official scouting-grade evaluation. Player rows display existing Player Value v1 outputs and trend deltas only when those artifacts have already been generated.
+
+## Guided workflows (M27)
+
+Guided workflows provide local, explicit checklists for common artifact paths without executing any underlying operation automatically. Workflow instances are stored in `backend/app/data/workflows/` and can be started from the Workflows page or from Development Dashboard next-best-actions.
+
+Available templates:
+
+- `BUILD_PLAYER_VALUE`: tracking review → player aliases → decision events → Player Value.
+- `IMPROVE_DATA_QUALITY`: review queue → dataset health → recognition model readiness.
+- `TRAINING_RECOMMENDATION`: Player Value → drill recommendations → practice plan → practice execution.
+- `COACH_REPORT`: Player Value/practice readiness → deterministic coach report export.
+- `MODEL_GOVERNANCE`: dataset health/review queue checks → active recognition model.
+
+Workflow API endpoints:
+
+```http
+POST /api/workflows
+POST /api/workflows/from-action
+GET /api/workflows
+GET /api/workflows/{workflow_id}
+PUT /api/workflows/{workflow_id}/refresh
+PUT /api/workflows/{workflow_id}/steps/{step_id}
+```
+
+Prerequisite checks read only existing local artifacts, including tracking, tracking review patches, player aliases, decision events, Player Value summaries, dataset health/manifests, recognition model registry, drill recommendations, practice plans/executions, coach reports, and open high-priority review queue items. Refresh a workflow after running an operation from its linked page to update the checklist state.

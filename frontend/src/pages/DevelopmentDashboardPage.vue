@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { apiClient, type DevelopmentDashboardPlayerSummary, type DevelopmentDashboardResponse } from '../api/client'
 
+const router = useRouter()
 const dashboard = ref<DevelopmentDashboardResponse | null>(null)
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -43,6 +45,19 @@ async function loadDashboard() {
     dashboard.value = await apiClient.getDevelopmentDashboard()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to load development dashboard.'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function startWorkflowFromAction(actionId: string) {
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    const workflow = await apiClient.createWorkflowFromAction({ action_id: actionId })
+    await router.push(`/workflows/${workflow.workflow_id}`)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to start guided workflow.'
   } finally {
     isLoading.value = false
   }
@@ -96,7 +111,10 @@ onMounted(loadDashboard)
           <li v-for="action in dashboard.next_best_actions" :key="action.action_id" :class="`action-${action.severity}`">
             <strong>{{ action.title }}</strong>
             <p>{{ action.detail }}</p>
-            <RouterLink v-if="action.href" :to="action.href" class="button-link">Open {{ action.artifact ?? 'artifact' }}</RouterLink>
+            <div class="button-row">
+              <RouterLink v-if="action.href" :to="action.href" class="button-link">Open {{ action.artifact ?? 'artifact' }}</RouterLink>
+              <button class="secondary" :disabled="isLoading" @click="startWorkflowFromAction(action.action_id)">Start guided workflow</button>
+            </div>
           </li>
         </ul>
       </section>
