@@ -7,11 +7,13 @@ function readPage(name: string) {
 }
 
 describe('development dashboard UI wiring', () => {
-  it('renders the M26 dashboard sections and API call', () => {
+  it('renders the command center sections and API call', () => {
     const page = readPage('DevelopmentDashboardPage.vue')
 
     expect(page).toContain('apiClient.getDevelopmentDashboard()')
-    expect(page).toContain('Development Progress Dashboard')
+    expect(page).toContain('Development Dashboard Command Center')
+    expect(page).toContain('Navigate by job-to-be-done')
+    expect(page).toContain('productNavigationSections')
     expect(page).toContain('Next-best-actions')
     expect(page).toContain('Team Summary')
     expect(page).toContain('Player Development Table')
@@ -20,12 +22,23 @@ describe('development dashboard UI wiring', () => {
     expect(page).toContain('not an official scouting-grade evaluation')
   })
 
-  it('adds route and navigation link', () => {
+  it('keeps the route, grouped navigation, and route inventory documentation', () => {
     const router = readFileSync(resolve(__dirname, '../../router/index.ts'), 'utf-8')
     const app = readFileSync(resolve(__dirname, '../../App.vue'), 'utf-8')
+    const navigation = readFileSync(resolve(__dirname, '../../navigation.ts'), 'utf-8')
+    const docs = readFileSync(resolve(__dirname, '../../../../docs/product/information-architecture.md'), 'utf-8')
 
     expect(router).toContain('/development-dashboard')
     expect(router).toContain('DevelopmentDashboardPage')
-    expect(app).toContain('Development Dashboard')
+    expect(app).toContain('Command Center')
+    expect(app).toContain('groupedNavigationItems')
+    expect(navigation).toContain("name: 'Analyze'")
+    expect(navigation).toContain("name: 'Review'")
+    expect(navigation).toContain("name: 'Player Value'")
+    expect(navigation).toContain("name: 'Training'")
+    expect(navigation).toContain("name: 'System / Lab'")
+    expect(docs).toContain('# Product Information Architecture')
+    expect(docs).toContain('| `/development-dashboard` | `development-dashboard` | `DevelopmentDashboardPage.vue` |')
+    expect(docs).toContain('| `/projects/:projectId/tracking-review` | `tracking-review` | `TrackingReviewPage.vue` |')
   })
 })

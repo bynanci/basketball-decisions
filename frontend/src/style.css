@@ -31,8 +31,10 @@ a {
 }
 
 .brand {
+  flex: 0 0 auto;
   font-size: 1.2rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 main {
@@ -678,4 +680,114 @@ button.ghost {
 .checkbox-label input[type='checkbox'] {
   margin: 0;
   width: auto;
+}
+
+.topbar {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.topbar nav {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.command-center-link {
+  background: #facc15;
+  border-radius: 999px;
+  color: #172033 !important;
+  flex: 0 0 auto;
+  font-weight: 900;
+  padding: 0.45rem 0.8rem;
+}
+
+.nav-sections {
+  display: grid;
+  flex: 1;
+  gap: 0.85rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  max-width: none;
+}
+
+.nav-section {
+  align-content: flex-start;
+  align-items: flex-start;
+  border-left: 1px solid rgb(255 255 255 / 0.22);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  padding-left: 0.75rem;
+}
+
+.nav-section-label {
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  width: 100%;
+}
+
+.nav-section a {
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.product-navigation-card .section-header {
+  align-items: flex-start;
+}
+
+.navigation-section-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.navigation-section-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+.navigation-section-card h3 {
+  margin-top: 0;
+}
+
+.navigation-section-card ul {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  padding-left: 0;
+}
+
+.navigation-section-card li {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.navigation-section-card small {
+  color: #64748b;
+  line-height: 1.35;
+}
+
+@media (max-width: 980px) {
+  .topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .topbar nav {
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .nav-sections {
+    max-width: none;
+    width: 100%;
+  }
 }

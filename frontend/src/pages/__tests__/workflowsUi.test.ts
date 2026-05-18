@@ -23,13 +23,14 @@ describe('guided workflow UI wiring', () => {
 
   it('adds routes, navigation, and dashboard start workflow integration', () => {
     const router = readFileSync(resolve(__dirname, '../../router/index.ts'), 'utf-8')
-    const app = readFileSync(resolve(__dirname, '../../App.vue'), 'utf-8')
+    const navigation = readFileSync(resolve(__dirname, '../../navigation.ts'), 'utf-8')
     const dashboard = readPage('DevelopmentDashboardPage.vue')
     const client = readFileSync(resolve(__dirname, '../../api/client.ts'), 'utf-8')
 
     expect(router).toContain('/workflows')
     expect(router).toContain('/workflows/:workflowId')
-    expect(app).toContain('Workflows')
+    expect(navigation).toContain("label: 'Workflows'")
+    expect(navigation).toContain("path: '/workflows'")
     expect(dashboard).toContain('startWorkflowFromAction')
     expect(client).toContain('/workflows/from-action')
   })

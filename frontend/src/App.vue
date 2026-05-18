@@ -1,24 +1,36 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { RouterLink, RouterView } from 'vue-router'
+import { primaryNavigationItems } from './navigation'
+
+const commandCenterLink = primaryNavigationItems.find((item) => item.routeName === 'development-dashboard')
+const groupedNavigationItems = computed(() =>
+  primaryNavigationItems
+    .filter((item) => item.routeName !== 'development-dashboard')
+    .reduce<Record<string, typeof primaryNavigationItems>>((groups, item) => {
+      groups[item.section] = groups[item.section] ?? []
+      groups[item.section].push(item)
+      return groups
+    }, {})
+)
+</script>
+
 <template>
   <div class="app-shell">
     <header class="topbar">
-      <RouterLink to="/" class="brand">Basketball Decisions</RouterLink>
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/start">Choose training role</RouterLink>
-        <RouterLink to="/training">Training</RouterLink>
-        <RouterLink to="/development-dashboard">Development Dashboard</RouterLink>
-        <RouterLink to="/workflows">Workflows</RouterLink>
-        <RouterLink to="/situations">Situations</RouterLink>
-        <RouterLink to="/local-lab">Local Lab</RouterLink>
-        <RouterLink to="/player-value">Player Value</RouterLink>
-        <RouterLink to="/reports/coach">Coach Reports</RouterLink>
-        <RouterLink to="/drills">Drills</RouterLink>
-        <RouterLink to="/practice-plans">Practice Plans</RouterLink>
-        <RouterLink to="/practice-executions">Practice Executions</RouterLink>
-        <RouterLink to="/review-queue">Review Queue</RouterLink>
-        <RouterLink to="/model-registry">Model Registry</RouterLink>
-        <RouterLink to="/reference-videos">Reference Videos</RouterLink>
-        <RouterLink to="/decision-rules">Decision Rules</RouterLink>
+      <RouterLink to="/development-dashboard" class="brand">Basketball Decisions</RouterLink>
+      <nav aria-label="Product navigation">
+        <RouterLink v-if="commandCenterLink" :to="commandCenterLink.path" class="command-center-link">
+          Command Center
+        </RouterLink>
+        <div class="nav-sections">
+          <div v-for="(items, sectionName) in groupedNavigationItems" :key="sectionName" class="nav-section">
+            <span class="nav-section-label">{{ sectionName }}</span>
+            <RouterLink v-for="item in items" :key="item.routeName" :to="item.path" :title="item.description">
+              {{ item.label }}
+            </RouterLink>
+          </div>
+        </div>
       </nav>
     </header>
     <main>
