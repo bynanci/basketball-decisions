@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .base import utc_now
 from .practice_plan import PracticePlanBlockType, PracticePlanDuration
@@ -118,6 +118,7 @@ class PracticeExecutionListResponse(BaseModel):
 class PracticeFeedbackSignal(BaseModel):
     """Deterministic signal generated from captured practice execution data."""
 
+    signal_id: str | None = None
     signal_type: PracticeFeedbackSignalType
     execution_id: str
     block_id: str | None = None
@@ -125,6 +126,26 @@ class PracticeFeedbackSignal(BaseModel):
     recommendation_id: str | None = None
     reason: str
     severity: Literal["info", "warning", "action"] = "info"
+    project_id: str | None = None
+    player_key: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="after")
+    def populate_signal_id(self) -> "PracticeFeedbackSignal":
+        if not self.signal_id:
+            import hashlib
+
+            parts = [
+                self.signal_type,
+                self.execution_id,
+                self.block_id or "",
+                self.drill_id or "",
+                self.recommendation_id or "",
+                self.reason,
+            ]
+            digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:12]
+            self.signal_id = f"practice-feedback-{digest}"
+        return self
 
 
 class PracticeFeedbackSummary(BaseModel):

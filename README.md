@@ -231,19 +231,20 @@ Tracking QC limitations:
 
 ## Drill Recommendation Engine
 
-M22 adds a deterministic drill recommendation engine backed by a local, human-authored drill catalog. It does not use LLM-generated coaching advice, does not include medical or injury guidance, does not claim official coaching certification, and does not build a full practice calendar.
+M22 adds a deterministic drill recommendation engine backed by a local, human-authored drill catalog. M25 integrates recent practice feedback signals from the M24 `practice_feedback_signals.jsonl` artifact so recommendations can be deterministically adjusted without reinforcement learning, automatic model retraining, calendar scheduling, medical/injury advice, or LLM-generated coaching advice.
 
 API endpoints:
 
 ```http
 GET /api/drills/catalog
+GET /api/drills/feedback-signals
 POST /api/drills/recommendations
 GET /api/drills/recommendations/latest
 ```
 
-`POST /api/drills/recommendations` accepts optional `project_id`, `player_key`, and `max_recommendations` filters. The service reads local Decision Diagnostics, Player Value summaries, Player Value trend artifacts, teaching-case decision events, and review queue findings, then selects matching catalog drills and saves the latest response under local drill data.
+`POST /api/drills/recommendations` accepts optional `project_id`, `player_key`, `max_recommendations`, `include_practice_feedback`, and `feedback_lookback_limit` filters. The service reads local Decision Diagnostics, Player Value summaries, Player Value trend artifacts, teaching-case decision events, and review queue findings, then selects matching catalog drills. When practice feedback is enabled, it reads recent M24 feedback signals and applies bounded deterministic adjustments such as prioritizing repeated or simplified drills and deprioritizing drills that were completed strongly. Responses include `feedback_signal_count`, response-level `adjustment_summary`, and per-card `feedback_adjusted`, `feedback_signal_ids`, `adjustment_summary`, and `adjustments` fields before saving the latest response under local drill data.
 
-The `/drills` frontend page shows recommendation cards with priority, confidence, role, situation, reason, coaching cues, success metrics, and evidence references. Coach Reports include a Drill Recommendations section when latest recommendations are available.
+The `/drills` frontend page shows recommendation cards with priority, confidence, role, situation, reason, coaching cues, success metrics, evidence references, a practice-feedback checkbox, a feedback lookback limit, feedback-adjusted badges, adjustment reasons, and a recent feedback signals section. Coach Reports include a Drill Recommendations section when latest recommendations are available.
 
 ## Practice Plan Builder
 
@@ -259,7 +260,7 @@ GET /api/practice-plans/{plan_id}/markdown
 GET /api/practice-plans/{plan_id}/json
 ```
 
-`POST /api/practice-plans` accepts `total_duration_minutes`, optional `project_id`, optional `player_key`, optional extra `player_keys`, `max_drill_blocks`, and builder `notes`. It builds fresh deterministic drill recommendations, allocates warmup, drill, scrimmage, and review / recap blocks, and copies target roles, target situations, player keys, coaching cues, success metrics, evidence references, and warnings into the saved plan.
+`POST /api/practice-plans` accepts `total_duration_minutes`, optional `project_id`, optional `player_key`, optional extra `player_keys`, `max_drill_blocks`, optional practice-feedback recommendation controls, and builder `notes`. It builds fresh deterministic drill recommendations, allocates warmup, drill, scrimmage, and review / recap blocks, and copies target roles, target situations, player keys, coaching cues, success metrics, evidence references, and warnings into the saved plan.
 
 The `/practice-plans` frontend page builds plans, lists saved plans, previews block timing, notes, targets, and block warnings, links directly to Markdown and JSON exports, and can start a local execution session. The feature intentionally does not add calendar integration, PDF/DOCX exports, medical or injury advice, LLM-generated coaching advice, or full season planning.
 
@@ -278,7 +279,7 @@ GET /api/practice-executions/{execution_id}/feedback-summary
 GET /api/practice-executions/signals
 ```
 
-Feedback summaries are deterministic from captured execution data and include completion rate, average block rating, met/missed metrics, skipped and modified counts, actual duration, recommended next actions, and feedback signals (`REPEAT_DRILL`, `PROGRESS_DRILL`, `SIMPLIFY_DRILL`, `SHORTEN_PLAN`, `REBUILD_DATASETS`, and `REVIEW_ALIAS_ATTRIBUTION`). The feature does not add calendar integration, attendance management, medical or injury advice, LLM-generated feedback, or automatic live-practice video measurement.
+Feedback summaries are deterministic from captured execution data and include completion rate, average block rating, met/missed metrics, skipped and modified counts, actual duration, recommended next actions, and feedback signals (`REPEAT_DRILL`, `PROGRESS_DRILL`, `SIMPLIFY_DRILL`, `SHORTEN_PLAN`, `REBUILD_DATASETS`, and `REVIEW_ALIAS_ATTRIBUTION`). Saved executions also refresh `backend/app/data/practice_executions/practice_feedback_signals.jsonl` for recommendation feedback integration. The feature does not add calendar integration, attendance management, medical or injury advice, LLM-generated feedback, or automatic live-practice video measurement.
 
 The `/practice-executions` frontend page lists saved sessions and global signals. The `/practice-executions/:executionId` page edits execution feedback and shows the feedback summary. The `/practice-plans` page includes a **Start Execution** button for the selected plan.
 

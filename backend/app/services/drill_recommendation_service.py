@@ -21,8 +21,11 @@ from app.models import (
     DrillRecommendation,
     DrillRecommendationRequest,
     DrillRecommendationResponse,
+    RecommendationAdjustment,
 )
 from app.models.base import utc_now
+from app.models.practice_execution import PracticeFeedbackSignal
+from app.services.practice_feedback_signal_service import read_practice_feedback_signals
 
 APP_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 DATASETS_DIR = APP_DATA_DIR / "datasets"
@@ -49,6 +52,112 @@ ROLE_TO_DRILL = {
     "HELP_DEFENDER": "help-tag-recover",
 }
 DEFAULT_DRILL_ID = "advantage-read-kickout"
+
+PRIORITY_RANK = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
+PRIORITY_BY_RANK = {0: "LOW", 1: "MEDIUM", 2: "HIGH"}
+
+
+def _adjustment_id(recommendation_id: str, signal_id: str, adjustment_type: str) -> str:
+    digest = hashlib.sha256(f"{recommendation_id}|{signal_id}|{adjustment_type}".encode("utf-8")).hexdigest()[:12]
+    return f"rec-adjust-{digest}"
+
+
+def _signal_matches_recommendation(signal: PracticeFeedbackSignal, recommendation: DrillRecommendation) -> bool:
+    if signal.recommendation_id and signal.recommendation_id == recommendation.recommendation_id:
+        return True
+    if signal.drill_id and signal.drill_id == recommendation.drill_id:
+        return True
+    return False
+
+
+def _adjustments_for_signal(signal: PracticeFeedbackSignal, recommendation: DrillRecommendation) -> list[RecommendationAdjustment]:
+    signal_id = signal.signal_id or "practice-feedback-unknown"
+    base = {
+        "signal_id": signal_id,
+        "signal_type": signal.signal_type,
+        "execution_id": signal.execution_id,
+        "block_id": signal.block_id,
+        "drill_id": signal.drill_id,
+        "recommendation_id": signal.recommendation_id,
+    }
+    if signal.signal_type == "REPEAT_DRILL":
+        return [
+            RecommendationAdjustment(
+                **base,
+                adjustment_id=_adjustment_id(recommendation.recommendation_id, signal_id, "PRIORITY_UP"),
+                adjustment_type="PRIORITY_UP",
+                priority_delta=1,
+                confidence_delta=0.08,
+                reason=f"Recent practice feedback recommends repeating this drill: {signal.reason}",
+            )
+        ]
+    if signal.signal_type == "SIMPLIFY_DRILL":
+        return [
+            RecommendationAdjustment(
+                **base,
+                adjustment_id=_adjustment_id(recommendation.recommendation_id, signal_id, "CONFIDENCE_UP"),
+                adjustment_type="CONFIDENCE_UP",
+                confidence_delta=0.05,
+                reason=f"Recent practice feedback suggests simplifying this drill before progressing: {signal.reason}",
+            )
+        ]
+    if signal.signal_type == "PROGRESS_DRILL":
+        return [
+            RecommendationAdjustment(
+                **base,
+                adjustment_id=_adjustment_id(recommendation.recommendation_id, signal_id, "PRIORITY_DOWN"),
+                adjustment_type="PRIORITY_DOWN",
+                priority_delta=-1,
+                confidence_delta=-0.08,
+                reason=f"Recent practice feedback showed strong completion, so this drill can be deprioritized: {signal.reason}",
+            )
+        ]
+    return [
+        RecommendationAdjustment(
+            **base,
+            adjustment_id=_adjustment_id(recommendation.recommendation_id, signal_id, "REASON_HINT"),
+            adjustment_type="REASON_HINT",
+            reason=f"Recent practice feedback is relevant to this drill: {signal.reason}",
+        )
+    ]
+
+
+def _apply_feedback_adjustments(
+    recommendations: list[DrillRecommendation],
+    request: DrillRecommendationRequest,
+    warnings: list[str],
+) -> tuple[list[DrillRecommendation], int, list[str]]:
+    if not request.include_practice_feedback:
+        return recommendations, 0, []
+
+    signals = read_practice_feedback_signals(
+        limit=request.feedback_lookback_limit,
+        project_id=request.project_id,
+        player_key=request.player_key,
+        warnings=warnings,
+    )
+    if not signals:
+        warnings.append("No recent practice feedback signals were available for recommendation adjustment.")
+        return recommendations, 0, []
+
+    response_summary: list[str] = []
+    for recommendation in recommendations:
+        matched = [signal for signal in signals if _signal_matches_recommendation(signal, recommendation)]
+        adjustments = [adjustment for signal in matched for adjustment in _adjustments_for_signal(signal, recommendation)]
+        if not adjustments:
+            continue
+        priority_delta = sum(adjustment.priority_delta for adjustment in adjustments)
+        confidence_delta = sum(adjustment.confidence_delta for adjustment in adjustments)
+        current_rank = PRIORITY_RANK[recommendation.priority]
+        recommendation.priority = PRIORITY_BY_RANK[max(0, min(2, current_rank + priority_delta))]  # type: ignore[assignment]
+        recommendation.confidence = max(0.25, min(0.95, recommendation.confidence + confidence_delta))
+        recommendation.adjustments = adjustments[:8]
+        recommendation.feedback_signal_ids = list(dict.fromkeys(adjustment.signal_id for adjustment in adjustments))
+        recommendation.adjustment_summary = list(dict.fromkeys(adjustment.reason for adjustment in adjustments))[:5]
+        recommendation.feedback_adjusted = True
+        response_summary.extend(recommendation.adjustment_summary)
+
+    return recommendations, len(signals), list(dict.fromkeys(response_summary))[:8]
 
 
 def _stable_id(parts: list[str]) -> str:
@@ -375,12 +484,15 @@ def build_drill_recommendations(request: DrillRecommendationRequest) -> DrillRec
                 evidence_refs=evidence_refs[:8],
             )
         )
+    recommendations, feedback_signal_count, adjustment_summary = _apply_feedback_adjustments(recommendations, request, warnings)
     recommendations.sort(key=lambda rec: ({"HIGH": 0, "MEDIUM": 1, "LOW": 2}[rec.priority], -rec.confidence, rec.title))
     response = DrillRecommendationResponse(
         generated_at=utc_now(),
         project_id=request.project_id,
         player_key=request.player_key,
         recommendations=recommendations[: request.max_recommendations],
+        feedback_signal_count=feedback_signal_count,
+        adjustment_summary=adjustment_summary,
         warnings=list(dict.fromkeys(warnings)),
         catalog_path=str(CATALOG_PATH),
         latest_path=str(LATEST_RECOMMENDATIONS_PATH),
