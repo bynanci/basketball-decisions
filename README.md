@@ -74,6 +74,27 @@ The frontend now supports the real local MP4 path through the backend APIs and c
 
 Decision Arrow Quiz is available as a small still-frame MVP: build one prompt from an extracted frame, draw decision arrows, save the prompt, and play it back with explanations.
 
+## Deterministic sample project / demo dataset
+
+The app includes a local, deterministic sample project for demos and smoke tests:
+
+- `project_id`: `sample-court-iq-pnr`
+- `project_name`: `Court IQ Sample: Pick-and-Roll Reads`
+
+The sample is metadata-only and uses a synthetic SVG frame. It does **not** download external videos, include copyrighted footage, train models, or require network access. It is marked demo-only in source governance and will not overwrite a non-sample project that already uses the deterministic sample id.
+
+From the frontend, click **Load Sample Project** on the home page. After installation, quick links open the sample project, tracking review, Player Value, practice plan, coach report, and workflow pages.
+
+Backend API examples:
+
+```bash
+curl http://localhost:8000/api/sample-data/status
+curl -X POST http://localhost:8000/api/sample-data/seed
+curl -X DELETE http://localhost:8000/api/sample-data
+```
+
+The seeded artifacts cover project/source/video/frame metadata, calibration, tracking, cleaned tracking, projected tracks, a tracking review patch, player aliases, quiz prompts and attempts, decision events, Player Value summary and build snapshot, drill recommendations, practice plan, practice execution, feedback signals, coach report, and workflow metadata.
+
 ## Refresh-safe hydration and deep links
 
 Project pages are designed to recover from backend storage instead of depending only on in-memory Pinia state. On mount, the project, calibration, and tracking routes call:

@@ -9,7 +9,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api import common, decision_rules, local_lab, projects, reference_videos, review_queue, sources  # noqa: E402
-from app.services import coach_report_service, development_dashboard_service, drill_recommendation_service, practice_execution_service, practice_feedback_signal_service, practice_plan_service, workflow_orchestrator_service  # noqa: E402
+from app.services import coach_report_service, development_dashboard_service, drill_recommendation_service, practice_execution_service, practice_feedback_signal_service, practice_plan_service, sample_data_service, workflow_orchestrator_service  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -17,11 +17,13 @@ from app.main import app  # noqa: E402
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(common, "DATA_DIR", tmp_path)
     monkeypatch.setattr(projects, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(sample_data_service, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(sample_data_service, "APP_DATA_DIR", tmp_path)
     monkeypatch.setattr(local_lab, "DATA_DIR", tmp_path)
     monkeypatch.setattr(local_lab, "DATASETS_DIR", tmp_path / "datasets")
     monkeypatch.setattr(review_queue, "DATA_DIR", tmp_path)
     monkeypatch.setattr(review_queue, "DATASETS_DIR", tmp_path / "datasets")
-    monkeypatch.setattr(review_queue, "REVIEW_QUEUE_PATH", tmp_path / "review_queue.json")
+    monkeypatch.setattr(review_queue, "REVIEW_QUEUE_PATH", tmp_path / "review_queue" / "review_queue.json")
     monkeypatch.setattr(review_queue, "REVIEW_ACTION_LOG_PATH", tmp_path / "review_queue" / "review_action_log.json")
     monkeypatch.setattr(review_queue, "DECISION_RULE_DRAFTS_PATH", tmp_path / "reference_videos" / "decision_rule_drafts.json")
     monkeypatch.setattr(local_lab, "RECOGNITION_MODELS_DIR", tmp_path / "models" / "recognition")

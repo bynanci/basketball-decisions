@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient, isApiClientError } from '../api/client'
 import { useProjectStore } from '../stores/projectStore'
@@ -17,6 +17,49 @@ const isSubmitting = ref(false)
 const errorMessage = ref('')
 const errorCode = ref('')
 const errorHint = ref('')
+const sampleStatus = ref<Awaited<ReturnType<typeof apiClient.getSampleDataStatus>> | null>(null)
+const isLoadingSample = ref(false)
+const sampleMessage = ref('')
+
+const sampleQuickLinks = computed(() => sampleStatus.value?.quick_links ?? [])
+
+function isInternalLink(href: string) {
+  return href.startsWith('/')
+}
+
+onMounted(() => {
+  void loadSampleStatus()
+})
+
+async function loadSampleStatus() {
+  try {
+    sampleStatus.value = await apiClient.getSampleDataStatus()
+  } catch (error) {
+    showError(error, 'Could not load sample project status.')
+  }
+}
+
+async function loadSampleProject() {
+  if (isLoadingSample.value) return
+  isLoadingSample.value = true
+  sampleMessage.value = ''
+  errorMessage.value = ''
+  errorCode.value = ''
+  errorHint.value = ''
+  try {
+    const response = await apiClient.seedSampleData()
+    sampleStatus.value = response
+    sampleMessage.value = response.message
+    const bundle = await apiClient.getProjectBundle(response.project_id)
+    projectStore.hydrateProjectFromBundle(bundle)
+    router.push(`/projects/${response.project_id}`)
+  } catch (error) {
+    showError(error, 'Could not install the sample project.')
+  } finally {
+    isLoadingSample.value = false
+  }
+}
+
 
 const recommendedSituations = computed(() => {
   if (!roleStore.roleProfile?.situationTypes.length) {
@@ -128,6 +171,29 @@ async function createYoutubeProject() {
     </div>
   </section>
 
+
+  <section class="card sample-project-card">
+    <div>
+      <p class="eyebrow">Sample dataset</p>
+      <h2>Load Sample Project <span v-if="sampleStatus?.installed" class="sample-badge">Sample installed</span></h2>
+      <p>Install a deterministic, metadata-only pick-and-roll sample. It uses synthetic frame artwork, does not download videos, and is marked demo-only.</p>
+      <p v-if="sampleStatus" class="muted">{{ sampleStatus.message }} · {{ sampleStatus.artifact_count }} artifacts present.</p>
+      <p v-if="sampleMessage" class="success-message">{{ sampleMessage }}</p>
+    </div>
+    <div class="sample-actions">
+      <button type="button" :disabled="isLoadingSample || sampleStatus?.protected_existing_project" @click="loadSampleProject">
+        {{ isLoadingSample ? 'Installing…' : sampleStatus?.installed ? 'Open / refresh sample project' : 'Load Sample Project' }}
+      </button>
+      <span v-if="sampleStatus?.protected_existing_project" class="error-text">A non-sample project already uses the sample id.</span>
+    </div>
+    <div v-if="sampleQuickLinks.length" class="quick-links sample-links">
+      <template v-for="link in sampleQuickLinks" :key="link.href">
+        <RouterLink v-if="isInternalLink(link.href)" :to="link.href">{{ link.label }}</RouterLink>
+        <a v-else :href="link.href">{{ link.label }}</a>
+      </template>
+    </div>
+  </section>
+
   <section v-if="roleStore.roleProfile" class="card role-mode-card">
     <div>
       <p class="eyebrow">Current mode</p>
@@ -175,3 +241,48 @@ async function createYoutubeProject() {
     </form>
   </section>
 </template>
+
+<style scoped>
+.sample-project-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.sample-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sample-badge {
+  background: #dbeafe;
+  border: 1px solid #60a5fa;
+  border-radius: 999px;
+  color: #1d4ed8;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.sample-links {
+  justify-content: flex-start;
+}
+
+.muted {
+  color: #64748b;
+}
+
+.success-message {
+  color: #166534;
+  font-weight: 700;
+}
+
+.error-text {
+  color: #b91c1c;
+  font-weight: 700;
+}
+</style>
