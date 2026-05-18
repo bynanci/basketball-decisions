@@ -1,5 +1,11 @@
 """Pydantic models for basketball decision project artifacts."""
 
+from .artifact_map import (
+    ArtifactDependency,
+    ArtifactMapResponse,
+    ArtifactSeverity,
+    ArtifactStatus,
+)
 from .decision_rule import (
     ApproveDecisionRuleDraftRequest,
     CreateDecisionRuleSetRequest,
@@ -57,6 +63,7 @@ from .coach_report import (
 )
 from .development_dashboard import (
     DevelopmentDashboardAction,
+    DevelopmentDashboardArtifactHealthSummary,
     DevelopmentDashboardDatasetHealthSummary,
     DevelopmentDashboardMetric,
     DevelopmentDashboardModelRegistrySummary,
@@ -234,12 +241,17 @@ from .workflow import (
 )
 
 __all__ = [
+    "ArtifactStatus",
+    "ArtifactSeverity",
+    "ArtifactMapResponse",
+    "ArtifactDependency",
     "SAMPLE_PROJECT_ID",
     "SAMPLE_PROJECT_NAME",
     "SampleDataArtifactStatus",
     "SampleDataMutationResponse",
     "SampleDataStatusResponse",
     "DevelopmentDashboardAction",
+    "DevelopmentDashboardArtifactHealthSummary",
     "DevelopmentDashboardDatasetHealthSummary",
     "DevelopmentDashboardMetric",
     "DevelopmentDashboardModelRegistrySummary",

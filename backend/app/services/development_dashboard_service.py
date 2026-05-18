@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from app.models import (
     DevelopmentDashboardAction,
+    DevelopmentDashboardArtifactHealthSummary,
     DevelopmentDashboardDatasetHealthSummary,
     DevelopmentDashboardMetric,
     DevelopmentDashboardModelRegistrySummary,
@@ -32,6 +33,7 @@ from app.models.dataset import DatasetHealthResponse
 from app.models.practice_execution import PracticeExecutionListResponse, PracticeFeedbackSignalsResponse
 from app.models.practice_plan import PracticePlanListResponse
 from app.models.coach_report import CoachReportListResponse
+from app.services.artifact_map_service import build_artifact_map
 
 APP_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 DATASETS_DIR = APP_DATA_DIR / "datasets"
@@ -260,6 +262,17 @@ def build_development_dashboard() -> DevelopmentDashboardResponse:
         ],
     )
 
+    artifact_map = build_artifact_map()
+    artifact_health_summary = DevelopmentDashboardArtifactHealthSummary(
+        stale_artifact_count=artifact_map.stale_artifact_count,
+        missing_artifact_count=artifact_map.missing_artifact_count,
+        action_artifact_count=artifact_map.severity_counts.get("action", 0),
+        warning_artifact_count=artifact_map.severity_counts.get("warning", 0),
+        generated_at=artifact_map.generated_at,
+    )
+    if artifact_health_summary.stale_artifact_count:
+        next_best_actions.append(_action("review-artifact-map", "Review stale artifact dependencies", f"{artifact_health_summary.stale_artifact_count} artifact(s) are stale according to the read-only dependency map.", severity="warning", artifact="artifact_map", href="/local-lab"))
+
     metrics = [
         DevelopmentDashboardMetric(key="players", label="Players", value=team_summary.player_count, detail="Player Value summary rows"),
         DevelopmentDashboardMetric(key="avg_player_value", label="Avg Player Value", value=team_summary.average_player_value_score if team_summary.average_player_value_score is not None else "—", detail="Existing Player Value v1 scores only"),
@@ -292,6 +305,7 @@ def build_development_dashboard() -> DevelopmentDashboardResponse:
         model_registry_summary=model_summary,
         practice_feedback_summary=practice_feedback_summary,
         review_queue_summary=review_summary,
+        artifact_health_summary=artifact_health_summary,
         warnings=warnings,
         artifact_counts=artifact_counts,
         artifact_status=artifact_status,

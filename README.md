@@ -2,6 +2,10 @@
 
 A minimal runnable monorepo for basketball-video decision experiments. The repo has a Vite + Vue 3 + TypeScript frontend and a FastAPI backend with local JSON storage for projects, uploads, extracted frames, manual calibration, tracking, and projected 2D court paths.
 
+## Artifact Dependency Map
+
+Local Lab includes a read-only artifact dependency map at `GET /api/local-lab/artifact-map`. The map reports project, analysis, dataset/model, workflow/training, and report artifact freshness without rebuilding, scheduling, migrating, or mutating artifacts. See `docs/architecture/artifact-map.md` for the deterministic freshness rules and UI surfaces.
+
 ## Product navigation and information architecture
 
 The frontend now treats **Development Dashboard** (`/development-dashboard`) as the main command center. The topbar and dashboard product map group existing routes into five product areas without removing core routes or changing backend APIs:

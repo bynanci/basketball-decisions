@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import {
   apiClient,
+  type ArtifactDependency,
+  type ArtifactMapResponse,
   type DatasetHealthResponse,
   type DatasetHealthWarning,
   type DatasetManifest,
@@ -19,6 +21,7 @@ import {
 const projects = ref<LocalLabProjectArtifact[]>([])
 const datasets = ref<DatasetSummary[]>([])
 const datasetHealth = ref<DatasetHealthResponse | null>(null)
+const artifactMap = ref<ArtifactMapResponse | null>(null)
 const sourceRegistry = ref<VideoSourceRecord[]>([])
 const referenceVideoSummary = ref<ReferenceVideoDraftSummary>({ reference_only_source_count: 0, quiz_prompt_draft_count: 0, decision_rule_draft_count: 0 })
 const isLoading = ref(false)
@@ -41,6 +44,17 @@ const errorMessage = ref('')
 const errorCode = ref('')
 
 const sortedDatasets = computed(() => [...datasets.value].sort((a, b) => a.dataset_type.localeCompare(b.dataset_type)))
+const staleArtifacts = computed<ArtifactDependency[]>(() => (artifactMap.value?.artifacts ?? []).filter((artifact) => artifact.status === 'stale'))
+const missingActionArtifacts = computed<ArtifactDependency[]>(() =>
+  (artifactMap.value?.artifacts ?? []).filter((artifact) => artifact.status === 'missing' && artifact.severity === 'action')
+)
+const artifactCategories = computed(() => {
+  const counts = new Map<string, number>()
+  for (const artifact of artifactMap.value?.artifacts ?? []) {
+    counts.set(artifact.category, (counts.get(artifact.category) ?? 0) + 1)
+  }
+  return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b))
+})
 
 const recognitionReadiness = computed(() => {
   if (!datasetHealth.value) return 'Needs more labels'
@@ -121,13 +135,14 @@ async function refreshLocalLab() {
   isLoading.value = true
   errorMessage.value = ''
   try {
-    const [projectResponse, datasetResponse, healthResponse, sourceResponse, referenceSummaryResponse, recognitionModelResponse] = await Promise.all([
+    const [projectResponse, datasetResponse, healthResponse, sourceResponse, referenceSummaryResponse, recognitionModelResponse, artifactMapResponse] = await Promise.all([
       apiClient.listLocalLabProjects(),
       apiClient.listDatasets(),
       apiClient.getDatasetHealth(),
       apiClient.listSources(),
       apiClient.getReferenceVideoSummary(),
-      apiClient.getRecognitionModelRegistry()
+      apiClient.getRecognitionModelRegistry(),
+      apiClient.getArtifactMap()
     ])
     projects.value = projectResponse.projects
     datasets.value = datasetResponse.datasets
@@ -135,6 +150,7 @@ async function refreshLocalLab() {
     sourceRegistry.value = sourceResponse
     referenceVideoSummary.value = referenceSummaryResponse
     recognitionModelRegistry.value = recognitionModelResponse
+    artifactMap.value = artifactMapResponse
     latestRecognitionModel.value = recognitionModelResponse.active_model ?? recognitionModelResponse.models[recognitionModelResponse.models.length - 1] ?? null
     try {
       decisionDiagnostics.value = await apiClient.getDecisionDiagnostics()
@@ -337,6 +353,38 @@ onMounted(refreshLocalLab)
     </div>
   </section>
 
+
+
+  <section class="card artifact-map-card">
+    <div class="table-header">
+      <div>
+        <p class="eyebrow">Artifact Map / Freshness</p>
+        <h2>Read-only dependency health</h2>
+        <p class="muted">Deterministic freshness checks only. This view never rebuilds, schedules, or mutates artifacts.</p>
+      </div>
+      <span>{{ artifactMap ? `${artifactMap.stale_artifact_count} stale / ${artifactMap.missing_artifact_count} missing` : 'Not loaded' }}</span>
+    </div>
+    <dl class="artifact-health-grid">
+      <div><dt>Total artifacts</dt><dd>{{ artifactMap?.artifacts.length ?? '—' }}</dd></div>
+      <div><dt>Fresh</dt><dd>{{ artifactMap?.status_counts.fresh ?? 0 }}</dd></div>
+      <div><dt>Stale</dt><dd>{{ artifactMap?.stale_artifact_count ?? 0 }}</dd></div>
+      <div><dt>Action missing</dt><dd>{{ missingActionArtifacts.length }}</dd></div>
+    </dl>
+    <div v-if="artifactCategories.length" class="artifact-category-list">
+      <span v-for="[category, count] in artifactCategories" :key="category" class="warning-badge">{{ category }}: {{ count }}</span>
+    </div>
+    <ul v-if="staleArtifacts.length || missingActionArtifacts.length" class="warning-list">
+      <li v-for="artifact in [...staleArtifacts, ...missingActionArtifacts].slice(0, 8)" :key="artifact.key">
+        <span class="severity-badge" :class="artifact.status === 'stale' ? 'severity-medium' : 'severity-high'">{{ artifact.status }}</span>
+        <div>
+          <strong>{{ artifact.label }}</strong>
+          <p>{{ artifact.stale_reason ?? artifact.detail ?? artifact.path ?? 'Artifact is not available yet.' }}</p>
+          <small v-if="artifact.depends_on.length">Depends on: {{ artifact.depends_on.join(', ') }}</small>
+        </div>
+      </li>
+    </ul>
+    <p v-else class="muted">No stale artifacts or action-level missing artifacts were found.</p>
+  </section>
 
   <section class="card recognition-model-card">
     <div class="table-header">
@@ -671,6 +719,42 @@ onMounted(refreshLocalLab)
 </template>
 
 <style scoped>
+
+
+.artifact-map-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.artifact-health-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin: 0;
+}
+
+.artifact-health-grid div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem;
+}
+
+.artifact-health-grid dt {
+  color: #64748b;
+}
+
+.artifact-health-grid dd {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin: 0.25rem 0 0;
+}
+
+.artifact-category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
 
 .export-summary {
   background: #f8fafc;

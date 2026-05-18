@@ -98,6 +98,17 @@ class DevelopmentDashboardPracticeFeedbackSummary(BaseModel):
     modified_count: int = 0
 
 
+
+
+class DevelopmentDashboardArtifactHealthSummary(BaseModel):
+    """Compact freshness rollup from the artifact dependency map."""
+
+    stale_artifact_count: int = 0
+    missing_artifact_count: int = 0
+    action_artifact_count: int = 0
+    warning_artifact_count: int = 0
+    generated_at: datetime | None = None
+
 class DevelopmentDashboardReviewQueueSummary(BaseModel):
     """Open review queue rollup."""
 
@@ -120,6 +131,7 @@ class DevelopmentDashboardResponse(BaseModel):
     model_registry_summary: DevelopmentDashboardModelRegistrySummary = Field(default_factory=DevelopmentDashboardModelRegistrySummary)
     practice_feedback_summary: DevelopmentDashboardPracticeFeedbackSummary = Field(default_factory=DevelopmentDashboardPracticeFeedbackSummary)
     review_queue_summary: DevelopmentDashboardReviewQueueSummary = Field(default_factory=DevelopmentDashboardReviewQueueSummary)
+    artifact_health_summary: DevelopmentDashboardArtifactHealthSummary = Field(default_factory=DevelopmentDashboardArtifactHealthSummary)
     warnings: list[str] = Field(default_factory=list)
     artifact_counts: dict[str, int] = Field(default_factory=dict)
     artifact_status: dict[str, bool] = Field(default_factory=dict)

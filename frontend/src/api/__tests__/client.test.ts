@@ -204,3 +204,29 @@ describe('drill recommendation client', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/drills/recommendations/latest', { headers: expect.any(Headers) })
   })
 })
+
+describe('apiClient.getArtifactMap', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('requests the backend artifact map endpoint', async () => {
+    const payload = {
+      schema_version: '1.0',
+      generated_at: '2026-01-01T00:00:00Z',
+      artifacts: [],
+      status_counts: {},
+      severity_counts: {},
+      stale_artifact_count: 0,
+      missing_artifact_count: 0,
+      warnings: []
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiClient.getArtifactMap()).resolves.toEqual(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/local-lab/artifact-map', { headers: expect.any(Headers) })
+  })
+})

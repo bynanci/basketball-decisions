@@ -42,6 +42,17 @@ describe('source governance UI wiring', () => {
     expect(localLabPage).toContain('Positive/negative sample imbalance is greater than 5:1')
   })
 
+  it('renders the read-only artifact map freshness section', () => {
+    const localLabPage = readPage('LocalLabPage.vue')
+
+    expect(localLabPage).toContain('apiClient.getArtifactMap()')
+    expect(localLabPage).toContain('Artifact Map / Freshness')
+    expect(localLabPage).toContain('Read-only dependency health')
+    expect(localLabPage).toContain('staleArtifacts')
+    expect(localLabPage).toContain('missingActionArtifacts')
+    expect(localLabPage).toContain('This view never rebuilds, schedules, or mutates artifacts')
+  })
+
   it('renders dataset health readiness when the health API returns data', () => {
     const localLabPage = readPage('LocalLabPage.vue')
 

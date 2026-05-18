@@ -66,6 +66,7 @@ from app.models import (
     TrackTrainingLabel,
     VideoSourceRecord,
     ReferenceVideoDraftSummary,
+    ArtifactMapResponse,
 )
 from app.models.base import utc_now
 from app.models.tracking import Detection, PlayerTrack
@@ -76,6 +77,7 @@ from app.services.decision_diagnostics import build_decision_diagnostics
 from app.services.dataset_health import dataset_health_response
 from app.services.recognition_training import activate_model, compare_models, get_model_version, load_evaluation_report_registry, load_recognition_registry, score_project_with_model, train_baseline
 from app.services.player_value_trends import mixed_baseline_warnings
+from app.services.artifact_map_service import build_artifact_map
 
 router = APIRouter(prefix="/local-lab", tags=["local-lab"])
 
@@ -168,6 +170,11 @@ def _latest_artifact_timestamp(directory: Path, project: Project) -> datetime:
         modified_at = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
         latest_datetime = max(latest_datetime, modified_at)
     return latest_datetime
+
+
+@router.get("/artifact-map", response_model=ArtifactMapResponse)
+def get_artifact_map() -> ArtifactMapResponse:
+    return build_artifact_map()
 
 
 @router.get("/projects", response_model=LocalLabProjectsResponse)
