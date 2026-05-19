@@ -75,7 +75,7 @@ onMounted(loadPlayerHome)
       <article class="panel"><h2>Current Strength</h2><p>{{ home.current_strength }}</p></article>
       <article class="panel"><h2>Current Risk</h2><p>{{ home.current_risk }}</p></article>
       <article class="panel"><h2>Suggested Drill Focus</h2><p>{{ home.recommended_drill }}</p><RouterLink to="/drills">View Drill</RouterLink></article>
-      <article class="panel"><h2>Latest Practice Feedback</h2><p>{{ home.latest_practice_feedback }}</p><RouterLink to="/practice-executions">Record Practice Feedback</RouterLink></article>
+      <article class="panel"><h2>Latest Practice Feedback</h2><p>{{ home.latest_practice_feedback }}</p><RouterLink to="/practice-executions">Review Practice Feedback</RouterLink></article>
       <article class="panel"><h2>Progress Trend</h2><p>{{ trendLabel }}</p><RouterLink to="/player-value/trends">View Progress Trend</RouterLink></article>
       <article class="panel"><h2>Confidence</h2><p>{{ home.confidence ?? '—' }}</p><ConfidenceHelp variant="player" compact /></article>
     </section>
@@ -83,7 +83,7 @@ onMounted(loadPlayerHome)
     <WarningPanel v-if="home?.warnings?.length" title="Player artifact warnings" :warnings="home.warnings" action-label="Open Local Lab" action-to="/local-lab" />
 
     <section v-if="home" class="panel">
-      <RouterLink class="primary" to="/practice-plans">{{ home.next_action }} — Review Suggested Plan</RouterLink>
+      <RouterLink class="primary" to="/practice-plans">{{ home.next_action }} — Review Suggested Plan (advisory)</RouterLink>
       <div>
         <RouterLink to="/practice-plans">View Practice Plan</RouterLink>
       </div>

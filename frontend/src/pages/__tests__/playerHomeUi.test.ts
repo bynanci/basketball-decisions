@@ -21,7 +21,7 @@ describe('player home UI wiring', () => {
     const router = readFileSync(resolve(__dirname, '../../router/index.ts'), 'utf-8')
     expect(page).toContain('View Drill')
     expect(page).toContain('View Practice Plan')
-    expect(page).toContain('Record Practice Feedback')
+    expect(page).toContain('Review Practice Feedback')
     expect(page).toContain('View Progress Trend')
     expect(page).not.toContain('undefined')
     expect(page).not.toContain('NaN')

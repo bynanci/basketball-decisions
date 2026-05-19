@@ -14,7 +14,7 @@ describe('development dashboard UI wiring', () => {
     expect(page).toContain('Development Dashboard')
     expect(page).toContain('Navigate by job-to-be-done')
     expect(page).toContain('productNavigationSections')
-    expect(page).toContain('Recommended next steps')
+    expect(page).toContain('Recommended next steps (advisory)')
     expect(page).toContain('Team Summary')
     expect(page).toContain('Player Development Table')
     expect(page).toContain('Practice Feedback Summary')

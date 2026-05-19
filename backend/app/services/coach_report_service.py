@@ -223,7 +223,7 @@ def _drill_recommendations_section(request: CoachReportBuildRequest, _: list[str
         return CoachReportSection(
             name="Drill Recommendations",
             heading="Drill Recommendations",
-            markdown="No saved drill recommendations are available yet. Build them from the Drills page or POST /api/drills/recommendations.",
+            markdown="No saved drill recommendations are available yet. Consider generating them from the Drills page or POST /api/drills/recommendations, then review before acting.",
             data={"recommendations": []},
             warnings=["No latest drill recommendations artifact was found."],
         )
@@ -239,7 +239,7 @@ def _drill_recommendations_section(request: CoachReportBuildRequest, _: list[str
     warnings = []
     if not recommendations:
         warnings.append("Latest drill recommendations exist, but none matched the selected report filters.")
-    markdown = "Drill recommendations are deterministic selections from a human-authored local drill catalog; no LLM-generated coaching advice is included.\n\n" + _bullet(bullets)
+    markdown = "Drill recommendations are deterministic selections from a human-authored local drill catalog and are intended as decision-support signals; no LLM-generated coaching advice is included. Review this before acting.\n\n" + _bullet(bullets)
     return CoachReportSection(
         name="Drill Recommendations",
         heading="Drill Recommendations",

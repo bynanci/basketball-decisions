@@ -129,6 +129,7 @@ onMounted(loadHistory)
     />
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
+    <p class="muted">Recommendations are generated from available local evidence and should be reviewed by a coach or analyst before use.</p>
     <ErrorState v-if="errorMessage" title="Coach reports API error" :message="errorMessage" action-label="Open Development Dashboard" action-to="/development-dashboard" />
 
     <div class="grid two-column">
