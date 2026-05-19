@@ -46,6 +46,13 @@ class PracticePlanBlock(BaseModel):
     player_keys: list[str] = Field(default_factory=list)
     coaching_cues: list[str] = Field(default_factory=list)
     success_metrics: list[str] = Field(default_factory=list)
+    purpose: str | None = None
+    court_area: str | None = None
+    constraints: list[str] = Field(default_factory=list)
+    scoring: list[str] = Field(default_factory=list)
+    common_mistakes: list[str] = Field(default_factory=list)
+    progression: list[str] = Field(default_factory=list)
+    regression: list[str] = Field(default_factory=list)
     evidence_refs: list[DrillEvidenceRef] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

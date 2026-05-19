@@ -59,6 +59,9 @@ def test_build_practice_plan_creates_timeboxed_exports(client: TestClient, tmp_p
     assert payload["total_duration_minutes"] == 75
     assert payload["notes"] == "Keep groups small."
     assert {block["block_type"] for block in payload["blocks"]} == {"warmup", "drill", "scrimmage", "review"}
+    drill_blocks = [block for block in payload["blocks"] if block["block_type"] == "drill" and block.get("drill_id")]
+    assert drill_blocks
+    assert "purpose" in drill_blocks[0]
     assert sum(block["duration_minutes"] for block in payload["blocks"]) == 75
     assert payload["blocks"][0]["start_minute"] == 0
     assert payload["blocks"][-1]["end_minute"] == 75

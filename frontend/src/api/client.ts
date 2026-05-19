@@ -1278,6 +1278,13 @@ export interface DrillCatalogItem {
   role?: string | null
   situation: string
   description: string
+  purpose?: string | null
+  court_area?: string | null
+  constraints: string[]
+  scoring: string[]
+  common_mistakes: string[]
+  progression: string[]
+  regression: string[]
   coaching_cues: string[]
   success_metrics: string[]
   tags: string[]
@@ -1321,6 +1328,13 @@ export interface DrillRecommendation {
   role?: string | null
   situation: string
   reason: string
+  purpose?: string | null
+  court_area?: string | null
+  constraints: string[]
+  scoring: string[]
+  common_mistakes: string[]
+  progression: string[]
+  regression: string[]
   coaching_cues: string[]
   success_metrics: string[]
   evidence_refs: DrillEvidenceRef[]

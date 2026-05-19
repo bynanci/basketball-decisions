@@ -118,6 +118,25 @@ def _render_markdown(plan: PracticePlan) -> str:
         if block.success_metrics:
             lines.extend(["", "Success metrics:"])
             lines.extend(f"- {metric}" for metric in block.success_metrics)
+        if block.purpose:
+            lines.append(f"- Purpose: {block.purpose}")
+        if block.court_area:
+            lines.append(f"- Court area: {block.court_area}")
+        if block.constraints:
+            lines.extend(["", "Constraints:"])
+            lines.extend(f"- {item}" for item in block.constraints)
+        if block.scoring:
+            lines.extend(["", "Scoring:"])
+            lines.extend(f"- {item}" for item in block.scoring)
+        if block.common_mistakes:
+            lines.extend(["", "Common mistakes:"])
+            lines.extend(f"- {item}" for item in block.common_mistakes)
+        if block.progression:
+            lines.extend(["", "Progression:"])
+            lines.extend(f"- {item}" for item in block.progression)
+        if block.regression:
+            lines.extend(["", "Regression:"])
+            lines.extend(f"- {item}" for item in block.regression)
         if block.evidence_refs:
             lines.extend(["", "Evidence refs:"])
             lines.extend(f"- {ref.source}: {ref.ref_id or ref.prompt_id or ref.player_key or 'artifact'} — {ref.detail}" for ref in block.evidence_refs)
@@ -196,6 +215,13 @@ def build_practice_plan(request: PracticePlanBuildRequest) -> PracticePlan:
                     player_keys=_unique([request.player_key, *[ref.player_key for ref in recommendation.evidence_refs]]),
                     coaching_cues=recommendation.coaching_cues,
                     success_metrics=recommendation.success_metrics,
+                    purpose=recommendation.purpose,
+                    court_area=recommendation.court_area,
+                    constraints=recommendation.constraints,
+                    scoring=recommendation.scoring,
+                    common_mistakes=recommendation.common_mistakes,
+                    progression=recommendation.progression,
+                    regression=recommendation.regression,
                     evidence_refs=recommendation.evidence_refs,
                     warnings=recommendation.adjustment_summary if recommendation.feedback_adjusted else [],
                 )

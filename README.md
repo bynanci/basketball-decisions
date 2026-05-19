@@ -20,6 +20,10 @@ See [Product Information Architecture](docs/product/information-architecture.md)
 
 The S3 core user journeys are documented in [S3 Core User Journeys](docs/product/user-journeys.md). They define the Coach, Analyst, and Player paths from entry route through required artifacts, expected outputs, success criteria, common blockers, recovery paths, and a cross-journey route mapping table. The journeys use existing pages and route names; they do not introduce a full onboarding wizard or remove any current route.
 
+## Drill template standard
+
+Drill catalog entries now follow a practical coaching template standard with stable `drill_id` values and richer fields (`purpose`, `court_area`, `constraints`, `scoring`, `common_mistakes`, `progression`, `regression`). See [Drill Template Standard](docs/product/drill-template-standard.md).
+
 ## Repository-level npm scripts
 
 For convenience, root-level npm scripts delegate to the frontend package:

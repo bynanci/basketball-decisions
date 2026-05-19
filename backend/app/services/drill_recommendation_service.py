@@ -42,6 +42,8 @@ SITUATION_TO_DRILL = {
     "DRIVE_AND_KICK": "spacing-drift-lift",
     "CLOSEOUT": "closeout-contain-no-middle",
     "HELP_ROTATION": "help-tag-recover",
+    "LATE_CLOCK": "late-clock-quick-decision",
+    "REVIEW_WORKFLOW": "tracking-alias-cleanup-workflow",
 }
 ROLE_TO_DRILL = {
     "BALL_HANDLER": "advantage-read-kickout",
@@ -224,6 +226,10 @@ def _pick_drill_id(role: str | None, situation: str | None, text: str = "") -> s
         return "closeout-contain-no-middle"
     if "HELP" in normalized_text or "ROTATION" in normalized_text:
         return "help-tag-recover"
+    if "ALIAS" in normalized_text or "TRACKING REVIEW" in normalized_text:
+        return "tracking-alias-cleanup-workflow"
+    if "LATE CLOCK" in normalized_text or "SHOT CLOCK" in normalized_text:
+        return "late-clock-quick-decision"
     if "SPACING" in normalized_text or "OFF BALL" in normalized_text:
         return "spacing-drift-lift"
     return DEFAULT_DRILL_ID
@@ -479,6 +485,13 @@ def build_drill_recommendations(request: DrillRecommendationRequest) -> DrillRec
                 role=drill.role,
                 situation=drill.situation,
                 reason=reason,
+                purpose=drill.purpose,
+                court_area=drill.court_area,
+                constraints=drill.constraints,
+                scoring=drill.scoring,
+                common_mistakes=drill.common_mistakes,
+                progression=drill.progression,
+                regression=drill.regression,
                 coaching_cues=drill.coaching_cues,
                 success_metrics=drill.success_metrics,
                 evidence_refs=evidence_refs[:8],
