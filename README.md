@@ -48,6 +48,7 @@ Recommended demo walkthrough: [docs/product/demo-script.md](docs/product/demo-sc
 ## Demo walkthrough
 
 - Repeatable 10-minute script: [docs/product/demo-script.md](docs/product/demo-script.md)
+- Release gate checklist: [docs/product/v0.1-release-readiness-checklist.md](docs/product/v0.1-release-readiness-checklist.md)
 
 ## Main workflows
 
