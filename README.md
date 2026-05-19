@@ -77,6 +77,7 @@ npm run test:e2e
 - Future backlog triage: [docs/product/future-backlog-triage.md](docs/product/future-backlog-triage.md)
 - Product positioning review: [docs/product/product-positioning-review.md](docs/product/product-positioning-review.md)
 - Usability test plan: [docs/product/usability-test-plan.md](docs/product/usability-test-plan.md)
+- v0.1 release readiness checklist: [docs/product/v0.1-release-readiness-checklist.md](docs/product/v0.1-release-readiness-checklist.md)
 
 ### Architecture
 
