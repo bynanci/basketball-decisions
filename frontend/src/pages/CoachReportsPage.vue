@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TrustCaveatGate from '../components/TrustCaveatGate.vue'
 import { computed, onMounted, ref } from 'vue'
 import { apiClient, COACH_REPORT_SECTIONS, isApiClientError, type CoachReport, type CoachReportBuildRequest, type CoachReportDepth, type CoachReportListItem, type CoachReportSectionName, type EvidenceLockedSummaryResponse } from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
@@ -118,6 +119,13 @@ onMounted(loadHistory)
         {{ isBuilding ? 'Building…' : 'Build report' }}
       </button>
     </header>
+
+
+    <TrustCaveatGate
+      surface="coach-reports"
+      title="Trust caveat"
+      message="Court IQ outputs are decision-support signals based on local sample data, aliases, decision events, rules, and available evidence. Player Value is not an official scouting grade. Review confidence, warnings, and evidence before using recommendations."
+    />
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
     <ErrorState v-if="errorMessage" title="Coach reports API error" :message="errorMessage" action-label="Open Development Dashboard" action-to="/development-dashboard" />
