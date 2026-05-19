@@ -78,7 +78,7 @@ onMounted(loadDashboard)
         <p class="eyebrow">M26 Dashboard</p>
         <h1>Development Dashboard</h1>
         <p class="lede">
-          A central operations view for the product: grouped navigation, existing artifact health, and operational follow-ups without changing scoring formulas, generating coaching advice, or claiming official scouting-grade evaluation; it is not an official scouting-grade evaluation.
+          A central operations view for the product: grouped navigation, existing Artifact Health, and operational follow-ups without changing scoring formulas, generating coaching advice, or claiming official scouting-grade evaluation; it is not an official scouting-grade evaluation.
         </p>
       </div>
       <button class="primary" :disabled="isLoading" @click="loadDashboard">
@@ -95,7 +95,7 @@ onMounted(loadDashboard)
         <div>
           <p class="eyebrow">Product map</p>
           <h2 id="product-navigation-heading">Navigate by job-to-be-done</h2>
-          <p class="lede">Routes are grouped into Analyze, Review, Player Value, Training, and System / Lab so the dashboard can act as the starting point while every existing URL remains available.</p>
+          <p class="lede">Routes are grouped into Analyze, Review Queue, Player Value, Player Home, and System Lab so the dashboard can act as the starting point while every existing URL remains available.</p>
         </div>
         <RouterLink class="button-link" to="/">Open Home / Intake</RouterLink>
       </div>
@@ -116,9 +116,9 @@ onMounted(loadDashboard)
 
     <WarningPanel
       v-if="dashboard?.warnings.length"
-      title="Artifact warnings"
+      title="Artifact Health warnings"
       :warnings="dashboard.warnings"
-      action-label="Open Artifact Map"
+      action-label="Open System Lab"
       action-to="/local-lab"
     />
 
@@ -134,11 +134,11 @@ onMounted(loadDashboard)
       <section class="card">
         <div class="section-header">
         <h2>Recommended next steps</h2>
-          <span class="muted">Operational artifact follow-ups only</span>
+          <span class="muted">Operational Artifact Health follow-ups only</span>
         </div>
         <EmptyState
           v-if="!dashboard.next_best_actions.length"
-          title="No blocking artifact follow-ups"
+          title="No blocking Artifact Health follow-ups"
           message="This repo can still be fresh. Load a sample project or start intake from Home."
           action-label="Load sample or start project"
           action-to="/"
@@ -148,7 +148,7 @@ onMounted(loadDashboard)
             <strong>{{ action.title }}</strong>
             <p>{{ action.detail }}</p>
             <div class="button-row">
-              <RouterLink v-if="action.href" :to="action.href" class="button-link">Open {{ action.artifact ?? 'artifact' }}</RouterLink>
+              <RouterLink v-if="action.href" :to="action.href" class="button-link">Open {{ action.artifact ?? 'evidence' }}</RouterLink>
               <button class="secondary" :disabled="isLoading" @click="startWorkflowFromAction(action.action_id)">Start guided workflow</button>
             </div>
           </li>

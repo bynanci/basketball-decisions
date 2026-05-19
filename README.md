@@ -81,6 +81,7 @@ npm run test:e2e
 - User journeys: [docs/product/user-journeys.md](docs/product/user-journeys.md)
 - Demo script: [docs/product/demo-script.md](docs/product/demo-script.md)
 - Information architecture: [docs/product/information-architecture.md](docs/product/information-architecture.md)
+- Terminology reference: [docs/product/terminology.md](docs/product/terminology.md)
 - Drill template standard: [docs/product/drill-template-standard.md](docs/product/drill-template-standard.md)
 - Future backlog triage: [docs/product/future-backlog-triage.md](docs/product/future-backlog-triage.md)
 - Product positioning review: [docs/product/product-positioning-review.md](docs/product/product-positioning-review.md)

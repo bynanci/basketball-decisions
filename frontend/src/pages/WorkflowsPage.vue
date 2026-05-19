@@ -14,10 +14,10 @@ const projectId = ref('')
 
 const templateOptions: Array<{ key: WorkflowTemplateKey; label: string; detail: string }> = [
   { key: 'BUILD_PLAYER_VALUE', label: 'Build Player Value', detail: 'Tracking review → aliases → decision events → Player Value' },
-  { key: 'IMPROVE_DATA_QUALITY', label: 'Improve Data Quality', detail: 'Review queue → dataset health → model readiness' },
-  { key: 'TRAINING_RECOMMENDATION', label: 'Training Recommendation Support', detail: 'Player Value → drills → practice plan → execution' },
+  { key: 'IMPROVE_DATA_QUALITY', label: 'Improve Evidence Quality', detail: 'Review Queue → Evidence quality → model readiness' },
+  { key: 'TRAINING_RECOMMENDATION', label: 'Practice Feedback Support', detail: 'Player Value → drills → practice plan → Practice Feedback' },
   { key: 'COACH_REPORT', label: 'Coach Report', detail: 'Readiness checks → deterministic report export' },
-  { key: 'MODEL_GOVERNANCE', label: 'Model Governance', detail: 'Dataset health → review queue → active model' }
+  { key: 'MODEL_GOVERNANCE', label: 'System Lab Governance', detail: 'Evidence quality → Review Queue → active model' }
 ]
 
 async function loadWorkflows() {
