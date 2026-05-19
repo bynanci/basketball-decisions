@@ -80,4 +80,8 @@ async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONRespons
 
 @app.get("/api/health")
 def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "version": "v0.1.0",
+        "release_channel": "demo/reviewer",
+    }

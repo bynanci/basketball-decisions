@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import { primaryNavigationItems } from './navigation'
+import { APP_RELEASE_CHANNEL, APP_VERSION } from './version'
 
 const commandCenterLink = primaryNavigationItems.find((item) => item.routeName === 'development-dashboard')
 const groupedNavigationItems = computed(() =>
@@ -31,6 +32,7 @@ const groupedNavigationItems = computed(() =>
             </RouterLink>
           </div>
         </div>
+        <p class="version-pill" data-testid="app-version">{{ APP_VERSION }} · {{ APP_RELEASE_CHANNEL }}</p>
       </nav>
     </header>
     <main>
@@ -38,3 +40,12 @@ const groupedNavigationItems = computed(() =>
     </main>
   </div>
 </template>
+
+
+<style scoped>
+.version-pill {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+</style>

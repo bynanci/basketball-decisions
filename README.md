@@ -2,6 +2,9 @@
 
 Court IQ is a local-first basketball decision intelligence workspace. It helps coaches, analysts, players, and developers move from project intake to explainable coaching/training artifacts using deterministic local data.
 
+- Current version: **v0.1 demo/reviewer build**
+- Readiness: **READY_WITH_RISKS**
+
 ## Product intro
 
 - **Coach**: consume reports, pick drills, build plans, review practice execution.
@@ -49,9 +52,10 @@ Recommended demo walkthrough: [docs/product/demo-script.md](docs/product/demo-sc
 
 - v0.1 readiness: **READY_WITH_RISKS**
 - v0.1 release notes: [docs/product/v0.1-release-notes.md](docs/product/v0.1-release-notes.md)
+- v0.1 demo checklist: [docs/product/v0.1-demo-checklist.md](docs/product/v0.1-demo-checklist.md)
+- v0.1 readiness audit: [docs/reviews/v0.1-readiness-audit.md](docs/reviews/v0.1-readiness-audit.md)
+- v0.1 release checklist: [docs/product/v0.1-release-checklist.md](docs/product/v0.1-release-checklist.md)
 - Repeatable 10-minute script: [docs/product/demo-script.md](docs/product/demo-script.md)
-- Live runbook checklist: [docs/product/v0.1-demo-checklist.md](docs/product/v0.1-demo-checklist.md)
-- Release gate checklist: [docs/product/v0.1-release-readiness-checklist.md](docs/product/v0.1-release-readiness-checklist.md)
 
 ## Main workflows
 
@@ -96,3 +100,13 @@ npm run test:e2e
 
 - Storage/performance audit: [docs/reviews/local-artifact-storage-performance-audit.md](docs/reviews/local-artifact-storage-performance-audit.md)
 - Guided workflow usability review: [docs/reviews/m27-guided-workflow-usability-review.md](docs/reviews/m27-guided-workflow-usability-review.md)
+
+
+## Manual release tagging
+
+If GitHub release tagging is not automated, run:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
