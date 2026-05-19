@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiClient, type PracticeExecution, type PracticeExecutionBlockStatus, type PracticeFeedbackSummary } from '../api/client'
+import TrustCaveatGate from '../components/TrustCaveatGate.vue'
 
 const props = defineProps<{ executionId: string }>()
 
@@ -87,6 +88,13 @@ onMounted(refresh)
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+
+    <TrustCaveatGate
+      surface="practice-execution"
+      compact
+      storage-key="trust-caveat-practice-execution-detail"
+      message="Practice feedback signals are decision-support cues based on local execution notes and available evidence. They should be reviewed by a coach or analyst before changing training priorities."
+    />
 
     <section v-if="execution" class="card">
       <div class="section-header">

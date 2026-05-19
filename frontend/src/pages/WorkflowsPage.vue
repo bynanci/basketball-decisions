@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { apiClient, type WorkflowListItem, type WorkflowTemplateKey } from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
+import TrustCaveatGate from '../components/TrustCaveatGate.vue'
 
 const router = useRouter()
 const workflows = ref<WorkflowListItem[]>([])
@@ -62,6 +63,13 @@ onMounted(loadWorkflows)
     </div>
 
     <ErrorState v-if="errorMessage" title="Workflow API error" :message="errorMessage" action-label="Open Development Dashboard" action-to="/development-dashboard" />
+
+    <TrustCaveatGate
+      surface="workflow"
+      compact
+      storage-key="trust-caveat-workflow"
+      message="Guided workflows help organize Court IQ tasks. They do not automatically validate scores, approve recommendations, or replace human review. Check warnings, evidence, and confidence before acting."
+    />
 
     <section class="card">
       <div class="section-header">

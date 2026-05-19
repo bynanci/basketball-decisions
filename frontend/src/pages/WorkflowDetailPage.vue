@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { apiClient, type Workflow } from '../api/client'
+import TrustCaveatGate from '../components/TrustCaveatGate.vue'
 
 const props = defineProps<{ workflowId: string }>()
 const workflow = ref<Workflow | null>(null)
@@ -71,6 +72,14 @@ onMounted(loadWorkflow)
         </div>
       </div>
 
+
+
+      <TrustCaveatGate
+        surface="workflow"
+        compact
+        storage-key="trust-caveat-workflow-detail"
+        message="Guided workflows help organize Court IQ tasks. They do not automatically validate scores, approve recommendations, or replace human review. Check warnings, evidence, and confidence before acting."
+      />
       <div v-if="workflow.warnings.length" class="warning-card">
         <ul><li v-for="warning in workflow.warnings" :key="warning">{{ warning }}</li></ul>
       </div>
