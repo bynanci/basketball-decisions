@@ -94,7 +94,7 @@ TEMPLATES: dict[WorkflowTemplateKey, WorkflowTemplate] = {
         title="Training Recommendation Support",
         description="Guide Player Value outputs into drill recommendations, practice plans, and execution feedback for coach review.",
         steps=[
-            _step("confirm-player-value", "Confirm Player Value", "Based on current evidence, Player Value should be available before recommendations are reviewed.", "Open Player Value", "/player-value", completion_prerequisite_key="has_player_value"),
+            _step("confirm-player-value", "Confirm Player Value", "Based on current evidence, confirm Player Value is available before reviewing recommendations.", "Open Player Value", "/player-value", completion_prerequisite_key="has_player_value"),
             _step("build-drills", "Build drill recommendations", "Use deterministic catalog matching; the workflow does not generate advice automatically.", "Open Drills", "/drills", prerequisite_keys=["has_player_value"], blocking_prerequisite_keys=["has_player_value"], completion_prerequisite_key="has_drill_recommendations"),
             _step("build-plan", "Create practice plan", "Create a time-boxed plan from saved recommendations.", "Open Practice Plans", "/practice-plans", prerequisite_keys=["has_drill_recommendations"], blocking_prerequisite_keys=["has_drill_recommendations"], completion_prerequisite_key="has_practice_plan"),
             _step("capture-execution", "Capture execution", "Record completion, skips, and modifications after practice.", "Open Practice Executions", "/practice-executions", prerequisite_keys=["has_practice_plan"], blocking_prerequisite_keys=["has_practice_plan"], completion_prerequisite_key="has_practice_execution"),
@@ -105,7 +105,7 @@ TEMPLATES: dict[WorkflowTemplateKey, WorkflowTemplate] = {
         title="Coach Report",
         description="Collect readiness artifacts before exporting a deterministic coach report.",
         steps=[
-            _step("confirm-player-value", "Confirm Player Value", "Reports should reference current Player Value summaries.", "Open Player Value", "/player-value", completion_prerequisite_key="has_player_value"),
+            _step("confirm-player-value", "Confirm Player Value", "Based on current evidence, reports are recommended to reference current Player Value summaries.", "Open Player Value", "/player-value", completion_prerequisite_key="has_player_value"),
             _step("confirm-practice", "Confirm practice context", "Reports are stronger when practice plans or execution feedback exist; if unavailable, document the gap before export.", "Open Practice Plans", "/practice-plans", prerequisite_keys=["has_practice_plan"]),
             _step("build-report", "Build coach report", "Use the existing deterministic report export when prerequisites are ready.", "Open Coach Reports", "/reports/coach", prerequisite_keys=["has_player_value"], blocking_prerequisite_keys=["has_player_value"], completion_prerequisite_key="has_coach_report"),
         ],

@@ -245,7 +245,7 @@ def build_development_dashboard() -> DevelopmentDashboardResponse:
         action_log_count=len(review_actions),
     )
     if review_summary.open_count:
-        next_best_actions.append(_action("resolve-review-queue", "Resolve open review items", f"There are {review_summary.open_count} open review items before downstream summaries should be treated as complete.", severity="warning", artifact="review_queue", href="/review-queue"))
+        next_best_actions.append(_action("resolve-review-queue", "Resolve open review items", f"There are {review_summary.open_count} open review items; review these before treating downstream summaries as complete.", severity="warning", artifact="review_queue", href="/review-queue"))
 
     team_summary = DevelopmentDashboardTeamSummary(
         player_count=len(player_summaries),
@@ -258,7 +258,7 @@ def build_development_dashboard() -> DevelopmentDashboardResponse:
         coach_report_count=len(coach_reports.reports) if coach_reports else 0,
         notes=[
             "Dashboard summarizes local artifacts only; it is not an official scouting-grade evaluation.",
-            "Recommended next steps are operational artifact follow-ups, not LLM-generated coaching advice.",
+            "Recommended next steps are advisory operational artifact follow-ups, not LLM-generated coaching advice.",
         ],
     )
 

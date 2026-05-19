@@ -133,13 +133,13 @@ onMounted(loadDashboard)
     <div v-if="dashboard" class="grid two-column">
       <section class="card">
         <div class="section-header">
-        <h2>Recommended next steps</h2>
+        <h2>Recommended next steps (advisory)</h2>
           <span class="muted">Operational Artifact Health follow-ups only</span>
         </div>
         <EmptyState
           v-if="!dashboard.next_best_actions.length"
           title="No blocking artifact follow-ups"
-          message="What this means: no blocking artifact actions were detected. Why it matters: low-signal projects can still be incomplete. Recommended next action: verify Artifact Map freshness before making decisions."
+          message="What this means: no blocking artifact actions were detected. Why it matters: low-signal projects can still be incomplete. Recommended next step: verify Artifact Map freshness before acting on downstream decisions."
           action-label="Load sample or start project"
           action-to="/"
         />
@@ -149,7 +149,7 @@ onMounted(loadDashboard)
             <p>{{ action.detail }}</p>
             <div class="button-row">
               <RouterLink v-if="action.href" :to="action.href" class="button-link">Open {{ action.artifact ?? 'evidence' }}</RouterLink>
-              <button class="secondary" :disabled="isLoading" @click="startWorkflowFromAction(action.action_id)">Start guided workflow</button>
+              <button class="secondary" :disabled="isLoading" @click="startWorkflowFromAction(action.action_id)">Review guided workflow steps</button>
             </div>
           </li>
         </ul>

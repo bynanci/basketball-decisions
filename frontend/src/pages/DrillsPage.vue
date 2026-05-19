@@ -114,7 +114,7 @@ onMounted(refresh)
     />
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
-    <p class="muted">Recommendations are generated from available local evidence and should be reviewed by a coach or analyst before use.</p>
+    <p class="muted">Recommendations are generated from available local evidence and should be reviewed by a coach or analyst before use. Based on current evidence, each card is a potential practice focus to consider training.</p>
     <ErrorState v-if="errorMessage" title="Drills API error" :message="errorMessage" action-label="Open Home / Intake" action-to="/" />
 
     <section class="card">
