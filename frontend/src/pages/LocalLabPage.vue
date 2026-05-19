@@ -383,7 +383,7 @@ onMounted(refreshLocalLab)
         </div>
       </li>
     </ul>
-    <p v-else class="muted">No stale artifacts or action-level missing artifacts were found.</p>
+    <p v-else class="muted"><strong>Artifact Map is clear.</strong> What this means: no stale/action-missing artifacts were detected. Why it matters: downstream guidance is less likely to be based on outdated dependencies. Recommended next action: continue to the Development Dashboard.</p>
   </section>
 
   <section class="card recognition-model-card">
@@ -710,7 +710,7 @@ onMounted(refreshLocalLab)
             <td>{{ formatDate(project.updated_at) }}</td>
           </tr>
           <tr v-if="projects.length === 0">
-            <td colspan="16">No local projects found yet.</td>
+            <td colspan="16">No local projects found yet. What this means: Local Lab has no project artifacts. Why it matters: dataset/export/model health states will remain low-signal. Recommended next action: load sample data from Home / Intake.</td>
           </tr>
         </tbody>
       </table>

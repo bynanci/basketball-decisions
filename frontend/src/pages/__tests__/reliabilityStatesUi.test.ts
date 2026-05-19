@@ -10,6 +10,7 @@ describe('S14 reliability state coverage', () => {
   it('has development dashboard empty state with recovery action', () => {
     const page = readPage('DevelopmentDashboardPage.vue')
     expect(page).toContain('No blocking artifact follow-ups')
+    expect(page).toContain('verify Artifact Map freshness')
     expect(page).toContain('Load sample or start project')
   })
 
@@ -17,6 +18,7 @@ describe('S14 reliability state coverage', () => {
     const page = readPage('PlayerHomePage.vue')
     expect(page).toContain('No player context yet')
     expect(page).toContain('Load Sample Project')
+    expect(page).toContain('no usable signal')
   })
 
   it('has coach reports api error state', () => {
@@ -28,7 +30,7 @@ describe('S14 reliability state coverage', () => {
   it('has drills empty recommendation state', () => {
     const page = readPage('DrillsPage.vue')
     expect(page).toContain('No drill recommendations yet')
-    expect(page).toContain('Build practice plan instead')
+    expect(page).toContain('Review practice plan options instead')
   })
 
   it('has practice plans no recommendations state', () => {
@@ -39,5 +41,18 @@ describe('S14 reliability state coverage', () => {
   it('has workflows blocked-state recovery link', () => {
     const page = readPage('WorkflowsPage.vue')
     expect(page).toContain('Resolve blocked steps')
+  })
+
+  it('has review queue empty-state next-best-action guidance', () => {
+    const page = readPage('ReviewQueuePage.vue')
+    expect(page).toContain('Review Queue is empty')
+    expect(page).toContain('Generate review queue')
+    expect(page).toContain('Open Artifact Map')
+  })
+
+  it('has local lab missing-data guidance copy', () => {
+    const page = readPage('LocalLabPage.vue')
+    expect(page).toContain('No local projects found yet.')
+    expect(page).toContain('dataset/export/model health states will remain low-signal')
   })
 })
