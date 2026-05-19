@@ -25,6 +25,9 @@ from app.models import (
     ReviewActionLog,
     ReviewActionRequest,
     ReviewActionResponse,
+    ReviewBatchActionItemResult,
+    ReviewBatchActionRequest,
+    ReviewBatchActionResponse,
     ReviewActionStatus,
     ReviewActionType,
     ReviewQueueGenerateResponse,
@@ -52,6 +55,11 @@ LOW_CONFIDENCE_DETECTION_THRESHOLD = 0.35
 UNCERTAIN_MODEL_RISK_LOW = 0.4
 UNCERTAIN_MODEL_RISK_HIGH = 0.6
 HIGH_OPPORTUNITY_COST_THRESHOLD = 0.3
+BATCH_SAFE_ACTIONS: set[ReviewActionType] = {
+    ReviewActionType.DISMISS_WITH_NOTE,
+    ReviewActionType.MARK_TRACK_FALSE_POSITIVE,
+    ReviewActionType.ACCEPT_UNKNOWN_ATTRIBUTION,
+}
 
 
 def allowed_actions_for_item(item: ReviewQueueItem) -> list[ReviewActionType]:
@@ -512,6 +520,41 @@ def _apply_review_action(item: ReviewQueueItem, request: ReviewActionRequest) ->
         return "RESOLVED", ["Alias review follow-up recorded; no alias was changed."]
     raise api_error(501, "REVIEW_ACTION_NOT_IMPLEMENTED", "This review action is not implemented yet.", {"action_type": request.action_type}, "Choose one of the implemented review actions.")
 
+
+
+def _resolve_item_for_action(items: list[ReviewQueueItem], item_id: str, request: ReviewActionRequest) -> tuple[ReviewQueueItem, ReviewActionLog] | tuple[None, ReviewActionLog]:
+    for index, item in enumerate(items):
+        if item.item_id != item_id:
+            continue
+        if request.action_type not in allowed_actions_for_item(item):
+            action = _new_action_log(item, request, "FAILED", [f"Action {request.action_type} is not allowed for {item.item_type}."])
+            _append_action_log(action)
+            return None, action
+        try:
+            new_status, warnings = _apply_review_action(item, request)
+        except Exception:
+            action = _new_action_log(item, request, "FAILED")
+            _append_action_log(action)
+            raise
+        resolved_at = utc_now() if new_status in {"RESOLVED", "DISMISSED"} else None
+        updated = _with_allowed_actions(item.model_copy(update={"status": new_status, "resolved_at": resolved_at}))
+        items[index] = updated
+        _write_queue(items)
+        action = _new_action_log(updated, request, "APPLIED", warnings)
+        _append_action_log(action)
+        return updated, action
+    missing_action = ReviewActionLog(
+        action_id=f"review-action-{uuid4().hex}",
+        item_id=item_id,
+        item_type="RECOGNITION_TRACK",
+        action_type=request.action_type,
+        payload=request.payload,
+        note=request.note,
+        status="FAILED",
+        warnings=["Review queue item was not found."],
+    )
+    return None, missing_action
+
 @router.post("/generate", response_model=ReviewQueueGenerateResponse)
 def generate_review_queue() -> ReviewQueueGenerateResponse:
     existing = _existing_item_by_id()
@@ -551,27 +594,44 @@ def list_review_actions(
 @router.post("/{item_id}/actions", response_model=ReviewActionResponse)
 def perform_review_action(item_id: str, request: ReviewActionRequest) -> ReviewActionResponse:
     items = _read_queue()
-    for index, item in enumerate(items):
-        if item.item_id != item_id:
-            continue
-        if request.action_type not in allowed_actions_for_item(item):
-            action = _new_action_log(item, request, "FAILED", [f"Action {request.action_type} is not allowed for {item.item_type}."])
-            _append_action_log(action)
-            raise api_error(400, "REVIEW_ACTION_NOT_ALLOWED", "Review action is not allowed for this queue item type.", {"item_type": item.item_type, "action_type": request.action_type, "allowed_actions": allowed_actions_for_item(item)}, "Choose an action from item.allowed_actions.")
+    updated, action = _resolve_item_for_action(items, item_id, request)
+    if updated is None:
+        if action.warnings and "not found" in action.warnings[0].lower():
+            raise api_error(404, "REVIEW_QUEUE_ITEM_NOT_FOUND", "Review queue item was not found.", {"item_id": item_id}, "Generate the review queue and retry with an item_id from the response.")
+        item_type = action.item_type
+        raise api_error(400, "REVIEW_ACTION_NOT_ALLOWED", "Review action is not allowed for this queue item type.", {"item_type": item_type, "action_type": request.action_type}, "Choose an action from item.allowed_actions.")
+    return ReviewActionResponse(item=updated, action=action)
+
+
+@router.post("/batch-actions", response_model=ReviewBatchActionResponse)
+def perform_review_batch_action(request: ReviewBatchActionRequest) -> ReviewBatchActionResponse:
+    if request.action_type not in BATCH_SAFE_ACTIONS:
+        raise api_error(400, "REVIEW_BATCH_ACTION_UNSAFE", "Batch action is not allowed.", {"action_type": request.action_type, "allowed_batch_actions": sorted(action.value for action in BATCH_SAFE_ACTIONS)}, "Use one of the documented batch-safe actions.")
+    if request.action_type == ReviewActionType.DISMISS_WITH_NOTE and (not request.note or not request.note.strip()):
+        raise api_error(422, "DISMISS_NOTE_REQUIRED", "DISMISS_WITH_NOTE requires a reviewer note.", {}, "Provide a note when dismissing in batch.")
+
+    items = _read_queue()
+    results: list[ReviewBatchActionItemResult] = []
+    warnings: list[str] = []
+    for item_id in request.item_ids:
+        action_request = ReviewActionRequest(action_type=request.action_type, note=request.note, payload=request.payload)
         try:
-            new_status, warnings = _apply_review_action(item, request)
-        except Exception:
-            action = _new_action_log(item, request, "FAILED")
-            _append_action_log(action)
-            raise
-        resolved_at = utc_now() if new_status in {"RESOLVED", "DISMISSED"} else None
-        updated = _with_allowed_actions(item.model_copy(update={"status": new_status, "resolved_at": resolved_at}))
-        items[index] = updated
-        _write_queue(items)
-        action = _new_action_log(updated, request, "APPLIED", warnings)
-        _append_action_log(action)
-        return ReviewActionResponse(item=updated, action=action)
-    raise api_error(404, "REVIEW_QUEUE_ITEM_NOT_FOUND", "Review queue item was not found.", {"item_id": item_id}, "Generate the review queue and retry with an item_id from the response.")
+            updated, action = _resolve_item_for_action(items, item_id, action_request)
+        except Exception as exc:
+            results.append(ReviewBatchActionItemResult(item_id=item_id, success=False, error_code="REVIEW_BATCH_ACTION_FAILED", error_message=str(exc)))
+            continue
+        if updated is None:
+            message = action.warnings[0] if action.warnings else "Action failed."
+            code = "REVIEW_QUEUE_ITEM_NOT_FOUND" if "not found" in message.lower() else "REVIEW_ACTION_NOT_ALLOWED"
+            results.append(ReviewBatchActionItemResult(item_id=item_id, success=False, error_code=code, error_message=message))
+            continue
+        if action.warnings:
+            warnings.extend(action.warnings)
+        results.append(ReviewBatchActionItemResult(item_id=item_id, success=True, item=updated, action=action))
+
+    succeeded_count = sum(1 for result in results if result.success)
+    failed_count = len(results) - succeeded_count
+    return ReviewBatchActionResponse(requested_count=len(request.item_ids), succeeded_count=succeeded_count, failed_count=failed_count, results=results, warnings=warnings)
 
 
 @router.put("/{item_id}", response_model=ReviewQueueItem)

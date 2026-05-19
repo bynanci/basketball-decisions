@@ -84,6 +84,30 @@ class ReviewActionResponse(BaseModel):
     action: ReviewActionLog
 
 
+class ReviewBatchActionRequest(BaseModel):
+    item_ids: list[str] = Field(min_length=1)
+    action_type: ReviewActionType
+    note: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReviewBatchActionItemResult(BaseModel):
+    item_id: str
+    success: bool
+    item: ReviewQueueItem | None = None
+    action: ReviewActionLog | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class ReviewBatchActionResponse(BaseModel):
+    requested_count: int
+    succeeded_count: int
+    failed_count: int
+    results: list[ReviewBatchActionItemResult] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ReviewQueueGenerateResponse(BaseModel):
     """Response returned after rebuilding open review queue candidates."""
 
