@@ -56,7 +56,7 @@ onMounted(loadPlayerHome)
     <EmptyState
       v-if="!isLoading && !home"
       title="No player context yet"
-      message="Select a player or load sample project data to see today’s next action."
+      message="What this means: Player Home has no usable signal for this player yet. Why it matters: low-confidence or missing artifacts can make recommendations unreliable. Recommended next action: load sample data or rebuild Player Value artifacts."
       action-label="Load Sample Project"
       action-to="/"
     />

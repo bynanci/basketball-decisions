@@ -91,7 +91,7 @@ onMounted(loadWorkflows)
         <button class="secondary" :disabled="isLoading" @click="loadWorkflows">Refresh list</button>
       </div>
       <p v-if="isLoading" class="status">Loading workflows…</p>
-      <EmptyState v-else-if="!workflows.length" title="No guided workflows yet" message="Start a template to track prerequisites and blocked steps." action-label="Open sample data intake" action-to="/" />
+      <EmptyState v-else-if="!workflows.length" title="No guided workflows yet" message="What this means: no workflow checklist has been started. Why it matters: blocked prerequisites are harder to spot without workflow state. Recommended next action: start a template to track blocked steps." action-label="Start from Home / Intake" action-to="/" />
       <div v-else class="table-card compact-table">
         <table>
           <thead>

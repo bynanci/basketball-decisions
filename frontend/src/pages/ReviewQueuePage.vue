@@ -116,7 +116,7 @@ async function loadQueue() {
     items.value = await apiClient.listReviewQueue()
     syncActionDefaults()
     await loadActions()
-    statusMessage.value = items.value.length ? `Loaded ${items.value.length} review item(s).` : 'No review queue has been generated yet.'
+    statusMessage.value = items.value.length ? `Loaded ${items.value.length} review item(s).` : 'Review Queue is empty. Generate it to surface unresolved diagnostics and attribution checks.'
   } catch (error) {
     if (isApiClientError(error)) errorMessage.value = `${error.code}: ${error.message}`
     else errorMessage.value = error instanceof Error ? error.message : 'Could not load review queue.'
@@ -242,7 +242,11 @@ async function applyBatchAction() {
     <p v-if="isLoading" class="muted">Loading review queue…</p>
 
     <div v-if="!isLoading && !items.length" class="empty-state">
-      Generate the queue to collect open review work from existing diagnostics and local artifacts.
+      <h2>Review Queue is empty</h2>
+      <p><strong>What this means:</strong> No open review items were found in current artifacts.</p>
+      <p><strong>Why it matters:</strong> Low-signal or stale inputs can hide issues that should be triaged before downstream reports.</p>
+      <p><strong>Recommended next action:</strong> Generate the queue to re-scan recognition, decision, and attribution diagnostics.</p>
+      <div class="button-row"><button class="primary" :disabled="isGenerating" @click="generateQueue">Generate review queue</button><RouterLink class="button-link" to="/local-lab">Open Artifact Map</RouterLink></div>
     </div>
 
     

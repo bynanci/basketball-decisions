@@ -138,8 +138,8 @@ onMounted(loadDashboard)
         </div>
         <EmptyState
           v-if="!dashboard.next_best_actions.length"
-          title="No blocking Artifact Health follow-ups"
-          message="This repo can still be fresh. Load a sample project or start intake from Home."
+          title="No blocking artifact follow-ups"
+          message="What this means: no blocking artifact actions were detected. Why it matters: low-signal projects can still be incomplete. Recommended next action: verify Artifact Map freshness before making decisions."
           action-label="Load sample or start project"
           action-to="/"
         />
