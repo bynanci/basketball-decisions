@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { apiClient, COACH_REPORT_SECTIONS, isApiClientError, type CoachReport, type CoachReportBuildRequest, type CoachReportDepth, type CoachReportListItem, type CoachReportSectionName } from '../api/client'
+import { apiClient, COACH_REPORT_SECTIONS, isApiClientError, type CoachReport, type CoachReportBuildRequest, type CoachReportDepth, type CoachReportListItem, type CoachReportSectionName, type EvidenceLockedSummaryResponse } from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
-import WarningPanel from '../components/WarningPanel.vue'
 
 const title = ref('Coach Report')
 const projectId = ref('')
@@ -18,6 +17,7 @@ const isLoading = ref(false)
 const isBuilding = ref(false)
 const statusMessage = ref('')
 const errorMessage = ref('')
+const llmSummary = ref<EvidenceLockedSummaryResponse | null>(null)
 
 const previewMarkdown = computed(() => currentReport.value?.markdown ?? 'Build or select a report to preview deterministic Markdown here.')
 
@@ -86,6 +86,18 @@ async function selectReport(reportId: string) {
     } else {
       errorMessage.value = error instanceof Error ? error.message : 'Unable to load coach report.'
     }
+  }
+}
+
+async function rewriteCoachSummary() {
+  if (!currentReport.value) return
+  errorMessage.value = ''
+  llmSummary.value = null
+  try {
+    llmSummary.value = await apiClient.createEvidenceLockedSummary({ report_id: currentReport.value.report_id, provider: 'mock', created_by: createdBy.value.trim() || null })
+    statusMessage.value = 'Generated LLM-assisted wording (evidence-locked).'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to rewrite coach summary.'
   }
 }
 
@@ -158,6 +170,7 @@ onMounted(loadHistory)
         <div class="section-header">
           <h2>Preview</h2>
           <div v-if="currentReport" class="button-row">
+            <button class="ghost" @click="rewriteCoachSummary">Rewrite as coach-friendly summary</button>
             <a class="button-link" :href="apiClient.coachReportMarkdownUrl(currentReport.report_id)" target="_blank" rel="noreferrer">Markdown</a>
             <a class="button-link" :href="apiClient.coachReportJsonUrl(currentReport.report_id)" target="_blank" rel="noreferrer">JSON</a>
           </div>
@@ -168,6 +181,15 @@ onMounted(loadHistory)
         <pre class="markdown-preview">{{ previewMarkdown }}</pre>
       </section>
     </div>
+
+    <section v-if="llmSummary" class="card">
+      <h2>LLM-assisted wording</h2>
+      <p class="muted">LLM rewrite cannot change scores or evidence.</p>
+      <pre class="markdown-preview">{{ llmSummary.llm_assisted_wording }}</pre>
+      <p v-if="!llmSummary.validation.warnings_preserved || !llmSummary.validation.scores_unchanged || !llmSummary.validation.evidence_refs_preserved || llmSummary.validation.prohibited_phrases.length" class="warning-cell">
+        Validation warning: warnings_preserved={{ llmSummary.validation.warnings_preserved }}, scores_unchanged={{ llmSummary.validation.scores_unchanged }}, evidence_refs_preserved={{ llmSummary.validation.evidence_refs_preserved }}, prohibited={{ llmSummary.validation.prohibited_phrases.join(', ') || 'none' }}
+      </p>
+    </section>
 
     <section class="card report-history">
       <div class="section-header">
@@ -208,4 +230,3 @@ onMounted(loadHistory)
     </section>
   </section>
 </template>
-        <WarningPanel v-if="currentReport?.warnings.length" title="Report artifact warnings" :warnings="currentReport.warnings" action-label="Open Local Lab" action-to="/local-lab" />
