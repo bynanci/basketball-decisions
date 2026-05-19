@@ -1679,6 +1679,36 @@ export interface CoachReportListResponse {
 
 
 
+
+export type LLMProvider = 'mock' | 'external'
+
+export interface EvidenceLockedSummaryRequest {
+  report_id: string
+  provider?: LLMProvider
+  created_by?: string | null
+}
+
+export interface EvidenceLockedSummaryValidation {
+  warnings_preserved: boolean
+  scores_unchanged: boolean
+  evidence_refs_preserved: boolean
+  prohibited_phrases: string[]
+}
+
+export interface EvidenceLockedSummaryResponse {
+  schema_version: string
+  summary_id: string
+  report_id: string
+  provider: LLMProvider
+  created_at: string
+  created_by?: string | null
+  llm_assisted_wording: string
+  warnings: string[]
+  validation: EvidenceLockedSummaryValidation
+  source_report_json_path: string
+  json_path: string
+}
+
 export type ArtifactStatus = 'fresh' | 'stale' | 'missing' | 'unknown'
 export type ArtifactSeverity = 'info' | 'warning' | 'action'
 
@@ -2025,6 +2055,9 @@ export const apiClient = {
   getCoachReportMarkdown: (reportId: string) => requestText(`/reports/coach/${encodeURIComponent(reportId)}/markdown`),
   coachReportMarkdownUrl: (reportId: string) => `${API_BASE_URL}/reports/coach/${encodeURIComponent(reportId)}/markdown`,
   coachReportJsonUrl: (reportId: string) => `${API_BASE_URL}/reports/coach/${encodeURIComponent(reportId)}/json`,
+  createEvidenceLockedSummary: (payload: EvidenceLockedSummaryRequest) => request<EvidenceLockedSummaryResponse>('/reports/coach/evidence-locked-summary', { method: 'POST', body: JSON.stringify(payload) }),
+  getEvidenceLockedSummary: (summaryId: string) => request<EvidenceLockedSummaryResponse>(`/reports/coach/evidence-locked-summary/${encodeURIComponent(summaryId)}`),
+  getEvidenceLockedSummaryMarkdown: (summaryId: string) => requestText(`/reports/coach/evidence-locked-summary/${encodeURIComponent(summaryId)}/markdown`),
   listLocalLabProjects: () => request<LocalLabProjectsResponse>('/local-lab/projects'),
   listSources: () => request<SourceRegistryResponse>('/sources'),
   seedCandidateSources: () => request<SourceRegistryResponse>('/sources/seed-candidates', { method: 'POST' }),
