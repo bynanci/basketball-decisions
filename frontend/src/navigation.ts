@@ -132,7 +132,7 @@ export const productNavigationSections: ProductNavigationSection[] = [
         label: 'Player Home',
         path: '/player-home',
         routeName: 'player-home',
-        description: 'Simple player-facing view of today's focus, drill, and next action.',
+        description: "Simple player-facing view of today's focus, drill, and next action.",
         status: 'core'
       },
       {

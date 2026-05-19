@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { apiClient, COACH_REPORT_SECTIONS, isApiClientError, type CoachReport, type CoachReportBuildRequest, type CoachReportDepth, type CoachReportListItem, type CoachReportSectionName } from '../api/client'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
+import WarningPanel from '../components/WarningPanel.vue'
 
 const title = ref('Coach Report')
 const projectId = ref('')
@@ -105,7 +108,7 @@ onMounted(loadHistory)
     </header>
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
-    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+    <ErrorState v-if="errorMessage" title="Coach reports API error" :message="errorMessage" action-label="Open Development Dashboard" action-to="/development-dashboard" />
 
     <div class="grid two-column">
       <section class="card report-builder">
@@ -171,7 +174,7 @@ onMounted(loadHistory)
         <h2>History</h2>
         <button class="ghost" :disabled="isLoading" @click="loadHistory">{{ isLoading ? 'Refreshing…' : 'Refresh' }}</button>
       </div>
-      <p v-if="!history.length" class="muted">No coach reports have been generated yet.</p>
+      <EmptyState v-if="!history.length" title="No coach reports yet" message="Build your first report or load sample data." action-label="Load sample project" action-to="/" />
       <div v-else class="table-card compact-table">
         <table>
           <thead>
@@ -205,3 +208,4 @@ onMounted(loadHistory)
     </section>
   </section>
 </template>
+        <WarningPanel v-if="currentReport?.warnings.length" title="Report artifact warnings" :warnings="currentReport.warnings" action-label="Open Local Lab" action-to="/local-lab" />

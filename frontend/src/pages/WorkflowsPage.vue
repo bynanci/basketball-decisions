@@ -2,6 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient, type WorkflowListItem, type WorkflowTemplateKey } from '../api/client'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
 
 const router = useRouter()
 const workflows = ref<WorkflowListItem[]>([])
@@ -59,7 +61,7 @@ onMounted(loadWorkflows)
       <p>Start local, explicit workflow checklists. Steps point to existing tools and never execute underlying operations automatically.</p>
     </div>
 
-    <div v-if="errorMessage" class="error-card">{{ errorMessage }}</div>
+    <ErrorState v-if="errorMessage" title="Workflow API error" :message="errorMessage" action-label="Open Development Dashboard" action-to="/development-dashboard" />
 
     <section class="card">
       <div class="section-header">
@@ -89,7 +91,7 @@ onMounted(loadWorkflows)
         <button class="secondary" :disabled="isLoading" @click="loadWorkflows">Refresh list</button>
       </div>
       <p v-if="isLoading" class="status">Loading workflows…</p>
-      <p v-else-if="!workflows.length" class="empty-card">No guided workflows have been started yet.</p>
+      <EmptyState v-else-if="!workflows.length" title="No guided workflows yet" message="Start a template to track prerequisites and blocked steps." action-label="Open sample data intake" action-to="/" />
       <div v-else class="table-card compact-table">
         <table>
           <thead>
@@ -102,7 +104,7 @@ onMounted(loadWorkflows)
               <td>{{ workflow.completed_step_count }} / {{ workflow.total_step_count }} complete<span v-if="workflow.blocked_step_count"> · {{ workflow.blocked_step_count }} blocked</span></td>
               <td>{{ workflow.project_id ?? 'All projects' }}</td>
               <td>{{ new Date(workflow.updated_at).toLocaleString() }}</td>
-              <td><RouterLink class="button-link" :to="`/workflows/${workflow.workflow_id}`">Open</RouterLink></td>
+              <td><RouterLink class="button-link" :to="`/workflows/${workflow.workflow_id}`">{{ workflow.blocked_step_count ? 'Resolve blocked steps' : 'Open' }}</RouterLink></td>
             </tr>
           </tbody>
         </table>
