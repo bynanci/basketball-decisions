@@ -96,6 +96,7 @@ npm run test:e2e
 - Backend services: [docs/architecture/backend-services.md](docs/architecture/backend-services.md)
 - Frontend routes: [docs/architecture/frontend-routes.md](docs/architecture/frontend-routes.md)
 - Local artifacts: [docs/architecture/local-artifacts.md](docs/architecture/local-artifacts.md)
+- AI intervention policy: [docs/architecture/ai-intervention-policy.md](docs/architecture/ai-intervention-policy.md)
 
 ### Reviews
 
