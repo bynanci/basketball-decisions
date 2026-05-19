@@ -77,6 +77,7 @@ describe('player value evidence UI wiring', () => {
     expect(playerValuePage).toContain("name: 'player-value-detail'")
     expect(playerValuePage).toContain('projectId: summary.project_id')
     expect(playerValuePage).toContain('playerKey: summary.player_key')
+    expect(playerValuePage).toContain('<ConfidenceHelp variant="analyst" compact />')
   })
 
   it('renders the evidence dashboard tables, warnings, and source/context track explanation', () => {
@@ -89,5 +90,6 @@ describe('player value evidence UI wiring', () => {
     expect(detailPage).toContain('Evidence Warning Panel')
     expect(detailPage).toContain('No decision event evidence was found for this summary.')
     expect(detailPage).toContain('formatNumber(value?: number | null')
+    expect(detailPage).toContain('<ConfidenceHelp variant="analyst" compact />')
   })
 })

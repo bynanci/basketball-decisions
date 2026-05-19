@@ -13,6 +13,7 @@ describe('player home UI wiring', () => {
     expect(page).toContain('Latest Practice Feedback')
     expect(page).toContain('Progress Trend')
     expect(page).toContain('home.confidence ??')
+    expect(page).toContain('<ConfidenceHelp variant="player" compact />')
   })
 
   it('renders links and route wiring', () => {

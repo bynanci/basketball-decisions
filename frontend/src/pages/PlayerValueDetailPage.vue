@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import ConfidenceHelp from '../components/ConfidenceHelp.vue'
 import { apiClient, type PlayerValueEvidenceResponse } from '../api/client'
 
 const props = defineProps<{
@@ -98,6 +99,7 @@ onMounted(loadEvidence)
           <span>Confidence</span>
           <strong>{{ formatPercent(summary.confidence) }}</strong>
         </article>
+        <ConfidenceHelp variant="analyst" compact />
       </section>
 
       <section v-if="summary.warnings.length" class="warning-card">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { apiClient, type PlayerValueCompareResponse, type PlayerValueTrendSeries, type PlayerValueTrendsResponse } from '../api/client'
+import ConfidenceHelp from '../components/ConfidenceHelp.vue'
 
 const trends = ref<PlayerValueTrendsResponse | null>(null)
 const comparison = ref<PlayerValueCompareResponse | null>(null)
@@ -95,6 +96,7 @@ onMounted(loadTrends)
 
     <section v-if="comparison" class="panel">
       <h2>Comparison results</h2>
+      <ConfidenceHelp variant="analyst" compact />
       <div class="trend-grid">
         <article v-for="series in comparison.trends" :key="`${series.project_id}:${series.player_key}`" class="trend-card">
           <h3>{{ series.player_key }} <small>{{ series.project_id }}</small></h3>
