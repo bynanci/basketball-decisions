@@ -316,3 +316,36 @@ def test_rule_draft_approve_and_dismiss_with_note(client: TestClient, tmp_path: 
     assert missing_note.status_code == 422
     assert dismissed.status_code == 200
     assert dismissed.json()["item"]["status"] == "DISMISSED"
+
+def test_batch_dismiss_with_note_and_without_note(client: TestClient, tmp_path: Path) -> None:
+    directory = _write_project(tmp_path)
+    _write_recognition_artifacts(directory)
+    payload = client.post('/api/review-queue/generate').json()
+    item_ids = [item['item_id'] for item in payload['items'][:1]]
+
+    missing = client.post('/api/review-queue/batch-actions', json={'item_ids': item_ids, 'action_type': 'DISMISS_WITH_NOTE', 'payload': {}})
+    assert missing.status_code == 422
+
+    ok = client.post('/api/review-queue/batch-actions', json={'item_ids': item_ids, 'action_type': 'DISMISS_WITH_NOTE', 'note': 'duplicate', 'payload': {}})
+    assert ok.status_code == 200
+    assert ok.json()['succeeded_count'] == 1
+
+
+def test_batch_unsafe_rejected_and_partial_success(client: TestClient, tmp_path: Path) -> None:
+    directory = _write_project(tmp_path)
+    _write_recognition_artifacts(directory)
+    payload = client.post('/api/review-queue/generate').json()
+    item = _item_by_type(payload, 'RECOGNITION_TRACK')
+
+    unsafe = client.post('/api/review-queue/batch-actions', json={'item_ids': [item['item_id']], 'action_type': 'ASSIGN_TRACK_TO_PLAYER_ALIAS', 'payload': {}})
+    assert unsafe.status_code == 400
+
+    before_tracking = (directory / 'tracking.json').read_text(encoding='utf-8')
+    mixed = client.post('/api/review-queue/batch-actions', json={'item_ids': [item['item_id'], 'missing-item'], 'action_type': 'MARK_TRACK_FALSE_POSITIVE', 'payload': {}})
+    assert mixed.status_code == 200
+    assert mixed.json()['succeeded_count'] == 1
+    assert mixed.json()['failed_count'] == 1
+    assert any(result['success'] is False for result in mixed.json()['results'])
+    actions = client.get('/api/review-queue/actions', params={'item_id': item['item_id']}).json()
+    assert actions[0]['status'] == 'APPLIED'
+    assert (directory / 'tracking.json').read_text(encoding='utf-8') == before_tracking

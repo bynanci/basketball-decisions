@@ -5,6 +5,7 @@ import {
   isApiClientError,
   type ReviewActionLog,
   type ReviewActionRequest,
+  type ReviewBatchActionResponse,
   type ReviewActionType,
   type ReviewQueueItem,
   type ReviewQueueItemType,
@@ -22,6 +23,11 @@ const selectedActions = reactive<Record<string, ReviewActionType | ''>>({})
 const actionNotes = reactive<Record<string, string>>({})
 const aliasPlayerKeys = reactive<Record<string, string>>({})
 const aliasTrackIds = reactive<Record<string, string>>({})
+const selectedItemIds = ref<string[]>([])
+const batchActionType = ref<ReviewActionType>('DISMISS_WITH_NOTE')
+const batchNote = ref('')
+const showBatchConfirm = ref(false)
+const batchResultSummary = ref<ReviewBatchActionResponse | null>(null)
 
 const typeLabels: Record<ReviewQueueItemType, string> = {
   RECOGNITION_TRACK: 'Recognition tracks',
@@ -47,6 +53,7 @@ const actionLabels: Record<ReviewActionType, string> = {
 }
 
 const typeOrder = Object.keys(typeLabels) as ReviewQueueItemType[]
+const batchSafeActions: ReviewActionType[] = ['DISMISS_WITH_NOTE', 'MARK_TRACK_FALSE_POSITIVE', 'ACCEPT_UNKNOWN_ATTRIBUTION']
 
 const groupedItems = computed(() =>
   typeOrder
@@ -59,6 +66,18 @@ const counts = computed(() => ({
   resolved: items.value.filter((item) => item.status === 'RESOLVED').length,
   dismissed: items.value.filter((item) => item.status === 'DISMISSED').length
 }))
+
+const selectedCount = computed(() => selectedItemIds.value.length)
+const allSelected = computed(() => !!items.value.length && selectedItemIds.value.length === items.value.length)
+
+function toggleSelectAll() {
+  selectedItemIds.value = allSelected.value ? [] : items.value.map((item) => item.item_id)
+}
+
+function toggleItemSelection(itemId: string, checked: boolean) {
+  if (checked) { if (!selectedItemIds.value.includes(itemId)) selectedItemIds.value.push(itemId) }
+  else selectedItemIds.value = selectedItemIds.value.filter((id) => id !== itemId)
+}
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
@@ -174,6 +193,26 @@ async function performAction(item: ReviewQueueItem) {
 }
 
 onMounted(loadQueue)
+
+async function applyBatchAction() {
+  if (!selectedItemIds.value.length) return
+  if (batchActionType.value === 'DISMISS_WITH_NOTE' && !batchNote.value.trim()) {
+    errorMessage.value = 'DISMISS_WITH_NOTE requires a note.'
+    return
+  }
+  const response = await apiClient.performReviewBatchAction({
+    item_ids: selectedItemIds.value,
+    action_type: batchActionType.value,
+    note: batchNote.value.trim() || null,
+    payload: {}
+  })
+  batchResultSummary.value = response
+  showBatchConfirm.value = false
+  selectedItemIds.value = []
+  await loadQueue()
+  statusMessage.value = `Batch action complete: ${response.succeeded_count} succeeded, ${response.failed_count} failed.`
+}
+
 </script>
 
 <template>
@@ -198,6 +237,7 @@ onMounted(loadQueue)
     </div>
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
+    <p>Selected: {{ selectedCount }}</p>
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     <p v-if="isLoading" class="muted">Loading review queue…</p>
 
@@ -205,17 +245,37 @@ onMounted(loadQueue)
       Generate the queue to collect open review work from existing diagnostics and local artifacts.
     </div>
 
+    
+    <section v-if="selectedCount" class="card queue-group" data-testid="batch-toolbar">
+      <h2>Batch actions</h2>
+      <select v-model="batchActionType">
+        <option v-for="action in batchSafeActions" :key="action" :value="action">{{ actionLabels[action] }}</option>
+      </select>
+      <textarea v-if="batchActionType === 'DISMISS_WITH_NOTE'" v-model="batchNote" placeholder="Dismiss note" />
+      <button class="primary" @click="showBatchConfirm = true">Apply batch action</button>
+    </section>
+    <div v-if="showBatchConfirm" class="card" data-testid="batch-confirmation-modal">
+      <p>Confirm batch action for {{ selectedCount }} items?</p>
+      <button class="ghost" @click="showBatchConfirm = false">Cancel</button>
+      <button class="primary" @click="applyBatchAction">Confirm</button>
+    </div>
+    <section v-if="batchResultSummary" class="card" data-testid="batch-partial-summary">
+      <p>Partial results: {{ batchResultSummary.succeeded_count }} succeeded / {{ batchResultSummary.failed_count }} failed.</p>
+    </section>
+
     <section v-for="group in groupedItems" :key="group.type" class="card queue-group">
       <div class="section-heading">
         <div>
           <p class="eyebrow">{{ group.type }}</p>
           <h2>{{ group.label }}</h2>
+          <label><input type="checkbox" :checked="allSelected" @change="toggleSelectAll" /> Select all</label>
         </div>
         <span class="pill">{{ group.items.length }} item(s)</span>
       </div>
 
       <article v-for="item in group.items" :key="item.item_id" class="queue-item" :class="`status-${item.status.toLowerCase()}`">
         <div class="queue-item-header">
+          <input type="checkbox" :checked="selectedItemIds.includes(item.item_id)" @change="toggleItemSelection(item.item_id, ($event.target as HTMLInputElement).checked)" />
           <div>
             <span class="priority-badge" :class="`priority-${item.priority.toLowerCase()}`">{{ item.priority }}</span>
             <span class="status-pill">{{ item.status }}</span>

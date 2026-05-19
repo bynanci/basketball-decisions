@@ -983,6 +983,31 @@ export interface ReviewActionResponse {
   action: ReviewActionLog
 }
 
+
+export interface ReviewBatchActionRequest {
+  item_ids: string[]
+  action_type: ReviewActionType
+  note?: string | null
+  payload?: Record<string, unknown>
+}
+
+export interface ReviewBatchActionItemResult {
+  item_id: string
+  success: boolean
+  item?: ReviewQueueItem | null
+  action?: ReviewActionLog | null
+  error_code?: string | null
+  error_message?: string | null
+}
+
+export interface ReviewBatchActionResponse {
+  requested_count: number
+  succeeded_count: number
+  failed_count: number
+  results: ReviewBatchActionItemResult[]
+  warnings: string[]
+}
+
 export interface ReviewActionFilters {
   item_id?: string
   project_id?: string
@@ -2011,6 +2036,8 @@ export const apiClient = {
     request<ReviewQueueItem>(`/review-queue/${encodeURIComponent(itemId)}`, { method: 'PUT', body: JSON.stringify({ status }) }),
   performReviewAction: (itemId: string, payload: ReviewActionRequest) =>
     request<ReviewActionResponse>(`/review-queue/${encodeURIComponent(itemId)}/actions`, { method: 'POST', body: JSON.stringify(payload) }),
+  performReviewBatchAction: (payload: ReviewBatchActionRequest) =>
+    request<ReviewBatchActionResponse>('/review-queue/batch-actions', { method: 'POST', body: JSON.stringify(payload) }),
   listReviewActions: (filters: ReviewActionFilters = {}) => {
     const params = new URLSearchParams()
     if (filters.item_id) params.set('item_id', filters.item_id)
