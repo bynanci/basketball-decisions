@@ -68,6 +68,6 @@ def build_player_home(player_key: str) -> PlayerHomeResponse:
         current_risk=rec.get("risk", "Inconsistent choices under pressure.") if rec else "Inconsistent choices under pressure.",
         recommended_drill=(rec.get("drill_name") or rec.get("title") or "No drill recommendation yet.") if rec else "No drill recommendation yet.",
         latest_practice_feedback=(latest_execution.get("plan_title") + " completion " + str(round(float(latest_execution.get("completion_rate", 0.0)) * 100)) + "%") if latest_execution else "No practice execution feedback yet.",
-        next_action="Start today's recommended drill" if rec else "View practice plan",
+        next_action="Review today's suggested drill focus" if rec else "Review practice plan",
         warnings=warnings,
     )

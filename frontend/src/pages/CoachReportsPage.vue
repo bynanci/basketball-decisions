@@ -97,7 +97,7 @@ async function rewriteCoachSummary() {
   llmSummary.value = null
   try {
     llmSummary.value = await apiClient.createEvidenceLockedSummary({ report_id: currentReport.value.report_id, provider: 'mock', created_by: createdBy.value.trim() || null })
-    statusMessage.value = 'Generated LLM-assisted wording (evidence-locked).'
+    statusMessage.value = 'Generated LLM-assisted advisory wording (evidence-locked).'
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to rewrite coach summary.'
   }
@@ -193,7 +193,7 @@ onMounted(loadHistory)
     </div>
 
     <section v-if="llmSummary" class="card">
-      <h2>LLM-assisted wording</h2>
+      <h2>LLM-assisted advisory wording</h2>
       <p class="muted">LLM rewrite cannot change scores or evidence.</p>
       <pre class="markdown-preview">{{ llmSummary.llm_assisted_wording }}</pre>
       <p v-if="!llmSummary.validation.warnings_preserved || !llmSummary.validation.scores_unchanged || !llmSummary.validation.evidence_refs_preserved || llmSummary.validation.prohibited_phrases.length" class="warning-cell">

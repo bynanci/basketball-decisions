@@ -430,22 +430,22 @@ def _render_summary_markdown(report_id: str, title: str, created_at: str, sectio
         )
     lines.append(_bullet(player_focus))
 
-    lines.extend(["", "## Recommended Drills", ""])
+    lines.extend(["", "## Potential Practice Focuses", ""])
     drill_bullets = [
         f"{row.get('priority', 'unknown')} priority / {row.get('title', 'Untitled drill')} ({row.get('role') or 'any role'}, {row.get('situation', 'unknown situation')}): confidence {_format_number(row.get('confidence'))} — {row.get('reason', 'No saved deterministic reason.')}"
         for row in recommendation_rows[:5]
     ]
     lines.append(_bullet(drill_bullets))
 
-    lines.extend(["", "## Suggested Practice Focus", ""])
+    lines.extend(["", "## Recommended Next Steps", ""])
     practice_focus = []
     if recommendation_rows:
-        practice_focus.extend(f"Use saved drill recommendation: {row.get('title', 'Untitled drill')} ({row.get('priority', 'unknown')} priority)." for row in recommendation_rows[:3])
+        practice_focus.extend(f"Consider saved drill recommendation: {row.get('title', 'Untitled drill')} ({row.get('priority', 'unknown')} priority)." for row in recommendation_rows[:3])
     low_confidence = [row for row in player_rows if isinstance(row.get("confidence"), (int, float)) and float(row.get("confidence")) < 0.6]
     if low_confidence:
         practice_focus.append("Review low-confidence Player Value evidence before using it for practice decisions.")
     if review_count:
-        practice_focus.append("Clear open review items before treating this report as final.")
+        practice_focus.append("Review open review items before treating this report as final.")
     if not practice_focus and player_rows:
         practice_focus.append("Use the Player Focus rows above to choose deterministic follow-up from existing drills and review artifacts.")
     lines.append(_bullet(practice_focus))

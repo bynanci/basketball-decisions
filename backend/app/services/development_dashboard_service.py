@@ -258,7 +258,7 @@ def build_development_dashboard() -> DevelopmentDashboardResponse:
         coach_report_count=len(coach_reports.reports) if coach_reports else 0,
         notes=[
             "Dashboard summarizes local artifacts only; it is not an official scouting-grade evaluation.",
-            "Next-best-actions are operational artifact follow-ups, not LLM-generated coaching advice.",
+            "Recommended next steps are operational artifact follow-ups, not LLM-generated coaching advice.",
         ],
     )
 

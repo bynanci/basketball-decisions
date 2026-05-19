@@ -201,7 +201,7 @@ export const productNavigationSections: ProductNavigationSection[] = [
         label: 'Development Dashboard',
         path: '/development-dashboard',
         routeName: 'development-dashboard',
-        description: 'Main command center for progress, health summaries, next-best-actions, and grouped navigation.',
+        description: 'Main dashboard for progress, health summaries, recommended next steps, and grouped navigation.',
         status: 'command-center'
       },
       {

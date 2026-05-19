@@ -7,14 +7,14 @@ function readPage(name: string) {
 }
 
 describe('development dashboard UI wiring', () => {
-  it('renders the command center sections and API call', () => {
+  it('renders the dashboard sections and API call', () => {
     const page = readPage('DevelopmentDashboardPage.vue')
 
     expect(page).toContain('apiClient.getDevelopmentDashboard()')
-    expect(page).toContain('Development Dashboard Command Center')
+    expect(page).toContain('Development Dashboard')
     expect(page).toContain('Navigate by job-to-be-done')
     expect(page).toContain('productNavigationSections')
-    expect(page).toContain('Next-best-actions')
+    expect(page).toContain('Recommended next steps')
     expect(page).toContain('Team Summary')
     expect(page).toContain('Player Development Table')
     expect(page).toContain('Practice Feedback Summary')

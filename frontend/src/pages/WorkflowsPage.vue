@@ -15,7 +15,7 @@ const projectId = ref('')
 const templateOptions: Array<{ key: WorkflowTemplateKey; label: string; detail: string }> = [
   { key: 'BUILD_PLAYER_VALUE', label: 'Build Player Value', detail: 'Tracking review → aliases → decision events → Player Value' },
   { key: 'IMPROVE_DATA_QUALITY', label: 'Improve Data Quality', detail: 'Review queue → dataset health → model readiness' },
-  { key: 'TRAINING_RECOMMENDATION', label: 'Training Recommendation', detail: 'Player Value → drills → practice plan → execution' },
+  { key: 'TRAINING_RECOMMENDATION', label: 'Training Recommendation Support', detail: 'Player Value → drills → practice plan → execution' },
   { key: 'COACH_REPORT', label: 'Coach Report', detail: 'Readiness checks → deterministic report export' },
   { key: 'MODEL_GOVERNANCE', label: 'Model Governance', detail: 'Dataset health → review queue → active model' }
 ]
@@ -69,7 +69,7 @@ onMounted(loadWorkflows)
           <h2>Start a workflow</h2>
           <p class="muted">Choose a template. Optional project ID scopes prerequisite checks.</p>
         </div>
-        <button :disabled="isLoading" @click="startWorkflow">Start guided workflow</button>
+        <button :disabled="isLoading" @click="startWorkflow">Review guided workflow steps</button>
       </div>
       <div class="form-grid">
         <label>
