@@ -9,7 +9,7 @@ describe('player home UI wiring', () => {
     expect(page).toContain('Today’s Focus')
     expect(page).toContain('Current Strength')
     expect(page).toContain('Current Risk')
-    expect(page).toContain('Recommended Drill')
+    expect(page).toContain('Suggested Drill Focus')
     expect(page).toContain('Latest Practice Feedback')
     expect(page).toContain('Progress Trend')
     expect(page).toContain('home.confidence ??')

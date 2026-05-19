@@ -152,7 +152,7 @@ def test_summary_coach_report_depth_surfaces_compact_warning_sections(client: Te
     payload = response.json()
     markdown = payload["markdown"]
     assert payload["report_depth"] == "SUMMARY"
-    for heading in ["Top Findings", "Player Focus", "Recommended Drills", "Suggested Practice Focus", "Confidence & Warnings", "Evidence References"]:
+    for heading in ["Top Findings", "Player Focus", "Potential Practice Focuses", "Recommended Next Steps", "Confidence & Warnings", "Evidence References"]:
         assert f"## {heading}" in markdown
     assert "confidence 0.31" in markdown
     assert "Identity is UNKNOWN" in markdown

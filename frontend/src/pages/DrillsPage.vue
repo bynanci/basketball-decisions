@@ -96,12 +96,12 @@ onMounted(refresh)
         <p class="eyebrow">M22 Recommendation Engine</p>
         <h1>Drill Recommendations</h1>
         <p class="lede">
-          Generate deterministic recommendations from diagnostics, Player Value, trends, teaching cases, and review findings using only the local drill catalog.
+          Generate deterministic suggested focuses from diagnostics, Player Value, trends, teaching cases, and review findings using only the local drill catalog.
         </p>
       </div>
       <div class="button-row">
         <button class="ghost" :disabled="isLoading" @click="refresh">{{ isLoading ? 'Refreshing…' : 'Refresh' }}</button>
-        <button class="primary" :disabled="isBuilding" @click="buildRecommendations">{{ isBuilding ? 'Generating…' : 'Generate recommendations' }}</button>
+        <button class="primary" :disabled="isBuilding" @click="buildRecommendations">{{ isBuilding ? 'Generating…' : 'Generate suggested focuses' }}</button>
       </div>
     </header>
 
@@ -114,6 +114,7 @@ onMounted(refresh)
     />
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
+    <p class="muted">Recommendations are generated from available local evidence and should be reviewed by a coach or analyst before use.</p>
     <ErrorState v-if="errorMessage" title="Drills API error" :message="errorMessage" action-label="Open Home / Intake" action-to="/" />
 
     <section class="card">
@@ -148,8 +149,8 @@ onMounted(refresh)
     <EmptyState
       v-if="!recommendations.length && !isLoading"
       title="No drill recommendations yet"
-      message="Generate recommendations or load sample data. Missing optional artifacts are handled as warnings."
-      action-label="Build practice plan instead"
+      message="Generate suggested focuses or load sample data. Missing optional artifacts are handled as warnings."
+      action-label="Review practice plan options instead"
       action-to="/practice-plans"
     />
     <section class="recommendation-grid">

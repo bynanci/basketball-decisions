@@ -114,7 +114,7 @@ onMounted(refresh)
       <div>
         <p class="eyebrow">M23 Practice Plan Builder</p>
         <h1>Practice Plans</h1>
-        <p class="lede">Build time-boxed 60, 75, 90, or 120 minute plans from deterministic drill recommendations and export Markdown or JSON.</p>
+        <p class="lede">Build time-boxed 60, 75, 90, or 120 minute plans from deterministic drill recommendations and export Markdown or JSON for coach review before use.</p>
       </div>
       <div class="button-row">
         <button class="ghost" :disabled="isLoading" @click="refresh">{{ isLoading ? 'Refreshing…' : 'Refresh' }}</button>
@@ -131,6 +131,7 @@ onMounted(refresh)
     />
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
+    <p class="muted">Recommendations are generated from available local evidence and should be reviewed by a coach or analyst before use.</p>
     <ErrorState v-if="errorMessage" title="Practice plan API error" :message="errorMessage" action-label="Open Drill Recommendations" action-to="/drills" />
 
     <section class="card practice-builder">

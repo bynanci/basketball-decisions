@@ -76,9 +76,9 @@ onMounted(loadDashboard)
     <header class="page-header">
       <div>
         <p class="eyebrow">M26 Dashboard</p>
-        <h1>Development Dashboard Command Center</h1>
+        <h1>Development Dashboard</h1>
         <p class="lede">
-          The main command center for the product: grouped navigation, existing artifact health, and operational follow-ups without changing scoring formulas, generating coaching advice, or claiming official scouting-grade evaluation; it is not an official scouting-grade evaluation.
+          A central operations view for the product: grouped navigation, existing artifact health, and operational follow-ups without changing scoring formulas, generating coaching advice, or claiming official scouting-grade evaluation; it is not an official scouting-grade evaluation.
         </p>
       </div>
       <button class="primary" :disabled="isLoading" @click="loadDashboard">
@@ -133,7 +133,7 @@ onMounted(loadDashboard)
     <div v-if="dashboard" class="grid two-column">
       <section class="card">
         <div class="section-header">
-          <h2>Next-best-actions</h2>
+        <h2>Recommended next steps</h2>
           <span class="muted">Operational artifact follow-ups only</span>
         </div>
         <EmptyState
