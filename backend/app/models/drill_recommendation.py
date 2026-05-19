@@ -34,6 +34,13 @@ class DrillCatalogItem(BaseModel):
     role: str | None = None
     situation: str
     description: str
+    purpose: str | None = None
+    court_area: str | None = None
+    constraints: list[str] = Field(default_factory=list)
+    scoring: list[str] = Field(default_factory=list)
+    common_mistakes: list[str] = Field(default_factory=list)
+    progression: list[str] = Field(default_factory=list)
+    regression: list[str] = Field(default_factory=list)
     coaching_cues: list[str] = Field(default_factory=list)
     success_metrics: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
@@ -85,6 +92,13 @@ class DrillRecommendation(BaseModel):
     role: str | None = None
     situation: str
     reason: str
+    purpose: str | None = None
+    court_area: str | None = None
+    constraints: list[str] = Field(default_factory=list)
+    scoring: list[str] = Field(default_factory=list)
+    common_mistakes: list[str] = Field(default_factory=list)
+    progression: list[str] = Field(default_factory=list)
+    regression: list[str] = Field(default_factory=list)
     coaching_cues: list[str] = Field(default_factory=list)
     success_metrics: list[str] = Field(default_factory=list)
     evidence_refs: list[DrillEvidenceRef] = Field(default_factory=list)

@@ -16,6 +16,8 @@ def test_drill_catalog_lists_human_authored_drills(client: TestClient) -> None:
     payload = response.json()
     assert len(payload["drills"]) >= 3
     assert payload["drills"][0]["coaching_cues"]
+    assert payload["drills"][0]["purpose"]
+    assert "constraints" in payload["drills"][0]
     assert "generated_at" in payload
 
 
@@ -103,6 +105,8 @@ def test_build_drill_recommendations_from_local_artifacts(client: TestClient, tm
     assert first["priority"] in {"HIGH", "MEDIUM"}
     assert first["coaching_cues"]
     assert first["success_metrics"]
+    assert "purpose" in first
+    assert "progression" in first
     assert {ref["source"] for ref in first["evidence_refs"]} & {"DECISION_DIAGNOSTICS", "PLAYER_VALUE", "TEACHING_CASE", "REVIEW_QUEUE"}
 
     latest_response = client.get("/api/drills/recommendations/latest")

@@ -151,6 +151,7 @@ onMounted(refresh)
           <div><dt>Situation</dt><dd>{{ recommendation.situation }}</dd></div>
         </dl>
         <p>{{ recommendation.reason }}</p>
+        <p v-if="recommendation.purpose" class="muted"><strong>Purpose:</strong> {{ recommendation.purpose }}</p>
         <div class="list-columns">
           <div>
             <h3>Coaching cues</h3>
@@ -163,6 +164,31 @@ onMounted(refresh)
             <ul>
               <li v-for="metric in recommendation.success_metrics" :key="metric">{{ metric }}</li>
             </ul>
+          </div>
+        </div>
+        <dl class="meta-grid">
+          <div v-if="recommendation.court_area"><dt>Court area</dt><dd>{{ recommendation.court_area }}</dd></div>
+        </dl>
+        <div class="list-columns">
+          <div v-if="recommendation.constraints.length">
+            <h3>Constraints</h3>
+            <ul><li v-for="item in recommendation.constraints" :key="item">{{ item }}</li></ul>
+          </div>
+          <div v-if="recommendation.scoring.length">
+            <h3>Scoring</h3>
+            <ul><li v-for="item in recommendation.scoring" :key="item">{{ item }}</li></ul>
+          </div>
+          <div v-if="recommendation.common_mistakes.length">
+            <h3>Common mistakes</h3>
+            <ul><li v-for="item in recommendation.common_mistakes" :key="item">{{ item }}</li></ul>
+          </div>
+          <div v-if="recommendation.progression.length">
+            <h3>Progression</h3>
+            <ul><li v-for="item in recommendation.progression" :key="item">{{ item }}</li></ul>
+          </div>
+          <div v-if="recommendation.regression.length">
+            <h3>Regression</h3>
+            <ul><li v-for="item in recommendation.regression" :key="item">{{ item }}</li></ul>
           </div>
         </div>
         <div v-if="recommendation.adjustment_summary.length" class="adjustment-panel">
@@ -212,6 +238,8 @@ onMounted(refresh)
         <article v-for="drill in catalog" :key="drill.drill_id" class="catalog-item">
           <h3>{{ drill.title }}</h3>
           <p>{{ drill.role || 'Any role' }} · {{ drill.situation }}</p>
+          <p v-if="drill.purpose" class="muted"><strong>Purpose:</strong> {{ drill.purpose }}</p>
+          <p v-if="drill.court_area" class="muted"><strong>Court area:</strong> {{ drill.court_area }}</p>
           <small>{{ drill.description }}</small>
         </article>
       </div>
