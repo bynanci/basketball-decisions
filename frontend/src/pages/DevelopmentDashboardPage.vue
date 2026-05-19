@@ -3,6 +3,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient, type DevelopmentDashboardPlayerSummary, type DevelopmentDashboardResponse } from '../api/client'
 import { productNavigationSections } from '../navigation'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
+import WarningPanel from '../components/WarningPanel.vue'
+import RecoveryActionLink from '../components/RecoveryActionLink.vue'
 
 const router = useRouter()
 const dashboard = ref<DevelopmentDashboardResponse | null>(null)
@@ -82,7 +86,7 @@ onMounted(loadDashboard)
       </button>
     </header>
 
-    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+    <ErrorState v-if="errorMessage" title="Dashboard failed to load" :message="errorMessage" action-label="Go to Home / Intake" action-to="/" />
     <p v-if="isLoading" class="muted">Loading development dashboard…</p>
     <p v-if="dashboard" class="muted">Generated {{ formatDate(dashboard.generated_at) }}</p>
 
@@ -110,12 +114,13 @@ onMounted(loadDashboard)
       </div>
     </section>
 
-    <div v-if="dashboard?.warnings.length" class="warning-card">
-      <strong>Artifact warnings</strong>
-      <ul>
-        <li v-for="warning in dashboard.warnings" :key="warning">{{ warning }}</li>
-      </ul>
-    </div>
+    <WarningPanel
+      v-if="dashboard?.warnings.length"
+      title="Artifact warnings"
+      :warnings="dashboard.warnings"
+      action-label="Open Artifact Map"
+      action-to="/local-lab"
+    />
 
     <section v-if="dashboard" class="metric-grid">
       <article v-for="metric in dashboard.metrics" :key="metric.key" class="card metric-card" :class="`metric-${metric.severity}`">
@@ -131,7 +136,13 @@ onMounted(loadDashboard)
           <h2>Next-best-actions</h2>
           <span class="muted">Operational artifact follow-ups only</span>
         </div>
-        <p v-if="!dashboard.next_best_actions.length" class="status">No blocking artifact follow-ups were detected.</p>
+        <EmptyState
+          v-if="!dashboard.next_best_actions.length"
+          title="No blocking artifact follow-ups"
+          message="This repo can still be fresh. Load a sample project or start intake from Home."
+          action-label="Load sample or start project"
+          action-to="/"
+        />
         <ul v-else class="action-list">
           <li v-for="action in dashboard.next_best_actions" :key="action.action_id" :class="`action-${action.severity}`">
             <strong>{{ action.title }}</strong>
@@ -197,7 +208,13 @@ onMounted(loadDashboard)
           </tbody>
         </table>
       </div>
-      <p v-else class="empty-card">No player summaries are available yet. Missing artifacts appear as warnings and next-best-actions instead of crashes.</p>
+      <EmptyState
+        v-else
+        title="No player summaries yet"
+        message="Missing artifacts are shown as warnings instead of crashes."
+        action-label="Open Player Value build page"
+        action-to="/player-value"
+      />
     </section>
 
     <div v-if="dashboard" class="grid two-column">
@@ -224,7 +241,7 @@ onMounted(loadDashboard)
           <dt>Warnings</dt><dd>{{ dashboard.artifact_health_summary?.warning_artifact_count ?? 0 }}</dd>
           <dt>Map generated</dt><dd>{{ formatDate(dashboard.artifact_health_summary?.generated_at) }}</dd>
         </dl>
-        <RouterLink class="button-link" to="/local-lab">Open Artifact Map</RouterLink>
+        <RecoveryActionLink label="Open Artifact Map" to="/local-lab" />
       </section>
 
       <section class="card">

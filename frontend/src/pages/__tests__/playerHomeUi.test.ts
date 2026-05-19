@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 describe('player home UI wiring', () => {
   it('renders empty and sample player states with next actions', () => {
     const page = readFileSync(resolve(__dirname, '..', 'PlayerHomePage.vue'), 'utf-8')
-    expect(page).toContain('Select a player to see today’s next action')
+    expect(page).toContain('No player context yet')
     expect(page).toContain('Today’s Focus')
     expect(page).toContain('Current Strength')
     expect(page).toContain('Current Risk')

@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient, type PracticePlan, type PracticePlanDuration, type PracticePlanListItem } from '../api/client'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
 
 const router = useRouter()
 const plans = ref<PracticePlanListItem[]>([])
@@ -120,7 +122,7 @@ onMounted(refresh)
     </header>
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
-    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+    <ErrorState v-if="errorMessage" title="Practice plan API error" :message="errorMessage" action-label="Open Drill Recommendations" action-to="/drills" />
 
     <section class="card practice-builder">
       <h2>Builder</h2>
@@ -188,6 +190,13 @@ onMounted(refresh)
       </ul>
     </section>
 
+    <EmptyState
+      v-if="selectedPlan && !blocks.length"
+      title="No recommendations in this plan"
+      message="No drill blocks were available for this scope yet."
+      action-label="Open Drill Recommendations"
+      action-to="/drills"
+    />
     <section class="recommendation-grid">
       <article v-for="block in blocks" :key="block.block_id" class="card recommendation-card">
         <div class="section-header">

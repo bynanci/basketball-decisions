@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { apiClient, isApiClientError, type DrillCatalogItem, type DrillRecommendationResponse, type PracticeFeedbackSignal } from '../api/client'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
 
 const catalog = ref<DrillCatalogItem[]>([])
 const latest = ref<DrillRecommendationResponse | null>(null)
@@ -103,7 +105,7 @@ onMounted(refresh)
     </header>
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
-    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+    <ErrorState v-if="errorMessage" title="Drills API error" :message="errorMessage" action-label="Open Home / Intake" action-to="/" />
 
     <section class="card">
       <h2>Filters</h2>
@@ -134,6 +136,13 @@ onMounted(refresh)
       </p>
     </section>
 
+    <EmptyState
+      v-if="!recommendations.length && !isLoading"
+      title="No drill recommendations yet"
+      message="Generate recommendations or load sample data. Missing optional artifacts are handled as warnings."
+      action-label="Build practice plan instead"
+      action-to="/practice-plans"
+    />
     <section class="recommendation-grid">
       <article v-for="recommendation in recommendations" :key="recommendation.recommendation_id" class="card recommendation-card">
         <div class="section-header">

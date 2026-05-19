@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { apiClient, type PlayerHomeResponse } from '../api/client'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
+import WarningPanel from '../components/WarningPanel.vue'
 
 const playerKey = ref('P1')
 const home = ref<PlayerHomeResponse | null>(null)
@@ -47,8 +50,14 @@ onMounted(loadPlayerHome)
       <button :disabled="isLoading" @click="loadPlayerHome">{{ isLoading ? 'Loading…' : 'Load player' }}</button>
     </section>
 
-    <div v-if="error" class="error-callout">{{ error }}</div>
-    <p v-if="!isLoading && !home" class="empty-state">Select a player to see today’s next action.</p>
+    <ErrorState v-if="error" title="Player Home unavailable" :message="error" action-label="Open Home / Intake" action-to="/" />
+    <EmptyState
+      v-if="!isLoading && !home"
+      title="No player context yet"
+      message="Select a player or load sample project data to see today’s next action."
+      action-label="Load Sample Project"
+      action-to="/"
+    />
 
     <section v-if="home" class="player-home-grid">
       <article class="panel"><h2>Today’s Focus</h2><p>{{ home.today_focus }}</p></article>
@@ -57,8 +66,9 @@ onMounted(loadPlayerHome)
       <article class="panel"><h2>Recommended Drill</h2><p>{{ home.recommended_drill }}</p><RouterLink to="/drills">View Drill</RouterLink></article>
       <article class="panel"><h2>Latest Practice Feedback</h2><p>{{ home.latest_practice_feedback }}</p><RouterLink to="/practice-executions">Record Practice Feedback</RouterLink></article>
       <article class="panel"><h2>Progress Trend</h2><p>{{ trendLabel }}</p><RouterLink to="/player-value/trends">View Progress Trend</RouterLink></article>
-      <article class="panel"><h2>Confidence</h2><p>{{ home.confidence ?? '—' }}</p><ul v-if="home.warnings.length"><li v-for="warning in home.warnings" :key="warning">{{ warning }}</li></ul></article>
+      <article class="panel"><h2>Confidence</h2><p>{{ home.confidence ?? '—' }}</p></article>
     </section>
+    <WarningPanel v-if="home?.warnings?.length" title="Player artifact warnings" :warnings="home.warnings" action-label="Open Local Lab" action-to="/local-lab" />
 
     <section v-if="home" class="panel">
       <RouterLink class="primary" to="/practice-plans">{{ home.next_action }} — Start Training</RouterLink>
