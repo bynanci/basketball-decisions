@@ -297,6 +297,22 @@ GET /api/drills/recommendations/latest
 
 The `/drills` frontend page shows recommendation cards with priority, confidence, role, situation, reason, coaching cues, success metrics, evidence references, a practice-feedback checkbox, a feedback lookback limit, feedback-adjusted badges, adjustment reasons, and a recent feedback signals section. Coach Reports include a Drill Recommendations section when latest recommendations are available.
 
+## Coach Reports
+
+Coach report exports are deterministic Markdown and JSON artifacts under `backend/app/data/reports/coach/`. `POST /api/reports/coach` accepts the existing title/filter/section fields plus `report_depth`, which can be `FULL` or `SUMMARY`. `FULL` remains the default and preserves the existing section-by-section report behavior. `SUMMARY` writes a compact Markdown report with these fixed sections: Top Findings, Player Focus, Recommended Drills, Suggested Practice Focus, Confidence & Warnings, and Evidence References.
+
+Summary mode still reads the same local artifacts as the full report and must not hide confidence, UNKNOWN attribution, mixed-baseline, stale-artifact, or source-governance warnings. It does not add PDF/DOCX export, LLM-generated coaching advice, or any change to the Player Value formula. The `/reports/coach` page includes a report-depth selector and the report history table shows whether each saved report was built as `FULL` or `SUMMARY`.
+
+API endpoints:
+
+```http
+POST /api/reports/coach
+GET /api/reports/coach
+GET /api/reports/coach/{report_id}
+GET /api/reports/coach/{report_id}/markdown
+GET /api/reports/coach/{report_id}/json
+```
+
 ## Practice Plan Builder
 
 M23 adds a deterministic practice plan builder that turns local drill recommendations into time-boxed practice blocks. Plans are saved under `backend/app/data/practice_plans/` as JSON and Markdown exports, with an `index.json` used by the list API. The builder supports only 60, 75, 90, and 120 minute plans.

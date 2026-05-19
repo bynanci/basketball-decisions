@@ -20,7 +20,9 @@ from app.models import (
     CoachReportSection,
 )
 from app.models.base import utc_now
+from app.services import artifact_map_service
 from app.services.drill_recommendation_service import get_latest_drill_recommendations
+from app.services.player_value_trends import BASELINE_FIELDS
 
 APP_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 PROJECTS_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "projects"
@@ -273,6 +275,206 @@ _SECTION_BUILDERS = {
 }
 
 
+def _section_by_name(sections: list[CoachReportSection], name: str) -> CoachReportSection | None:
+    return next((section for section in sections if section.name == name), None)
+
+
+def _stringify_warning(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _collect_warning_strings(value: Any) -> list[str]:
+    """Collect nested artifact warning strings without inventing new advice."""
+
+    found: list[str] = []
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            key_text = str(key).lower()
+            if "warning" in key_text:
+                if isinstance(nested, list):
+                    found.extend(warning for item in nested if (warning := _stringify_warning(item)))
+                elif warning := _stringify_warning(nested):
+                    found.append(warning)
+            found.extend(_collect_warning_strings(nested))
+    elif isinstance(value, list):
+        for item in value:
+            found.extend(_collect_warning_strings(item))
+    return found
+
+
+def _mixed_baseline_warnings_from_sections(sections: list[CoachReportSection]) -> list[str]:
+    trends = _section_by_name(sections, "Trends")
+    builds = trends.data.get("builds", []) if trends else []
+    if not isinstance(builds, list):
+        return []
+    warnings: list[str] = []
+    for field in BASELINE_FIELDS:
+        values = {str(row.get(field)) for row in builds if isinstance(row, dict) and row.get(field) is not None}
+        if len(values) > 1:
+            warnings.append(
+                f"Mixed baseline warning: report history uses multiple {field} values ({', '.join(sorted(values))}). Compare scores cautiously and do not hide this warning."
+            )
+    return warnings
+
+
+def _source_governance_warnings_from_sections(sections: list[CoachReportSection]) -> list[str]:
+    governance = _section_by_name(sections, "Source Governance")
+    records = governance.data.get("sources", []) if governance else []
+    if not isinstance(records, list):
+        return []
+
+    warnings: list[str] = []
+    for row in records:
+        if not isinstance(row, dict):
+            continue
+        label = row.get("title") or row.get("name") or row.get("reference_id") or row.get("source_id") or "Source"
+        if row.get("rights_confirmed") is not True:
+            warnings.append(f"Source governance warning: {label} has rights_confirmed={row.get('rights_confirmed', 'unknown')}.")
+        if str(row.get("usage_scope", "unknown")).upper() in {"UNKNOWN", "REFERENCE_ONLY", "DEMO_ONLY"}:
+            warnings.append(f"Source governance warning: {label} usage scope is {row.get('usage_scope', 'unknown')}.")
+        if row.get("allowed_for_training") is False:
+            warnings.append(f"Source governance warning: {label} is not marked training-eligible.")
+    return warnings
+
+
+def _stale_artifact_warnings() -> list[str]:
+    artifact_map = artifact_map_service.build_artifact_map()
+    return [
+        f"Stale artifact warning: {artifact.label} is stale ({artifact.stale_reason or 'dependency freshness check failed'})."
+        for artifact in artifact_map.artifacts
+        if artifact.status == "stale"
+    ]
+
+
+def _all_summary_warnings(sections: list[CoachReportSection], warnings: list[str]) -> list[str]:
+    collected = list(warnings)
+    for section in sections:
+        collected.extend(section.warnings)
+        collected.extend(_collect_warning_strings(section.data))
+    collected.extend(_mixed_baseline_warnings_from_sections(sections))
+    collected.extend(_stale_artifact_warnings())
+    collected.extend(_source_governance_warnings_from_sections(sections))
+    return list(dict.fromkeys(warning for warning in collected if warning))
+
+
+def _render_summary_markdown(report_id: str, title: str, created_at: str, sections: list[CoachReportSection], warnings: list[str], statuses: list[CoachReportArtifactStatus]) -> str:
+    player_value = _section_by_name(sections, "Player Value")
+    diagnostics = _section_by_name(sections, "Decision Diagnostics")
+    review = _section_by_name(sections, "Review Findings")
+    drills = _section_by_name(sections, "Drill Recommendations")
+    governance = _section_by_name(sections, "Source Governance")
+
+    summaries = player_value.data.get("summaries", []) if player_value else []
+    if not isinstance(summaries, list):
+        summaries = []
+    player_rows = [row for row in summaries if isinstance(row, dict)]
+    player_rows = sorted(player_rows, key=lambda row: float(row.get("player_value_score") or 0), reverse=True)
+
+    diagnostic_summary = diagnostics.data.get("global_summary", {}) if diagnostics and isinstance(diagnostics.data, dict) else {}
+    if not isinstance(diagnostic_summary, dict):
+        diagnostic_summary = {}
+    review_items = review.data.get("review_items", []) if review else []
+    review_count = len(review_items) if isinstance(review_items, list) else 0
+
+    recommendations = drills.data.get("recommendations", []) if drills else []
+    if not isinstance(recommendations, list):
+        recommendations = []
+    recommendation_rows = [row for row in recommendations if isinstance(row, dict)]
+
+    source_rows = governance.data.get("sources", []) if governance else []
+    if not isinstance(source_rows, list):
+        source_rows = []
+
+    summary_warnings = _all_summary_warnings(sections, warnings)
+    evidence_paths = [status for status in statuses if status.available]
+    missing_paths = [status for status in statuses if not status.available]
+
+    lines = [
+        f"# {title}",
+        "",
+        f"Report ID: `{report_id}`",
+        f"Generated: {created_at}",
+        "Report depth: `SUMMARY`",
+        "",
+        "## Safety Notes",
+        "",
+        "- Uses local project aliases only; no real player identity is asserted beyond those aliases.",
+        "- No official scouting grades are claimed.",
+        "- No LLM-generated coach advice is included.",
+        "- Summary mode is a compact deterministic view of local artifacts; build FULL for all sections.",
+        "",
+        "## Top Findings",
+        "",
+    ]
+    top_findings = [
+        f"{row.get('project_id', 'unknown')} / {row.get('player_key', 'UNKNOWN')} ({row.get('display_name') or 'local alias only'}): Player Value {_format_number(row.get('player_value_score'))}, confidence {_format_number(row.get('confidence'))}, events {_format_number(row.get('decision_event_count'))}."
+        for row in player_rows[:5]
+    ]
+    if diagnostic_summary:
+        top_findings.append(
+            f"Decision diagnostics: {_format_number(diagnostic_summary.get('attempt_count'))} attempts, correct rate {_format_number(diagnostic_summary.get('correct_rate'))}, average role-adjusted score {_format_number(diagnostic_summary.get('avg_role_adjusted_score'))}."
+        )
+    if review:
+        top_findings.append(f"Review queue: {review_count} open local review item(s) reflected in the source artifacts.")
+    lines.append(_bullet(top_findings))
+
+    lines.extend(["", "## Player Focus", ""])
+    player_focus = []
+    for row in player_rows[:5]:
+        row_warnings = row.get("warnings", []) if isinstance(row.get("warnings"), list) else []
+        warning_suffix = f" Warnings: {'; '.join(str(warning) for warning in row_warnings[:3])}." if row_warnings else ""
+        player_focus.append(
+            f"{row.get('player_key', 'UNKNOWN')}: confidence {_format_number(row.get('confidence'))}; correct rate {_format_number(row.get('correct_rate'))}; timeout rate {_format_number(row.get('timeout_rate'))}.{warning_suffix}"
+        )
+    lines.append(_bullet(player_focus))
+
+    lines.extend(["", "## Recommended Drills", ""])
+    drill_bullets = [
+        f"{row.get('priority', 'unknown')} priority / {row.get('title', 'Untitled drill')} ({row.get('role') or 'any role'}, {row.get('situation', 'unknown situation')}): confidence {_format_number(row.get('confidence'))} — {row.get('reason', 'No saved deterministic reason.')}"
+        for row in recommendation_rows[:5]
+    ]
+    lines.append(_bullet(drill_bullets))
+
+    lines.extend(["", "## Suggested Practice Focus", ""])
+    practice_focus = []
+    if recommendation_rows:
+        practice_focus.extend(f"Use saved drill recommendation: {row.get('title', 'Untitled drill')} ({row.get('priority', 'unknown')} priority)." for row in recommendation_rows[:3])
+    low_confidence = [row for row in player_rows if isinstance(row.get("confidence"), (int, float)) and float(row.get("confidence")) < 0.6]
+    if low_confidence:
+        practice_focus.append("Review low-confidence Player Value evidence before using it for practice decisions.")
+    if review_count:
+        practice_focus.append("Clear open review items before treating this report as final.")
+    if not practice_focus and player_rows:
+        practice_focus.append("Use the Player Focus rows above to choose deterministic follow-up from existing drills and review artifacts.")
+    lines.append(_bullet(practice_focus))
+
+    lines.extend(["", "## Confidence & Warnings", ""])
+    confidence_bullets = [
+        f"{row.get('project_id', 'unknown')} / {row.get('player_key', 'UNKNOWN')}: confidence {_format_number(row.get('confidence'))}; warnings {len(row.get('warnings', [])) if isinstance(row.get('warnings'), list) else 0}."
+        for row in player_rows[:8]
+    ]
+    confidence_bullets.extend(summary_warnings[:12])
+    if missing_paths:
+        confidence_bullets.append(f"Artifacts missing or unreadable: {len(missing_paths)}.")
+    lines.append(_bullet(confidence_bullets))
+
+    lines.extend(["", "## Evidence References", ""])
+    evidence_bullets = [f"{status.artifact}: {status.path}" for status in evidence_paths[:12]]
+    evidence_bullets.extend(f"Missing {status.artifact}: {status.path}" for status in missing_paths[:8])
+    for row in recommendation_rows[:3]:
+        refs = row.get("evidence_refs", [])
+        if isinstance(refs, list):
+            for ref in refs[:3]:
+                if isinstance(ref, dict):
+                    evidence_bullets.append(f"Drill evidence: {ref.get('source', 'unknown')} {ref.get('artifact', '')} {ref.get('ref_id', '')}".strip())
+    if source_rows:
+        evidence_bullets.append(f"Source governance records reviewed: {len(source_rows)}.")
+    lines.append(_bullet(evidence_bullets))
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def _render_markdown(report_id: str, title: str, created_at: str, sections: list[CoachReportSection], warnings: list[str]) -> str:
     lines = [f"# {title}", "", f"Report ID: `{report_id}`", f"Generated: {created_at}", "", "## Safety Notes", "", "- Uses local project aliases only; no real player identity is asserted beyond those aliases.", "- No official scouting grades are claimed.", "- No LLM-generated coach advice is included."]
     if warnings:
@@ -316,7 +518,10 @@ def build_coach_report(request: CoachReportBuildRequest) -> CoachReport:
     created_at = utc_now()
     json_path = REPORTS_DIR / f"{report_id}.json"
     markdown_path = REPORTS_DIR / f"{report_id}.md"
-    markdown = _render_markdown(report_id, request.title, created_at.isoformat(), sections, warnings)
+    if request.report_depth == "SUMMARY":
+        markdown = _render_summary_markdown(report_id, request.title, created_at.isoformat(), sections, warnings, statuses)
+    else:
+        markdown = _render_markdown(report_id, request.title, created_at.isoformat(), sections, warnings)
     report = CoachReport(
         report_id=report_id,
         title=request.title,
@@ -324,6 +529,7 @@ def build_coach_report(request: CoachReportBuildRequest) -> CoachReport:
         created_by=request.created_by,
         project_id=request.project_id,
         player_key=request.player_key,
+        report_depth=request.report_depth,
         sections=sections,
         warnings=list(dict.fromkeys(warnings)),
         artifact_status=statuses,
@@ -344,6 +550,7 @@ def build_coach_report(request: CoachReportBuildRequest) -> CoachReport:
             created_by=report.created_by,
             project_id=report.project_id,
             player_key=report.player_key,
+            report_depth=report.report_depth,
             section_names=[section.name for section in report.sections],
             warning_count=len(report.warnings),
             json_path=report.json_path,
