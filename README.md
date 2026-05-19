@@ -50,6 +50,7 @@ Recommended demo walkthrough: [docs/product/demo-script.md](docs/product/demo-sc
 - v0.1 readiness: **READY_WITH_RISKS**
 - v0.1 release notes: [docs/product/v0.1-release-notes.md](docs/product/v0.1-release-notes.md)
 - Repeatable 10-minute script: [docs/product/demo-script.md](docs/product/demo-script.md)
+- Live runbook checklist: [docs/product/v0.1-demo-checklist.md](docs/product/v0.1-demo-checklist.md)
 - Release gate checklist: [docs/product/v0.1-release-readiness-checklist.md](docs/product/v0.1-release-readiness-checklist.md)
 
 ## Main workflows
@@ -81,6 +82,7 @@ npm run test:e2e
 - Product positioning review: [docs/product/product-positioning-review.md](docs/product/product-positioning-review.md)
 - Usability test plan: [docs/product/usability-test-plan.md](docs/product/usability-test-plan.md)
 - v0.1 release notes: [docs/product/v0.1-release-notes.md](docs/product/v0.1-release-notes.md)
+- v0.1 demo checklist: [docs/product/v0.1-demo-checklist.md](docs/product/v0.1-demo-checklist.md)
 - v0.1 release readiness checklist: [docs/product/v0.1-release-readiness-checklist.md](docs/product/v0.1-release-readiness-checklist.md)
 
 ### Architecture
