@@ -76,6 +76,7 @@ npm run test:e2e
 - Drill template standard: [docs/product/drill-template-standard.md](docs/product/drill-template-standard.md)
 - Future backlog triage: [docs/product/future-backlog-triage.md](docs/product/future-backlog-triage.md)
 - Product positioning review: [docs/product/product-positioning-review.md](docs/product/product-positioning-review.md)
+- Usability test plan: [docs/product/usability-test-plan.md](docs/product/usability-test-plan.md)
 
 ### Architecture
 
