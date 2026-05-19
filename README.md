@@ -74,6 +74,7 @@ npm run test:e2e
 - Demo script: [docs/product/demo-script.md](docs/product/demo-script.md)
 - Information architecture: [docs/product/information-architecture.md](docs/product/information-architecture.md)
 - Drill template standard: [docs/product/drill-template-standard.md](docs/product/drill-template-standard.md)
+- Future backlog triage: [docs/product/future-backlog-triage.md](docs/product/future-backlog-triage.md)
 
 ### Architecture
 
