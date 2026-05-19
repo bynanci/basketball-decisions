@@ -9,6 +9,9 @@ from pydantic import BaseModel, Field
 
 from .base import utc_now
 
+CoachReportDepth = Literal["SUMMARY", "FULL"]
+
+
 CoachReportSectionName = Literal[
     "Player Value",
     "Trends",
@@ -40,6 +43,7 @@ class CoachReportBuildRequest(BaseModel):
     title: str = "Coach Report"
     project_id: str | None = None
     player_key: str | None = None
+    report_depth: CoachReportDepth = "FULL"
     sections: list[CoachReportSectionName] = Field(default_factory=lambda: list(COACH_REPORT_SECTIONS))
     created_by: str | None = None
     notes: str | None = None
@@ -74,6 +78,7 @@ class CoachReport(BaseModel):
     created_by: str | None = None
     project_id: str | None = None
     player_key: str | None = None
+    report_depth: CoachReportDepth = "FULL"
     sections: list[CoachReportSection] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     artifact_status: list[CoachReportArtifactStatus] = Field(default_factory=list)
@@ -91,6 +96,7 @@ class CoachReportListItem(BaseModel):
     created_by: str | None = None
     project_id: str | None = None
     player_key: str | None = None
+    report_depth: CoachReportDepth = "FULL"
     section_names: list[str] = Field(default_factory=list)
     warning_count: int = 0
     json_path: str

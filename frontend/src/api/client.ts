@@ -1575,11 +1575,14 @@ export const COACH_REPORT_SECTIONS: CoachReportSectionName[] = [
   'Methodology & Limitations'
 ]
 
+export type CoachReportDepth = 'SUMMARY' | 'FULL'
+
 export interface CoachReportBuildRequest {
   title?: string
   project_id?: string | null
   player_key?: string | null
   sections?: CoachReportSectionName[]
+  report_depth?: CoachReportDepth
   created_by?: string | null
   notes?: string | null
 }
@@ -1607,6 +1610,7 @@ export interface CoachReport {
   created_by?: string | null
   project_id?: string | null
   player_key?: string | null
+  report_depth: CoachReportDepth
   sections: CoachReportSection[]
   warnings: string[]
   artifact_status: CoachReportArtifactStatus[]
@@ -1622,6 +1626,7 @@ export interface CoachReportListItem {
   created_by?: string | null
   project_id?: string | null
   player_key?: string | null
+  report_depth: CoachReportDepth
   section_names: string[]
   warning_count: number
   json_path: string

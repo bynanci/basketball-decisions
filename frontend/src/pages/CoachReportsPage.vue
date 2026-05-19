@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { apiClient, COACH_REPORT_SECTIONS, isApiClientError, type CoachReport, type CoachReportBuildRequest, type CoachReportListItem, type CoachReportSectionName } from '../api/client'
+import { apiClient, COACH_REPORT_SECTIONS, isApiClientError, type CoachReport, type CoachReportBuildRequest, type CoachReportDepth, type CoachReportListItem, type CoachReportSectionName } from '../api/client'
 
 const title = ref('Coach Report')
 const projectId = ref('')
 const playerKey = ref('')
 const createdBy = ref('')
 const notes = ref('')
+const reportDepth = ref<CoachReportDepth>('FULL')
 const selectedSections = ref<Set<CoachReportSectionName>>(new Set(COACH_REPORT_SECTIONS))
 const history = ref<CoachReportListItem[]>([])
 const currentReport = ref<CoachReport | null>(null)
@@ -36,6 +37,7 @@ function buildPayload(): CoachReportBuildRequest {
     player_key: playerKey.value.trim() || null,
     created_by: createdBy.value.trim() || null,
     notes: notes.value.trim() || null,
+    report_depth: reportDepth.value,
     sections: COACH_REPORT_SECTIONS.filter((section) => selectedSections.value.has(section))
   }
 }
@@ -123,6 +125,13 @@ onMounted(loadHistory)
           </label>
         </div>
         <label>
+          Report depth
+          <select v-model="reportDepth">
+            <option value="FULL">Full report</option>
+            <option value="SUMMARY">Summary report</option>
+          </select>
+        </label>
+        <label>
           Created by
           <input v-model="createdBy" type="text" placeholder="Optional local reviewer name" />
         </label>
@@ -151,7 +160,7 @@ onMounted(loadHistory)
           </div>
         </div>
         <p v-if="currentReport" class="muted">
-          {{ currentReport.report_id }} · {{ formatDate(currentReport.created_at) }} · {{ currentReport.warnings.length }} warnings
+          {{ currentReport.report_id }} · {{ currentReport.report_depth }} · {{ formatDate(currentReport.created_at) }} · {{ currentReport.warnings.length }} warnings
         </p>
         <pre class="markdown-preview">{{ previewMarkdown }}</pre>
       </section>
@@ -169,6 +178,7 @@ onMounted(loadHistory)
             <tr>
               <th>Report</th>
               <th>Generated</th>
+              <th>Depth</th>
               <th>Filters</th>
               <th>Sections</th>
               <th>Warnings</th>
@@ -179,6 +189,7 @@ onMounted(loadHistory)
             <tr v-for="report in history" :key="report.report_id">
               <td><button class="link-button" @click="selectReport(report.report_id)">{{ report.title }}</button><br /><span class="muted">{{ report.report_id }}</span></td>
               <td>{{ formatDate(report.created_at) }}</td>
+              <td>{{ report.report_depth }}</td>
               <td>{{ report.project_id || 'All projects' }} / {{ report.player_key || 'All aliases' }}</td>
               <td>{{ report.section_names.join(', ') }}</td>
               <td>{{ report.warning_count }}</td>

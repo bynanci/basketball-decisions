@@ -56,6 +56,7 @@ from .coach_report import (
     CoachReport,
     CoachReportArtifactStatus,
     CoachReportBuildRequest,
+    CoachReportDepth,
     CoachReportListItem,
     CoachReportListResponse,
     CoachReportSection,
