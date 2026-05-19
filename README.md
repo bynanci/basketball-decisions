@@ -83,6 +83,7 @@ npm run test:e2e
 - Usability test plan: [docs/product/usability-test-plan.md](docs/product/usability-test-plan.md)
 - v0.1 release notes: [docs/product/v0.1-release-notes.md](docs/product/v0.1-release-notes.md)
 - v0.1 demo checklist: [docs/product/v0.1-demo-checklist.md](docs/product/v0.1-demo-checklist.md)
+- v0.1 reviewer feedback template: [docs/product/v0.1-reviewer-feedback-template.md](docs/product/v0.1-reviewer-feedback-template.md)
 - v0.1 release readiness checklist: [docs/product/v0.1-release-readiness-checklist.md](docs/product/v0.1-release-readiness-checklist.md)
 
 ### Architecture
