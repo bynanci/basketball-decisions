@@ -45,6 +45,10 @@ curl -X DELETE http://localhost:8000/api/sample-data
 
 Recommended demo walkthrough: [docs/product/demo-script.md](docs/product/demo-script.md).
 
+## Demo walkthrough
+
+- Repeatable 10-minute script: [docs/product/demo-script.md](docs/product/demo-script.md)
+
 ## Main workflows
 
 - Coach workflow: [docs/workflows/coach-workflow.md](docs/workflows/coach-workflow.md)
