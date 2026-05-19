@@ -84,7 +84,7 @@ TEMPLATES: dict[WorkflowTemplateKey, WorkflowTemplate] = {
         title="Improve Data Quality",
         description="Work through review queue, dataset health, and recognition readiness artifacts.",
         steps=[
-            _step("triage-review", "Triage high-priority review", "Resolve or document high-priority review items before rebuilding datasets.", "Open Review Queue", "/review-queue", prerequisite_keys=["has_open_high_priority_review_items"]),
+            _step("triage-review", "Triage high-priority review", "Resolve or document open high-priority review items before rebuilding datasets; if none are open, record that check and continue.", "Open Review Queue", "/review-queue", prerequisite_keys=["has_open_high_priority_review_items"]),
             _step("refresh-datasets", "Refresh dataset health", "Use Local Lab dataset tools to export or curate datasets.", "Open Local Lab", "/local-lab", completion_prerequisite_key="has_dataset_health"),
             _step("check-model", "Check recognition model", "Register or activate a local recognition model only after data quality is acceptable.", "Open Model Registry", "/model-registry", prerequisite_keys=["has_dataset_health"], blocking_prerequisite_keys=["has_dataset_health"], completion_prerequisite_key="has_active_recognition_model"),
         ],
@@ -106,7 +106,7 @@ TEMPLATES: dict[WorkflowTemplateKey, WorkflowTemplate] = {
         description="Collect readiness artifacts before exporting a deterministic coach report.",
         steps=[
             _step("confirm-player-value", "Confirm Player Value", "Reports should reference current Player Value summaries.", "Open Player Value", "/player-value", completion_prerequisite_key="has_player_value"),
-            _step("confirm-practice", "Confirm practice context", "Reports are more useful with practice plans or execution feedback.", "Open Practice Plans", "/practice-plans", prerequisite_keys=["has_practice_plan"]),
+            _step("confirm-practice", "Confirm practice context", "Reports are stronger when practice plans or execution feedback exist; if unavailable, document the gap before export.", "Open Practice Plans", "/practice-plans", prerequisite_keys=["has_practice_plan"]),
             _step("build-report", "Build coach report", "Use the existing deterministic report export when prerequisites are ready.", "Open Coach Reports", "/reports/coach", prerequisite_keys=["has_player_value"], blocking_prerequisite_keys=["has_player_value"], completion_prerequisite_key="has_coach_report"),
         ],
     ),
@@ -116,7 +116,7 @@ TEMPLATES: dict[WorkflowTemplateKey, WorkflowTemplate] = {
         description="Check data health, review items, and active recognition model status.",
         steps=[
             _step("review-health", "Review dataset health", "Inspect dataset counts and warnings before model changes.", "Open Local Lab", "/local-lab", completion_prerequisite_key="has_dataset_health"),
-            _step("review-queue", "Review quality queue", "Address open high-priority recognition or attribution items.", "Open Review Queue", "/review-queue", prerequisite_keys=["has_open_high_priority_review_items"]),
+            _step("review-queue", "Review quality queue", "Address open high-priority recognition or attribution items when present; if none are open, note that and continue.", "Open Review Queue", "/review-queue", prerequisite_keys=["has_open_high_priority_review_items"]),
             _step("activate-model", "Activate recognition model", "Train/register via the existing model registry workflow; no cloud orchestration is added.", "Open Model Registry", "/model-registry", prerequisite_keys=["has_dataset_health"], blocking_prerequisite_keys=["has_dataset_health"], completion_prerequisite_key="has_active_recognition_model"),
         ],
     ),
