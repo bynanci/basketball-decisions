@@ -17,6 +17,7 @@ import DecisionRulesPage from '../pages/DecisionRulesPage.vue'
 import PlayerValuePage from '../pages/PlayerValuePage.vue'
 import PlayerValueDetailPage from '../pages/PlayerValueDetailPage.vue'
 import PlayerValueTrendsPage from '../pages/PlayerValueTrendsPage.vue'
+import PlayerHomePage from '../pages/PlayerHomePage.vue'
 import ReviewQueuePage from '../pages/ReviewQueuePage.vue'
 import ModelRegistryPage from '../pages/ModelRegistryPage.vue'
 import CoachReportsPage from '../pages/CoachReportsPage.vue'
@@ -34,6 +35,7 @@ export const router = createRouter({
     { path: '/', name: 'home', component: HomePage },
     { path: '/start', name: 'role-entry', component: RoleEntryPage },
     { path: '/training', name: 'training-lobby', component: TrainingLobbyPage },
+    { path: '/player-home', name: 'player-home', component: PlayerHomePage },
     { path: '/development-dashboard', name: 'development-dashboard', component: DevelopmentDashboardPage },
     { path: '/workflows', name: 'workflows', component: WorkflowsPage },
     { path: '/workflows/:workflowId', name: 'workflow-detail', component: WorkflowDetailPage, props: true },

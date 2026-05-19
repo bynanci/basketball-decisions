@@ -9,7 +9,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api import common, decision_rules, local_lab, projects, reference_videos, review_queue, sources  # noqa: E402
-from app.services import artifact_map_service, coach_report_service, development_dashboard_service, drill_recommendation_service, practice_execution_service, practice_feedback_signal_service, practice_plan_service, sample_data_service, workflow_orchestrator_service  # noqa: E402
+from app.services import artifact_map_service, coach_report_service, development_dashboard_service, drill_recommendation_service, player_home_service, practice_execution_service, practice_feedback_signal_service, practice_plan_service, sample_data_service, workflow_orchestrator_service  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -68,6 +68,11 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(workflow_orchestrator_service, "REPORTS_DIR", tmp_path / "reports" / "coach")
     monkeypatch.setattr(workflow_orchestrator_service, "REVIEW_QUEUE_DIR", tmp_path / "review_queue")
     monkeypatch.setattr(workflow_orchestrator_service, "RECOGNITION_MODELS_DIR", tmp_path / "models" / "recognition")
+
+    monkeypatch.setattr(player_home_service, "APP_DATA_DIR", tmp_path)
+    monkeypatch.setattr(player_home_service, "DATASETS_DIR", tmp_path / "datasets")
+    monkeypatch.setattr(player_home_service, "DRILLS_DIR", tmp_path / "drills")
+    monkeypatch.setattr(player_home_service, "PRACTICE_EXECUTIONS_DIR", tmp_path / "practice_executions")
     monkeypatch.setattr(drill_recommendation_service, "APP_DATA_DIR", tmp_path)
     monkeypatch.setattr(drill_recommendation_service, "DATASETS_DIR", tmp_path / "datasets")
     monkeypatch.setattr(drill_recommendation_service, "REVIEW_QUEUE_DIR", tmp_path / "review_queue")

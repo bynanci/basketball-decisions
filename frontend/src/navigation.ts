@@ -129,6 +129,13 @@ export const productNavigationSections: ProductNavigationSection[] = [
         status: 'core'
       },
       {
+        label: 'Player Home',
+        path: '/player-home',
+        routeName: 'player-home',
+        description: 'Simple player-facing view of today's focus, drill, and next action.',
+        status: 'core'
+      },
+      {
         label: 'Training Lobby',
         path: '/training',
         routeName: 'training-lobby',

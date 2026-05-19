@@ -133,6 +133,10 @@ from .player_value import (
     RoleBreakdownItem,
     SituationBreakdownItem,
 )
+from .player_home import (
+    PlayerHomeResponse,
+    PlayerTrendDirection,
+)
 from .source import LeagueTag, SourceLicenseType, SourceType, UsageScope, VideoSourceRecord
 
 from .sample_data import (
@@ -265,6 +269,8 @@ __all__ = [
     "DevelopmentDashboardReviewQueueSummary",
     "DevelopmentDashboardSeverity",
     "DevelopmentDashboardTeamSummary",
+    "PlayerHomeResponse",
+    "PlayerTrendDirection",
     "COACH_REPORT_SECTIONS",
     "CoachReport",
     "CoachReportArtifactStatus",

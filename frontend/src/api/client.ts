@@ -1817,6 +1817,22 @@ export interface DevelopmentDashboardResponse {
 }
 
 
+
+export interface PlayerHomeResponse {
+  player_key: string
+  display_name: string
+  latest_player_value: number | null
+  confidence: number | null
+  trend_direction: "up" | "down" | "flat" | "unknown"
+  today_focus: string
+  current_strength: string
+  current_risk: string
+  recommended_drill: string
+  latest_practice_feedback: string
+  next_action: string
+  warnings: string[]
+}
+
 export type WorkflowTemplateKey = 'BUILD_PLAYER_VALUE' | 'IMPROVE_DATA_QUALITY' | 'TRAINING_RECOMMENDATION' | 'COACH_REPORT' | 'MODEL_GOVERNANCE'
 export type WorkflowStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'BLOCKED' | 'COMPLETED'
 export type WorkflowStepStatus = 'PENDING' | 'READY' | 'BLOCKED' | 'COMPLETED' | 'SKIPPED'
@@ -1974,6 +1990,7 @@ export const apiClient = {
   updateWorkflowStep: (workflowId: string, stepId: string, payload: WorkflowStepUpdateRequest) =>
     request<Workflow>(`/workflows/${encodeURIComponent(workflowId)}/steps/${encodeURIComponent(stepId)}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getDevelopmentDashboard: () => request<DevelopmentDashboardResponse>('/development-dashboard'),
+  getPlayerHome: (playerKey: string) => request<PlayerHomeResponse>(`/player-home?player_key=${encodeURIComponent(playerKey)}`),
   getArtifactMap: () => request<ArtifactMapResponse>('/local-lab/artifact-map'),
   listProjects: () => request<ListProjectsResponse>('/projects'),
   getSampleDataStatus: () => request<SampleDataStatusResponse>('/sample-data/status'),
