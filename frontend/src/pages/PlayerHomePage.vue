@@ -5,6 +5,7 @@ import { apiClient, type PlayerHomeResponse } from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
 import WarningPanel from '../components/WarningPanel.vue'
+import ConfidenceHelp from '../components/ConfidenceHelp.vue'
 
 const playerKey = ref('P1')
 const home = ref<PlayerHomeResponse | null>(null)
@@ -76,7 +77,7 @@ onMounted(loadPlayerHome)
       <article class="panel"><h2>Recommended Drill</h2><p>{{ home.recommended_drill }}</p><RouterLink to="/drills">View Drill</RouterLink></article>
       <article class="panel"><h2>Latest Practice Feedback</h2><p>{{ home.latest_practice_feedback }}</p><RouterLink to="/practice-executions">Record Practice Feedback</RouterLink></article>
       <article class="panel"><h2>Progress Trend</h2><p>{{ trendLabel }}</p><RouterLink to="/player-value/trends">View Progress Trend</RouterLink></article>
-      <article class="panel"><h2>Confidence</h2><p>{{ home.confidence ?? '—' }}</p></article>
+      <article class="panel"><h2>Confidence</h2><p>{{ home.confidence ?? '—' }}</p><ConfidenceHelp variant="player" compact /></article>
     </section>
     <WarningPanel v-if="home?.warnings?.length" title="Player artifact warnings" :warnings="home.warnings" action-label="Open Local Lab" action-to="/local-lab" />
 

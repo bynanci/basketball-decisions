@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 import { apiClient, COACH_REPORT_SECTIONS, isApiClientError, type CoachReport, type CoachReportBuildRequest, type CoachReportDepth, type CoachReportListItem, type CoachReportSectionName, type EvidenceLockedSummaryResponse } from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
+import ConfidenceHelp from '../components/ConfidenceHelp.vue'
 
 const title = ref('Coach Report')
 const projectId = ref('')
@@ -186,6 +187,7 @@ onMounted(loadHistory)
         <p v-if="currentReport" class="muted">
           {{ currentReport.report_id }} · {{ currentReport.report_depth }} · {{ formatDate(currentReport.created_at) }} · {{ currentReport.warnings.length }} warnings
         </p>
+        <ConfidenceHelp v-if="currentReport" variant="coach" compact />
         <pre class="markdown-preview">{{ previewMarkdown }}</pre>
       </section>
     </div>

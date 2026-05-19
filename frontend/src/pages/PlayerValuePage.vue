@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TrustCaveatGate from '../components/TrustCaveatGate.vue'
+import ConfidenceHelp from '../components/ConfidenceHelp.vue'
 import { onMounted, ref } from 'vue'
 import { apiClient, isApiClientError, type PlayerValueBuildResponse, type PlayerValueSummary } from '../api/client'
 
@@ -112,6 +113,7 @@ onMounted(loadPlayerValue)
     <p v-if="playerValue" class="muted">Generated {{ formatDate(playerValue.generated_at) }}</p>
 
     <div v-if="playerValue?.summaries.length" class="table-card">
+      <ConfidenceHelp variant="analyst" compact />
       <table>
         <thead>
           <tr>
