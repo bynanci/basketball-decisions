@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TrustCaveatGate from '../components/TrustCaveatGate.vue'
 import { computed, onMounted, ref } from 'vue'
 import { apiClient, type PlayerHomeResponse } from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
@@ -57,6 +58,15 @@ onMounted(loadPlayerHome)
       message="Select a player or load sample project data to see today’s next action."
       action-label="Load Sample Project"
       action-to="/"
+    />
+
+
+    <TrustCaveatGate
+      v-if="home"
+      surface="player-home"
+      title="Training signal caveat"
+      message="This score is a training signal, not a final grade. Use it with the confidence and warnings shown here."
+      compact
     />
 
     <section v-if="home" class="player-home-grid">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TrustCaveatGate from '../components/TrustCaveatGate.vue'
 import { computed, onMounted, ref } from 'vue'
 import { apiClient, isApiClientError, type DrillCatalogItem, type DrillRecommendationResponse, type PracticeFeedbackSignal } from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
@@ -103,6 +104,14 @@ onMounted(refresh)
         <button class="primary" :disabled="isBuilding" @click="buildRecommendations">{{ isBuilding ? 'Generating…' : 'Generate recommendations' }}</button>
       </div>
     </header>
+
+
+    <TrustCaveatGate
+      surface="drills"
+      title="Trust caveat"
+      message="Court IQ outputs are decision-support signals based on local sample data, aliases, decision events, rules, and available evidence. Player Value is not an official scouting grade. Review confidence, warnings, and evidence before using recommendations."
+      compact
+    />
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
     <ErrorState v-if="errorMessage" title="Drills API error" :message="errorMessage" action-label="Open Home / Intake" action-to="/" />

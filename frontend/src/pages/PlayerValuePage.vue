@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TrustCaveatGate from '../components/TrustCaveatGate.vue'
 import { onMounted, ref } from 'vue'
 import { apiClient, isApiClientError, type PlayerValueBuildResponse, type PlayerValueSummary } from '../api/client'
 
@@ -89,6 +90,13 @@ onMounted(loadPlayerValue)
         {{ isBuilding ? 'Building…' : 'Build Player Value' }}
       </button>
     </header>
+
+
+    <TrustCaveatGate
+      surface="player-value"
+      title="Trust caveat"
+      message="Court IQ outputs are decision-support signals based on local sample data, aliases, decision events, rules, and available evidence. Player Value is not an official scouting grade. Review confidence, warnings, and evidence before using recommendations."
+    />
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>

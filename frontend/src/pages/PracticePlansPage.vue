@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TrustCaveatGate from '../components/TrustCaveatGate.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient, type PracticePlan, type PracticePlanDuration, type PracticePlanListItem } from '../api/client'
@@ -120,6 +121,14 @@ onMounted(refresh)
         <button class="primary" :disabled="isBuilding" @click="buildPlan">{{ isBuilding ? 'Building…' : 'Build plan' }}</button>
       </div>
     </header>
+
+
+    <TrustCaveatGate
+      surface="practice-plans"
+      title="Trust caveat"
+      message="Court IQ outputs are decision-support signals based on local sample data, aliases, decision events, rules, and available evidence. Player Value is not an official scouting grade. Review confidence, warnings, and evidence before using recommendations."
+      compact
+    />
 
     <p v-if="statusMessage" class="status">{{ statusMessage }}</p>
     <ErrorState v-if="errorMessage" title="Practice plan API error" :message="errorMessage" action-label="Open Drill Recommendations" action-to="/drills" />
