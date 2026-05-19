@@ -6,6 +6,11 @@ A minimal runnable monorepo for basketball-video decision experiments. The repo 
 
 Local Lab includes a read-only artifact dependency map at `GET /api/local-lab/artifact-map`. The map reports project, analysis, dataset/model, workflow/training, and report artifact freshness without rebuilding, scheduling, migrating, or mutating artifacts. See `docs/architecture/artifact-map.md` for the deterministic freshness rules and UI surfaces.
 
+
+## Local artifact storage/performance audit
+
+S11 documents storage growth and performance risks for local JSON/JSONL artifacts, including P0/P1/P2 priorities and actionable mitigations (without database migration): [Local Artifact Storage Performance Audit](docs/reviews/local-artifact-storage-performance-audit.md).
+
 ## Product navigation and information architecture
 
 The frontend now treats **Development Dashboard** (`/development-dashboard`) as the main command center. The topbar and dashboard product map group existing routes into five product areas without removing core routes or changing backend APIs:
